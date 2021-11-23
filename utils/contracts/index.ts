@@ -1,6 +1,6 @@
 export { BaseExtensionMock } from "../../typechain/BaseExtensionMock";
 export { BaseManagerV2 } from "../../typechain/BaseManagerV2";
-export { ChainlinkAggregatorV3Mock } from "../../typechain/ChainlinkAggregatorV3Mock";
+export { ChainlinkAggregatorMock } from "../../typechain/ChainlinkAggregatorMock";
 export { MutualUpgradeMock } from "../../typechain/MutualUpgradeMock";
 export { PerpV2LeverageStrategyExtension } from "../../typechain/PerpV2LeverageStrategyExtension";
 export { StandardTokenMock } from "../../typechain/StandardTokenMock";

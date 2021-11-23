@@ -10,12 +10,9 @@ import {
   CompoundFixture,
   SetFixture,
   UniswapFixture,
-  UniswapV3Fixture
-} from "./fixtures";
-
-import {
+  UniswapV3Fixture,
   PerpV2Fixture
-} from "@setprotocol/set-protocol-v2/utils/fixtures";
+} from "./fixtures";
 
 export const getSetFixture = (ownerAddress: Address) => new SetFixture(provider, ownerAddress);
 export const getAaveV2Fixture = (ownerAddress: Address) => new AaveV2Fixture(provider, ownerAddress);

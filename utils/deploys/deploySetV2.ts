@@ -230,6 +230,45 @@ export default class DeploySetV2 {
     );
   }
 
+  public async deployPerpV2Lib(): Promise<PerpV2> {
+    return await new PerpV2__factory(this._deployerSigner).deploy();
+  }
+
+  public async deployPerpV2LeverageModule(
+    controller: string,
+    perpAccountBalance: string,
+    perpClearingHouse: string,
+    perpExchange: string,
+    perpVault: string,
+    perpQuoter: string,
+    perpMarketRegistry: string,
+    perpCollateralToken: string
+  ): Promise<PerpV2LeverageModule> {
+    const perpV2Lib = await this.deployPerpV2Lib();
+
+    const linkId = convertLibraryNameToLinkId(
+      "contracts/protocol/integration/lib/PerpV2.sol:PerpV2"
+    );
+
+    return await new PerpV2LeverageModule__factory(
+      // @ts-ignore
+      {
+        [linkId]: perpV2Lib.address,
+      },
+      // @ts-ignore
+      this._deployerSigner
+    ).deploy(
+      controller,
+      perpAccountBalance,
+      perpClearingHouse,
+      perpExchange,
+      perpVault,
+      perpQuoter,
+      perpMarketRegistry,
+      perpCollateralToken
+    );
+  }
+
   public async deployAirdropModule(controller: Address): Promise<AirdropModule> {
     return await new AirdropModule__factory(this._deployerSigner).deploy(controller);
   }

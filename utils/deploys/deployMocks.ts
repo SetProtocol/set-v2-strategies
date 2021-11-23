@@ -2,13 +2,14 @@ import { Signer, BigNumber } from "ethers";
 import { Address } from "../types";
 import {
   BaseExtensionMock,
+  ChainlinkAggregatorMock,
   MutualUpgradeMock,
   StandardTokenMock,
   StringArrayUtilsMock,
 } from "../contracts/index";
 
 import { BaseExtensionMock__factory } from "../../typechain/factories/BaseExtensionMock__factory";
-import { ChainlinkAggregatorV3Mock__factory  } from "../../typechain/factories/ChainlinkAggregatorV3Mock__factory";
+import { ChainlinkAggregatorMock__factory  } from "../../typechain/factories/ChainlinkAggregatorMock__factory";
 import { MutualUpgradeMock__factory } from "../../typechain/factories/MutualUpgradeMock__factory";
 import { StandardTokenMock__factory  } from "../../typechain/factories/StandardTokenMock__factory";
 import { StringArrayUtilsMock__factory  } from "../../typechain/factories/StringArrayUtilsMock__factory";
@@ -32,8 +33,8 @@ export default class DeployMocks {
     return await new StandardTokenMock__factory(this._deployerSigner).deploy(owner, BigNumber.from(1000000).mul(BigNumber.from(10).pow(decimals)), "USDCoin", "USDC", decimals);
   }
 
-  public async deployChainlinkAggregatorMock() {
-    return await new ChainlinkAggregatorV3Mock__factory(this._deployerSigner).deploy();
+  public async deployChainlinkAggregatorMock(decimals: number): Promise<ChainlinkAggregatorMock> {
+    return await new ChainlinkAggregatorMock__factory(this._deployerSigner).deploy(decimals);
   }
 
   public async deployStringArrayUtilsMock(): Promise<StringArrayUtilsMock> {
