@@ -20,8 +20,6 @@ import {
   SetTokenCreator,
   SingleIndexModule,
   UniswapV2ExchangeAdapter,
-  PerpV2,
-  PerpV2LeverageModule
 } from "../contracts/setV2";
 import { WETH9, StandardTokenMock } from "../contracts/index";
 import { ether } from "../common";
@@ -45,8 +43,6 @@ import { SetTokenCreator__factory } from "../../typechain/factories/SetTokenCrea
 import { StandardTokenMock__factory } from "../../typechain/factories/StandardTokenMock__factory";
 import { UniswapV2ExchangeAdapter__factory } from "../../typechain/factories/UniswapV2ExchangeAdapter__factory";
 import { WETH9__factory } from "../../typechain/factories/WETH9__factory";
-import { PerpV2__factory } from "../../typechain/index";
-import { PerpV2LeverageModule__factory } from "../../typechain/index";
 
 export default class DeploySetV2 {
   private _deployerSigner: Signer;
@@ -231,43 +227,6 @@ export default class DeploySetV2 {
       controller,
       lendingPoolAddressesProvider,
       protocolDataProvider
-    );
-  }
-
-  public async deployPerpV2Lib(): Promise<PerpV2> {
-    return await new PerpV2__factory(this._deployerSigner).deploy();
-  }
-
-  public async deployPerpV2LeverageModule(
-    controller: string,
-    perpAccountBalance: string,
-    perpClearingHouse: string,
-    perpExchange: string,
-    perpVault: string,
-    perpQuoter: string,
-    perpMarketRegistry: string
-  ): Promise<PerpV2LeverageModule> {
-    const perpV2Lib = await this.deployPerpV2Lib();
-
-    const linkId = convertLibraryNameToLinkId(
-      "contracts/protocol/integration/lib/PerpV2.sol:PerpV2"
-    );
-
-    return await new PerpV2LeverageModule__factory(
-      // @ts-ignore
-      {
-        [linkId]: perpV2Lib.address,
-      },
-      // @ts-ignore
-      this._deployerSigner
-    ).deploy(
-      controller,
-      perpAccountBalance,
-      perpClearingHouse,
-      perpExchange,
-      perpVault,
-      perpQuoter,
-      perpMarketRegistry
     );
   }
 
