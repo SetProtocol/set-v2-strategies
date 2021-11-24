@@ -1,6 +1,6 @@
 import { BigNumber } from "ethers";
 
-import { Account } from "../../utils/test/types";
+import { Account } from "../../utils/types";
 import { PRECISE_UNIT, MIN_INT_256, MAX_INT_256, ZERO } from "../../utils/constants";
 import { PreciseUnitMathMock } from "../../utils/contracts";
 import DeployHelper from "../../utils/deploys";

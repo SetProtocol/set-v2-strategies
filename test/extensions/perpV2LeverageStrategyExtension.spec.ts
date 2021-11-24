@@ -12,7 +12,7 @@ import {
   PerpV2ExchangeSettings
 } from "../../utils/types";
 import { ADDRESS_ZERO, ZERO, EMPTY_BYTES, MAX_UINT_256, THREE, TWO, ONE } from "../../utils/constants";
-import { BaseManagerV2, ChainlinkAggregatorV3Mock, PerpV2LeverageStrategyExtension, StandardTokenMock } from "../../utils/contracts/index";
+import { BaseManagerV2, ChainlinkAggregatorMock, PerpV2LeverageStrategyExtension, StandardTokenMock } from "../../utils/contracts/index";
 import { PerpV2LeverageModule, ContractCallerMock, DebtIssuanceModule, SetToken } from "../../utils/contracts/setV2";
 import DeployHelper from "../../utils/deploys";
 import {
@@ -34,8 +34,7 @@ import {
   usdc,
 } from "../../utils/index";
 
-import { SetFixture } from "../../utils/fixtures";
-import { PerpV2Fixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
+import { SetFixture, PerpV2Fixture } from "../../utils/fixtures";
 
 const expect = getWaffleExpect();
 const provider = ethers.provider;
@@ -65,8 +64,8 @@ describe.only("LeverageStrategyExtension", () => {
   let issuanceModule: DebtIssuanceModule;
   let baseManagerV2: BaseManagerV2;
 
-  let chainlinkBasePriceMock: ChainlinkAggregatorV3Mock;
-  let chainlinkQuotePriceMock: ChainlinkAggregatorV3Mock;
+  let chainlinkBasePriceMock: ChainlinkAggregatorMock;
+  let chainlinkQuotePriceMock: ChainlinkAggregatorMock;
 
   cacheBeforeEach(async () => {
     [
@@ -90,6 +89,7 @@ describe.only("LeverageStrategyExtension", () => {
       ether(10000),
       ether(100000)
     );
+    console.log("here3")
 
     await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vBTC, BigNumber.from(60000));
     await perpV2Setup.initializePoolWithLiquidityWide(
@@ -97,6 +97,8 @@ describe.only("LeverageStrategyExtension", () => {
       ether(10000),
       ether(600000)
     );
+
+    console.log("here2")
 
     perpV2LeverageModule = await deployer.setV2.deployPerpV2LeverageModule(
       setV2Setup.controller.address,
@@ -106,9 +108,11 @@ describe.only("LeverageStrategyExtension", () => {
       perpV2Setup.vault.address,
       perpV2Setup.quoter.address,
       perpV2Setup.marketRegistry.address,
+      setV2Setup.usdc.address
     );
+    console.log("here1")
     await setV2Setup.controller.addModule(perpV2LeverageModule.address);
-
+    console.log("here0")
     await setV2Setup.integrationRegistry.addIntegration(
       perpV2LeverageModule.address,
       "DefaultIssuanceModule",
@@ -117,9 +121,9 @@ describe.only("LeverageStrategyExtension", () => {
 
     // Deploy Chainlink mocks
     chainlinkBasePriceMock = await deployer.mocks.deployChainlinkAggregatorMock(8);
-    await chainlinkBasePriceMock.setPrice(BigNumber.from(1000).mul(10 ** 8));
+    await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1000).mul(10 ** 8));
     chainlinkQuotePriceMock = await deployer.mocks.deployChainlinkAggregatorMock(8);
-    await chainlinkQuotePriceMock.setPrice(10 ** 8);
+    await chainlinkQuotePriceMock.setLatestAnswer(10 ** 8);
   });
 
   const initializeRootScopeContracts = async () => {
@@ -870,7 +874,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     cacheBeforeEach(async () => {
   //       destinationTokenQuantity = ether(0.1);
   //       await increaseTimeAsync(BigNumber.from(100000));
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(1010).mul(10 ** 8));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1010).mul(10 ** 8));
   //       await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
   //     });
 
@@ -975,7 +979,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       cacheBeforeEach(async () => {
   //         await subject();
   //         // ~1.6x leverage
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(1300).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1300).mul(10 ** 8));
   //         const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
   //           twapMaxTradeSize: ether(1.9),
   //           incentivizedTwapMaxTradeSize: exchange.incentivizedTwapMaxTradeSize,
@@ -1067,7 +1071,7 @@ describe.only("LeverageStrategyExtension", () => {
   //           deleverExchangeData: EMPTY_BYTES,
   //         };
   //         await leverageStrategyExtension.updateEnabledExchange(subjectExchangeName, newPerpV2ExchangeSettings);
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(1500).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1500).mul(10 ** 8));
   //         await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
   //       });
 
@@ -1158,7 +1162,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when in a TWAP rebalance", async () => {
   //       beforeEach(async () => {
   //         await increaseTimeAsync(BigNumber.from(100000));
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1200).mul(10 ** 8));
 
   //         const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
   //           twapMaxTradeSize: ether(0.01),
@@ -1245,8 +1249,8 @@ describe.only("LeverageStrategyExtension", () => {
   //       await tradeAdapterMock.withdraw(setV2Setup.usdc.address);
   //       await increaseTimeAsync(BigNumber.from(100000));
   //       // Set to $990 so need to delever
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(990).mul(10 ** 8));
-  //       await perpV2Setup.setAssetPriceInOracle(setV2Setup.usdc.address, ether(1 / 990));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
+  //       await perpV2Setup.setAssetLatestAnswerInOracle(setV2Setup.usdc.address, ether(1 / 990));
   //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(2500000));
   //     });
 
@@ -1343,7 +1347,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       cacheBeforeEach(async () => {
   //         await leverageStrategyExtension.connect(owner.wallet).rebalance(subjectExchangeName);
   //         // ~2.4x leverage
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(850).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
   //         const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
   //           twapMaxTradeSize: ether(1.9),
   //           incentivizedTwapMaxTradeSize: exchange.incentivizedTwapMaxTradeSize,
@@ -1454,7 +1458,7 @@ describe.only("LeverageStrategyExtension", () => {
   //         };
   //         await leverageStrategyExtension.updateEnabledExchange(subjectExchangeName, newPerpV2ExchangeSettings);
   //         // ~2.4x leverage
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(850).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
   //         await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(10000000));
   //       });
 
@@ -1549,7 +1553,7 @@ describe.only("LeverageStrategyExtension", () => {
   //         await leverageStrategyExtension.updateEnabledExchange(exchangeName, newPerpV2ExchangeSettings);
   //         await leverageStrategyExtension.addEnabledExchange(exchangeName2, newPerpV2ExchangeSettings);
 
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(850).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
   //         await setV2Setup.usdc.transfer(tradeAdapterMock.address, usdc(100));
   //         await setV2Setup.usdc.transfer(tradeAdapterMock2.address, usdc(100));
   //       });
@@ -1569,7 +1573,7 @@ describe.only("LeverageStrategyExtension", () => {
   //           const timestamp1 = await getLastBlockTimestamp();
 
   //           subjectExchangeToUse = exchangeName2;
-  //           await chainlinkBasePriceMock.setPrice(BigNumber.from(800).mul(10 ** 8));
+  //           await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
 
   //           await subject();
   //           const timestamp2 = await getLastBlockTimestamp();
@@ -1609,7 +1613,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       beforeEach(async () => {
   //         await subject();
 
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(650).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(650).mul(10 ** 8));
   //       });
 
   //       it("should revert", async () => {
@@ -1695,7 +1699,7 @@ describe.only("LeverageStrategyExtension", () => {
   //   context("when currently in the last chunk of a TWAP rebalance", async () => {
   //     cacheBeforeEach(async () => {
   //       await increaseTimeAsync(BigNumber.from(100000));
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1200).mul(10 ** 8));
 
   //       destinationTokenQuantity = ether(0.01);
   //       const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
@@ -1790,7 +1794,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     cacheBeforeEach(async () => {
   //       await increaseTimeAsync(BigNumber.from(100000));
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1200).mul(10 ** 8));
 
   //       destinationTokenQuantity = ether(0.0001);
   //       const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
@@ -1916,7 +1920,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when price has moved advantageously towards target leverage ratio", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(1000).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1000).mul(10 ** 8));
   //       });
 
   //       it("should set the global last trade timestamp", async () => {
@@ -1968,7 +1972,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       beforeEach(async () => {
   //         await subject();
 
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(650).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(650).mul(10 ** 8));
   //       });
 
   //       it("should revert", async () => {
@@ -2062,8 +2066,8 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     cacheBeforeEach(async () => {
   //       await increaseTimeAsync(BigNumber.from(10000000));
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(900).mul(10 ** 8));
-  //       await perpV2Setup.setAssetPriceInOracle(setV2Setup.usdc.address, ether(0.00111111111));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
+  //       await perpV2Setup.setAssetLatestAnswerInOracle(setV2Setup.usdc.address, ether(0.00111111111));
 
   //       destinationTokenQuantity = ether(0.0001);
   //       const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
@@ -2093,7 +2097,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when price has moved advantageously towards target leverage ratio", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(1000).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1000).mul(10 ** 8));
   //       });
 
   //       it("should set the global last trade timestamp", async () => {
@@ -2147,7 +2151,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     cacheBeforeEach(async () => {
   //       await increaseTimeAsync(BigNumber.from(100000));
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1200).mul(10 ** 8));
 
   //       destinationTokenQuantity = ether(0.0001);
   //       const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
@@ -2285,7 +2289,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       await increaseTimeAsync(BigNumber.from(100000));
 
   //       // Set to above incentivized ratio
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(800).mul(10 ** 8));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
   //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(450000000));
 
   //       transferredEth = ether(1);
@@ -2483,7 +2487,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       describe("when incentivized cooldown period has not elapsed", async () => {
   //         beforeEach(async () => {
   //           await subject();
-  //           await chainlinkBasePriceMock.setPrice(BigNumber.from(400).mul(10 ** 8));
+  //           await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(400).mul(10 ** 8));
   //         });
 
   //         it("should revert", async () => {
@@ -2495,8 +2499,8 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when greater than max borrow", async () => {
   //       beforeEach(async () => {
   //         // Set to above max borrow
-  //         await perpV2Setup.setAssetPriceInOracle(setV2Setup.usdc.address, preciseDiv(ether(1), ether(650)));
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(650).mul(10 ** 8));
+  //         await perpV2Setup.setAssetLatestAnswerInOracle(setV2Setup.usdc.address, preciseDiv(ether(1), ether(650)));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(650).mul(10 ** 8));
   //       });
 
   //       it("should set the global last trade timestamp", async () => {
@@ -2577,7 +2581,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when below incentivized leverage ratio threshold", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(2000).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(2000).mul(10 ** 8));
   //       });
 
   //       it("should revert", async () => {
@@ -2668,7 +2672,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       subjectExchangeName = exchangeName;
   //       await leverageStrategyExtension.updateEnabledExchange(subjectExchangeName, newPerpV2ExchangeSettings);
 
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(990).mul(10 ** 8));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
 
   //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
 
@@ -2678,7 +2682,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
 
   //       // Set to above incentivized ratio
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(800).mul(10 ** 8));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
   //     });
 
   //     async function subject(): Promise<any> {
@@ -2721,7 +2725,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       await increaseTimeAsync(BigNumber.from(100000));
 
   //       // Set to above incentivized ratio
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(800).mul(10 ** 8));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
   //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(300000000));
   //       await setV2Setup.usdc.transfer(tradeAdapterMock2.address, BigNumber.from(300000000));
 
@@ -2745,7 +2749,7 @@ describe.only("LeverageStrategyExtension", () => {
   //         const timestamp1 = await getLastBlockTimestamp();
 
   //         subjectExchangeToUse = exchangeName2;
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(600).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(600).mul(10 ** 8));
 
   //         await subject();
   //         const timestamp2 = await getLastBlockTimestamp();
@@ -2964,7 +2968,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       await leverageStrategyExtension.updateEnabledExchange(subjectExchangeName, newPerpV2ExchangeSettings);
 
   //       // Set price to reduce borrowing power
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(1000).mul(10 ** 8));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1000).mul(10 ** 8));
 
   //       subjectCaller = owner;
   //     });
@@ -3844,7 +3848,7 @@ describe.only("LeverageStrategyExtension", () => {
   //   describe("when above incentivized leverage ratio", async () => {
   //     beforeEach(async () => {
   //       await owner.wallet.sendTransaction({to: leverageStrategyExtension.address, value: ether(1)});
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(650).mul(10 ** 8));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(650).mul(10 ** 8));
   //     });
 
   //     it("should return the correct value", async () => {
@@ -3870,7 +3874,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //   describe("when below incentivized leverage ratio", async () => {
   //     beforeEach(async () => {
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(2000).mul(10 ** 8));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(2000).mul(10 ** 8));
   //     });
 
   //     it("should return the correct value", async () => {
@@ -3926,7 +3930,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       // Set up new rebalance TWAP
   //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(990).mul(10 ** 8));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
   //       await increaseTimeAsync(BigNumber.from(100000));
   //       await leverageStrategyExtension.rebalance(exchangeName);
   //     });
@@ -3934,7 +3938,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when above incentivized leverage ratio and incentivized TWAP cooldown has elapsed", async () => {
   //       beforeEach(async () => {
   //         // Set to above incentivized ratio
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(800).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
   //         await increaseTimeAsync(BigNumber.from(100));
   //       });
 
@@ -3949,7 +3953,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when below incentivized leverage ratio and regular TWAP cooldown has elapsed", async () => {
   //       beforeEach(async () => {
   //         // Set to below incentivized ratio
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(900).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
   //         await increaseTimeAsync(BigNumber.from(4000));
   //       });
 
@@ -3964,7 +3968,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when above incentivized leverage ratio and incentivized TWAP cooldown has NOT elapsed", async () => {
   //       beforeEach(async () => {
   //         // Set to above incentivized ratio
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(800).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
   //       });
 
   //       it("should not rebalance", async () => {
@@ -3978,7 +3982,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when below incentivized leverage ratio and regular TWAP cooldown has NOT elapsed", async () => {
   //       beforeEach(async () => {
   //         // Set to above incentivized ratio
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(900).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
   //       });
 
   //       it("should not rebalance", async () => {
@@ -3994,7 +3998,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when above incentivized leverage ratio and cooldown period has elapsed", async () => {
   //       beforeEach(async () => {
   //         // Set to above incentivized ratio
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(800).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
   //         await increaseTimeAsync(BigNumber.from(100));
   //       });
 
@@ -4008,7 +4012,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when between max and min leverage ratio and rebalance interval has elapsed", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(990).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
   //         await increaseTimeAsync(BigNumber.from(100000));
   //       });
 
@@ -4022,7 +4026,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when above max leverage ratio but below incentivized leverage ratio", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(850).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
   //       });
 
   //       it("should return rebalance", async () => {
@@ -4035,7 +4039,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when below min leverage ratio", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(1400).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1400).mul(10 ** 8));
   //       });
 
   //       it("should return rebalance", async () => {
@@ -4048,7 +4052,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when above incentivized leverage ratio and incentivized TWAP cooldown has NOT elapsed", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(800).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
   //       });
 
   //       it("should not rebalance", async () => {
@@ -4061,7 +4065,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when between max and min leverage ratio and rebalance interval has NOT elapsed", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(990).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
   //       });
 
   //       it("should not rebalance", async () => {
@@ -4130,7 +4134,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       // Set up new rebalance TWAP
   //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(990).mul(10 ** 8));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
   //       await increaseTimeAsync(BigNumber.from(100000));
   //       await leverageStrategyExtension.rebalance(exchangeName);
   //     });
@@ -4138,7 +4142,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when above incentivized leverage ratio and incentivized TWAP cooldown has elapsed", async () => {
   //       beforeEach(async () => {
   //         // Set to above incentivized ratio
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(800).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
   //         await increaseTimeAsync(BigNumber.from(100));
   //       });
 
@@ -4153,7 +4157,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when below incentivized leverage ratio and regular TWAP cooldown has elapsed", async () => {
   //       beforeEach(async () => {
   //         // Set to below incentivized ratio
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(900).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
   //         await increaseTimeAsync(BigNumber.from(4000));
   //       });
 
@@ -4168,7 +4172,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when above incentivized leverage ratio and incentivized TWAP cooldown has NOT elapsed", async () => {
   //       beforeEach(async () => {
   //         // Set to above incentivized ratio
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(800).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
   //       });
 
   //       it("should not rebalance", async () => {
@@ -4182,7 +4186,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when below incentivized leverage ratio and regular TWAP cooldown has NOT elapsed", async () => {
   //       beforeEach(async () => {
   //         // Set to above incentivized ratio
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(900).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
   //       });
 
   //       it("should not rebalance", async () => {
@@ -4198,7 +4202,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when above incentivized leverage ratio and cooldown period has elapsed", async () => {
   //       beforeEach(async () => {
   //         // Set to above incentivized ratio
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(800).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
   //         await increaseTimeAsync(BigNumber.from(100));
   //       });
 
@@ -4212,7 +4216,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when between max and min leverage ratio and rebalance interval has elapsed", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(990).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
   //         await increaseTimeAsync(BigNumber.from(100000));
   //       });
 
@@ -4226,7 +4230,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when above max leverage ratio but below incentivized leverage ratio", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(850).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
   //       });
 
   //       it("should return rebalance", async () => {
@@ -4239,7 +4243,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when below min leverage ratio", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(1400).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1400).mul(10 ** 8));
   //       });
 
   //       it("should return rebalance", async () => {
@@ -4252,7 +4256,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when above incentivized leverage ratio and incentivized TWAP cooldown has NOT elapsed", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(800).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
   //       });
 
   //       it("should not rebalance", async () => {
@@ -4265,7 +4269,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when between max and min leverage ratio and rebalance interval has NOT elapsed", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(990).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
   //       });
 
   //       it("should not rebalance", async () => {
@@ -4349,7 +4353,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       // Set up new rebalance TWAP
   //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
-  //       await chainlinkBasePriceMock.setPrice(BigNumber.from(990).mul(10 ** 8));
+  //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
   //       await increaseTimeAsync(BigNumber.from(100000));
   //       await leverageStrategyExtension.rebalance(exchangeName);
   //     });
@@ -4357,7 +4361,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when above incentivized leverage ratio", async () => {
   //       beforeEach(async () => {
   //         // Set to above incentivized ratio
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(800).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
   //       });
 
   //       it("should return correct total rebalance size and isLever boolean", async () => {
@@ -4377,7 +4381,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when below incentivized leverage ratio", async () => {
   //       beforeEach(async () => {
   //         // Set to below incentivized ratio
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(900).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
   //       });
 
   //       it("should return correct total rebalance size and isLever boolean", async () => {
@@ -4407,7 +4411,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when above incentivized leverage ratio", async () => {
   //       beforeEach(async () => {
   //         // Set to above incentivized ratio
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(800).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
   //       });
 
   //       it("should return correct total rebalance size and isLever boolean", async () => {
@@ -4426,7 +4430,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when between max and min leverage ratio", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(990).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
   //       });
 
   //       it("should return correct total rebalance size and isLever boolean", async () => {
@@ -4451,7 +4455,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when above max leverage ratio but below incentivized leverage ratio", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(850).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
   //       });
 
   //       it("should return correct total rebalance size and isLever boolean", async () => {
@@ -4476,7 +4480,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when below min leverage ratio", async () => {
   //       beforeEach(async () => {
-  //         await chainlinkBasePriceMock.setPrice(BigNumber.from(1400).mul(10 ** 8));
+  //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1400).mul(10 ** 8));
   //       });
 
   //       it("should return correct total rebalance size and isLever boolean", async () => {

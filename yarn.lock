@@ -1451,18 +1451,6 @@
     "@sentry/types" "5.29.2"
     tslib "^1.9.3"
 
-"@setprotocol/set-protocol-v2@^0.1.4-perp.3":
-  version "0.1.4-perp.3"
-  resolved "https://registry.yarnpkg.com/@setprotocol/set-protocol-v2/-/set-protocol-v2-0.1.4-perp.3.tgz#19996c6093258204884ff5d53611afd967832447"
-  integrity sha512-n16ZSyVwqs+ECrYD9QufmH0MqTBvPoi7aHI5PVJN/Z970Vdv7UReU5/MWk/0JazE75KBEPvNPreCijHboQnHnQ==
-  dependencies:
-    "@uniswap/v3-sdk" "^3.5.1"
-    ethers "^5.4.6"
-    fs-extra "^5.0.0"
-    jsbi "^3.2.5"
-    module-alias "^2.2.2"
-    replace-in-file "^6.1.0"
-
 "@sindresorhus/is@^0.14.0":
   version "0.14.0"
   resolved "https://registry.yarnpkg.com/@sindresorhus/is/-/is-0.14.0.tgz#9fb3a3cf3132328151f353de4632e01e52102bea"

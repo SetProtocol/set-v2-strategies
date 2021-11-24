@@ -20,6 +20,8 @@ import {
   SetTokenCreator,
   SingleIndexModule,
   UniswapV2ExchangeAdapter,
+  PerpV2,
+  PerpV2LeverageModule
 } from "../contracts/setV2";
 import { WETH9, StandardTokenMock } from "../contracts/index";
 import { ether } from "../common";
@@ -42,6 +44,8 @@ import { SetToken__factory } from "../../typechain/factories/SetToken__factory";
 import { SetTokenCreator__factory } from "../../typechain/factories/SetTokenCreator__factory";
 import { StandardTokenMock__factory } from "../../typechain/factories/StandardTokenMock__factory";
 import { UniswapV2ExchangeAdapter__factory } from "../../typechain/factories/UniswapV2ExchangeAdapter__factory";
+import { PerpV2__factory } from "../../typechain/factories/PerpV2__factory";
+import { PerpV2LeverageModule__factory } from "../../typechain/factories/PerpV2LeverageModule__factory";
 import { WETH9__factory } from "../../typechain/factories/WETH9__factory";
 
 export default class DeploySetV2 {
