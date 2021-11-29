@@ -21,33 +21,34 @@ import {
   SingleIndexModule,
   UniswapV2ExchangeAdapter,
   PerpV2,
-  PerpV2LeverageModule
+  PerpV2LeverageModule,
+  WETH9,
+  AaveLeverageModule__factory,
+  AaveV2__factory,
+  AirdropModule__factory,
+  BasicIssuanceModule__factory,
+  Controller__factory,
+  Compound__factory,
+  CompoundLeverageModule__factory,
+  ComptrollerMock__factory,
+  ContractCallerMock__factory,
+  DebtIssuanceModule__factory,
+  GeneralIndexModule__factory,
+  GovernanceModule__factory,
+  IntegrationRegistry__factory,
+  SingleIndexModule__factory,
+  StreamingFeeModule__factory,
+  SetToken__factory,
+  SetTokenCreator__factory,
+  UniswapV2ExchangeAdapter__factory,
+  PerpV2__factory,
+  PerpV2LeverageModule__factory,
+  WETH9__factory,
 } from "../contracts/setV2";
-import { WETH9, StandardTokenMock } from "../contracts/index";
-import { ether } from "../common";
-import { AaveLeverageModule__factory } from "../../typechain/factories/AaveLeverageModule__factory";
-import { AaveV2__factory  } from "../../typechain/factories/AaveV2__factory";
-import { AirdropModule__factory } from "../../typechain/factories/AirdropModule__factory";
-import { BasicIssuanceModule__factory } from "../../typechain/factories/BasicIssuanceModule__factory";
-import { Controller__factory } from "../../typechain/factories/Controller__factory";
-import { Compound__factory } from "../../typechain/factories/Compound__factory";
-import { CompoundLeverageModule__factory } from "../../typechain/factories/CompoundLeverageModule__factory";
-import { ComptrollerMock__factory } from "../../typechain/factories/ComptrollerMock__factory";
-import { ContractCallerMock__factory } from "../../typechain/factories/ContractCallerMock__factory";
-import { DebtIssuanceModule__factory } from "../../typechain/factories/DebtIssuanceModule__factory";
-import { GeneralIndexModule__factory } from "../../typechain/factories/GeneralIndexModule__factory";
-import { GovernanceModule__factory } from "../../typechain/factories/GovernanceModule__factory";
-import { IntegrationRegistry__factory } from "../../typechain/factories/IntegrationRegistry__factory";
-import { SingleIndexModule__factory } from "../../typechain/factories/SingleIndexModule__factory";
-import { StreamingFeeModule__factory } from "../../typechain/factories/StreamingFeeModule__factory";
-import { SetToken__factory } from "../../typechain/factories/SetToken__factory";
-import { SetTokenCreator__factory } from "../../typechain/factories/SetTokenCreator__factory";
-import { StandardTokenMock__factory } from "../../typechain/factories/StandardTokenMock__factory";
-import { UniswapV2ExchangeAdapter__factory } from "../../typechain/factories/UniswapV2ExchangeAdapter__factory";
-import { PerpV2__factory } from "../../typechain/factories/PerpV2__factory";
-import { PerpV2LeverageModule__factory } from "../../typechain/factories/PerpV2LeverageModule__factory";
-import { WETH9__factory } from "../../typechain/factories/WETH9__factory";
 
+import { StandardTokenMock } from "../contracts/index";
+import { StandardTokenMock__factory } from "../../typechain/factories/StandardTokenMock__factory";
+import { ether } from "../common";
 export default class DeploySetV2 {
   private _deployerSigner: Signer;
 
@@ -212,7 +213,6 @@ export default class DeploySetV2 {
   public async deployAaveLeverageModule(
     controller: string,
     lendingPoolAddressesProvider: string,
-    protocolDataProvider: string
   ): Promise<AaveLeverageModule> {
     const aaveV2Lib = await this.deployAaveV2Lib();
 
@@ -229,8 +229,7 @@ export default class DeploySetV2 {
       this._deployerSigner
     ).deploy(
       controller,
-      lendingPoolAddressesProvider,
-      protocolDataProvider
+      lendingPoolAddressesProvider
     );
   }
 
@@ -240,13 +239,9 @@ export default class DeploySetV2 {
 
   public async deployPerpV2LeverageModule(
     controller: string,
-    perpAccountBalance: string,
-    perpClearingHouse: string,
-    perpExchange: string,
     perpVault: string,
     perpQuoter: string,
     perpMarketRegistry: string,
-    perpCollateralToken: string
   ): Promise<PerpV2LeverageModule> {
     const perpV2Lib = await this.deployPerpV2Lib();
 
@@ -263,13 +258,9 @@ export default class DeploySetV2 {
       this._deployerSigner
     ).deploy(
       controller,
-      perpAccountBalance,
-      perpClearingHouse,
-      perpExchange,
       perpVault,
       perpQuoter,
-      perpMarketRegistry,
-      perpCollateralToken
+      perpMarketRegistry
     );
   }
 

@@ -11,7 +11,7 @@ import {
 } from "../contracts/uniswap";
 
 import { UniswapV2ExchangeAdapter } from "../contracts/setV2";
-import { UniswapV2Pair__factory } from "../../typechain/factories/UniswapV2Pair__factory";
+import { UniswapV2Pair__factory } from "@setprotocol/set-protocol-v2/typechain/factories/UniswapV2Pair__factory";
 
 export class UniswapFixture {
   private _deployer: DeployHelper;
@@ -29,7 +29,7 @@ export class UniswapFixture {
   public wbtcUsdcPool: UniswapV2Pair;
 
   public uniswapTradeAdapter: UniswapV2ExchangeAdapter;
-  public uniWethPool: UniswapV2Pair;
+  public unWETH9Pool: UniswapV2Pair;
 
   public weth: Address;
 
@@ -56,7 +56,7 @@ export class UniswapFixture {
       BigNumber.from(lastBlock.timestamp).add(2)
     );
 
-    this.uniWethPool = await this.createNewPair(_weth, this.uni.address);
+    this.unWETH9Pool = await this.createNewPair(_weth, this.uni.address);
   }
 
   public async createNewPair(_tokenOne: Address, _tokenTwo: Address): Promise<UniswapV2Pair> {

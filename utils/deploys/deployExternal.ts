@@ -16,22 +16,22 @@ import {
 
 import { Address } from "./../types";
 
-import { CERc20__factory } from "../../typechain/factories/CERc20__factory";
-import { CEther__factory } from "../../typechain/factories/CEther__factory";
-import { CompoundPriceOracleMock__factory } from "../../typechain/factories/CompoundPriceOracleMock__factory";
-import { Comp__factory } from "../../typechain/factories/Comp__factory";
-import { CompoundGovernorAlpha__factory } from "../../typechain/factories/CompoundGovernorAlpha__factory";
-import { CompoundTimelock__factory } from "../../typechain/factories/CompoundTimelock__factory";
-import { Comptroller__factory } from "../../typechain/factories/Comptroller__factory";
-import { PriceOracleProxy__factory } from "../../typechain/factories/PriceOracleProxy__factory";
-import { Unitroller__factory } from "../../typechain/factories/Unitroller__factory";
-import { WhitePaperInterestRateModel__factory } from "../../typechain/factories/WhitePaperInterestRateModel__factory";
+import { CERc20__factory } from "@setprotocol/set-protocol-v2/typechain/factories/CERc20__factory";
+import { CEther__factory } from "@setprotocol/set-protocol-v2/typechain/factories/CEther__factory";
+import { CompoundPriceOracleMock__factory } from "@setprotocol/set-protocol-v2/typechain/factories/CompoundPriceOracleMock__factory";
+import { Comp__factory } from "@setprotocol/set-protocol-v2/typechain/factories/Comp__factory";
+import { CompoundGovernorAlpha__factory } from "@setprotocol/set-protocol-v2/typechain/factories/CompoundGovernorAlpha__factory";
+import { CompoundTimelock__factory } from "@setprotocol/set-protocol-v2/typechain/factories/CompoundTimelock__factory";
+import { Comptroller__factory } from "@setprotocol/set-protocol-v2/typechain/factories/Comptroller__factory";
+import { PriceOracleProxy__factory } from "@setprotocol/set-protocol-v2/typechain/factories/PriceOracleProxy__factory";
+import { Unitroller__factory } from "@setprotocol/set-protocol-v2/typechain/factories/Unitroller__factory";
+import { WhitePaperInterestRateModel__factory } from "@setprotocol/set-protocol-v2/typechain/factories/WhitePaperInterestRateModel__factory";
 
 import {
   AaveTokenV2Mintable
 } from "../contracts/aaveV2";
 
-import { AaveTokenV2Mintable__factory } from "../../typechain/factories/AaveTokenV2Mintable__factory";
+import { AaveTokenV2Mintable__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveTokenV2Mintable__factory";
 
 import {
   Uni,
@@ -40,10 +40,10 @@ import {
   UniswapV2Router02,
 } from "../contracts/uniswap";
 
-import { Uni__factory } from "../../typechain/factories/Uni__factory";
-import { UniswapV2Factory__factory } from "../../typechain/factories/UniswapV2Factory__factory";
-import { UniswapV2Pair__factory } from "../../typechain/factories/UniswapV2Pair__factory";
-import { UniswapV2Router02__factory } from "../../typechain/factories/UniswapV2Router02__factory";
+import { Uni__factory } from "@setprotocol/set-protocol-v2/typechain/factories/Uni__factory";
+import { UniswapV2Factory__factory } from "@setprotocol/set-protocol-v2/typechain/factories/UniswapV2Factory__factory";
+import { UniswapV2Pair__factory } from "@setprotocol/set-protocol-v2/typechain/factories/UniswapV2Pair__factory";
+import { UniswapV2Router02__factory } from "@setprotocol/set-protocol-v2/typechain/factories/UniswapV2Router02__factory";
 
 import {
   SwapRouter,
@@ -53,12 +53,12 @@ import {
   NFTDescriptor,
   UniswapV3Pool
 } from "../contracts/uniswapV3";
-import { UniswapV3Factory__factory } from "../../typechain/factories/UniswapV3Factory__factory";
-import { UniswapV3Pool__factory } from "../../typechain/factories/UniswapV3Pool__factory";
-import { SwapRouter__factory } from "../../typechain/factories/SwapRouter__factory";
-import { NonfungiblePositionManager__factory } from "../../typechain/factories/NonfungiblePositionManager__factory";
-import { Quoter__factory } from "../../typechain/factories/Quoter__factory";
-import { NFTDescriptor__factory } from "../../typechain/factories/NFTDescriptor__factory";
+import { UniswapV3Factory__factory } from "@setprotocol/set-protocol-v2/typechain/factories/UniswapV3Factory__factory";
+import { UniswapV3Pool__factory } from "@setprotocol/set-protocol-v2/typechain/factories/UniswapV3Pool__factory";
+import { SwapRouter__factory } from "@setprotocol/set-protocol-v2/typechain/factories/SwapRouter__factory";
+import { NonfungiblePositionManager__factory } from "@setprotocol/set-protocol-v2/typechain/factories/NonfungiblePositionManager__factory";
+import { Quoter__factory } from "@setprotocol/set-protocol-v2/typechain/factories/Quoter__factory";
+import { NFTDescriptor__factory } from "@setprotocol/set-protocol-v2/typechain/factories/NFTDescriptor__factory";
 
 import {
   AaveGovernanceV2,
@@ -81,25 +81,25 @@ import {
   ReserveLogic,
   ValidationLogic
 } from "../contracts/aaveV2";
-import { AaveV2LendingPool__factory } from "../../typechain/factories/AaveV2LendingPool__factory";
-import { AaveV2LendingPoolAddressesProvider__factory } from "../../typechain/factories/AaveV2LendingPoolAddressesProvider__factory";
-import { AaveV2ProtocolDataProvider__factory } from "../../typechain/factories/AaveV2ProtocolDataProvider__factory";
-import { AaveV2LendingPoolConfigurator__factory } from "../../typechain/factories/AaveV2LendingPoolConfigurator__factory";
-import { AaveV2LendingPoolCollateralManager__factory } from "../../typechain/factories/AaveV2LendingPoolCollateralManager__factory";
-import { AaveV2DefaultReserveInterestRateStrategy__factory } from "../../typechain/factories/AaveV2DefaultReserveInterestRateStrategy__factory";
-import { AaveV2AToken__factory } from "../../typechain/factories/AaveV2AToken__factory";
-import { AaveV2StableDebtToken__factory } from "../../typechain/factories/AaveV2StableDebtToken__factory";
-import { AaveV2VariableDebtToken__factory } from "../../typechain/factories/AaveV2VariableDebtToken__factory";
-import { AaveV2StakedTokenIncentivesController__factory } from "../../typechain/factories/AaveV2StakedTokenIncentivesController__factory";
-import { GenericLogic__factory } from "../../typechain/factories/GenericLogic__factory";
-import { ValidationLogic__factory } from "../../typechain/factories/ValidationLogic__factory";
-import { ReserveLogic__factory } from "../../typechain/factories/ReserveLogic__factory";
-import { AaveV2LendingRateOracle__factory } from "../../typechain/factories/AaveV2LendingRateOracle__factory";
-import { AaveV2Oracle__factory } from "../../typechain/factories/AaveV2Oracle__factory";
-import { AaveV2PriceOracle__factory } from "../../typechain/factories/AaveV2PriceOracle__factory";
-import { AaveGovernanceV2__factory } from "../../typechain/factories/AaveGovernanceV2__factory";
-import { Executor__factory } from "../../typechain/factories/Executor__factory";
-import { GovernanceStrategy__factory } from "../../typechain/factories/GovernanceStrategy__factory";
+import { AaveV2LendingPool__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveV2LendingPool__factory";
+import { AaveV2LendingPoolAddressesProvider__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveV2LendingPoolAddressesProvider__factory";
+import { AaveV2ProtocolDataProvider__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveV2ProtocolDataProvider__factory";
+import { AaveV2LendingPoolConfigurator__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveV2LendingPoolConfigurator__factory";
+import { AaveV2LendingPoolCollateralManager__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveV2LendingPoolCollateralManager__factory";
+import { AaveV2DefaultReserveInterestRateStrategy__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveV2DefaultReserveInterestRateStrategy__factory";
+import { AaveV2AToken__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveV2AToken__factory";
+import { AaveV2StableDebtToken__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveV2StableDebtToken__factory";
+import { AaveV2VariableDebtToken__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveV2VariableDebtToken__factory";
+import { AaveV2StakedTokenIncentivesController__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveV2StakedTokenIncentivesController__factory";
+import { GenericLogic__factory } from "@setprotocol/set-protocol-v2/typechain/factories/GenericLogic__factory";
+import { ValidationLogic__factory } from "@setprotocol/set-protocol-v2/typechain/factories/ValidationLogic__factory";
+import { ReserveLogic__factory } from "@setprotocol/set-protocol-v2/typechain/factories/ReserveLogic__factory";
+import { AaveV2LendingRateOracle__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveV2LendingRateOracle__factory";
+import { AaveV2Oracle__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveV2Oracle__factory";
+import { AaveV2PriceOracle__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveV2PriceOracle__factory";
+import { AaveGovernanceV2__factory } from "@setprotocol/set-protocol-v2/typechain/factories/AaveGovernanceV2__factory";
+import { Executor__factory } from "@setprotocol/set-protocol-v2/typechain/factories/Executor__factory";
+import { GovernanceStrategy__factory } from "@setprotocol/set-protocol-v2/typechain/factories/GovernanceStrategy__factory";
 
 import {
   PerpV2MarketRegistry,
@@ -117,19 +117,19 @@ import {
   PerpV2Exchange
 } from "./../contracts/perpV2";
 
-import { PerpV2ClearingHouse__factory } from "../../typechain/factories/PerpV2ClearingHouse__factory";
-import { PerpV2MarketRegistry__factory } from "../../typechain/factories/PerpV2MarketRegistry__factory";
-import { PerpV2OrderBook__factory } from "../../typechain/factories/PerpV2OrderBook__factory";
-import { PerpV2Quoter__factory } from "../../typechain/factories/PerpV2Quoter__factory";
-import { PerpV2QuoteToken__factory } from "../../typechain/factories/PerpV2QuoteToken__factory";
-import { PerpV2Vault__factory } from "../../typechain/factories/PerpV2Vault__factory";
-import { PerpV2TestAggregatorV3__factory } from "../../typechain/factories/PerpV2TestAggregatorV3__factory";
-import { PerpV2ChainlinkPriceFeed__factory } from "../../typechain/factories/PerpV2ChainlinkPriceFeed__factory";
-import { PerpV2BaseToken__factory } from "../../typechain/factories/PerpV2BaseToken__factory";
-import { PerpV2ClearingHouseConfig__factory } from "../../typechain/factories/PerpV2ClearingHouseConfig__factory";
-import { PerpV2InsuranceFund__factory } from "../../typechain/factories/PerpV2InsuranceFund__factory";
-import { PerpV2AccountBalance__factory } from "../../typechain/factories/PerpV2AccountBalance__factory";
-import { PerpV2Exchange__factory } from "../../typechain/factories/PerpV2Exchange__factory";
+import { PerpV2ClearingHouse__factory } from "@setprotocol/set-protocol-v2/typechain/factories/PerpV2ClearingHouse__factory";
+import { PerpV2MarketRegistry__factory } from "@setprotocol/set-protocol-v2/typechain/factories/PerpV2MarketRegistry__factory";
+import { PerpV2OrderBook__factory } from "@setprotocol/set-protocol-v2/typechain/factories/PerpV2OrderBook__factory";
+import { PerpV2Quoter__factory } from "@setprotocol/set-protocol-v2/typechain/factories/PerpV2Quoter__factory";
+import { PerpV2QuoteToken__factory } from "@setprotocol/set-protocol-v2/typechain/factories/PerpV2QuoteToken__factory";
+import { PerpV2Vault__factory } from "@setprotocol/set-protocol-v2/typechain/factories/PerpV2Vault__factory";
+import { PerpV2TestAggregatorV3__factory } from "@setprotocol/set-protocol-v2/typechain/factories/PerpV2TestAggregatorV3__factory";
+import { PerpV2ChainlinkPriceFeed__factory } from "@setprotocol/set-protocol-v2/typechain/factories/PerpV2ChainlinkPriceFeed__factory";
+import { PerpV2BaseToken__factory } from "@setprotocol/set-protocol-v2/typechain/factories/PerpV2BaseToken__factory";
+import { PerpV2ClearingHouseConfig__factory } from "@setprotocol/set-protocol-v2/typechain/factories/PerpV2ClearingHouseConfig__factory";
+import { PerpV2InsuranceFund__factory } from "@setprotocol/set-protocol-v2/typechain/factories/PerpV2InsuranceFund__factory";
+import { PerpV2AccountBalance__factory } from "@setprotocol/set-protocol-v2/typechain/factories/PerpV2AccountBalance__factory";
+import { PerpV2Exchange__factory } from "@setprotocol/set-protocol-v2/typechain/factories/PerpV2Exchange__factory";
 
 export default class DeployExternalContracts {
   private _deployerSigner: Signer;

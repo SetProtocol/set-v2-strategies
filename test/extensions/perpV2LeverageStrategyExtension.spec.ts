@@ -102,14 +102,11 @@ describe.only("LeverageStrategyExtension", () => {
 
     perpV2LeverageModule = await deployer.setV2.deployPerpV2LeverageModule(
       setV2Setup.controller.address,
-      perpV2Setup.accountBalance.address,
-      perpV2Setup.clearingHouse.address,
-      perpV2Setup.exchange.address,
       perpV2Setup.vault.address,
       perpV2Setup.quoter.address,
       perpV2Setup.marketRegistry.address,
-      setV2Setup.usdc.address
     );
+    
     console.log("here1")
     await setV2Setup.controller.addModule(perpV2LeverageModule.address);
     console.log("here0")

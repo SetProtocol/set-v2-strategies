@@ -12,10 +12,10 @@ import {
   NFTDescriptor
 } from "../contracts/uniswapV3";
 
-import { UniswapV3Pool__factory } from "../../typechain/factories/UniswapV3Pool__factory";
+import { UniswapV3Pool__factory } from "@setprotocol/set-protocol-v2/typechain/factories/UniswapV3Pool__factory";
 import { ether } from "../index";
 import { StandardTokenMock } from "../../typechain/StandardTokenMock";
-import { WETH9 } from "../../typechain/WETH9";
+import { WETH9 } from "@setprotocol/set-protocol-v2/typechain/WETH9";
 import { parseEther } from "ethers/lib/utils";
 
 type Token = StandardTokenMock | WETH9;

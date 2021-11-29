@@ -11,9 +11,10 @@ import {
   IntegrationRegistry,
   SetToken,
   SetTokenCreator,
-  StreamingFeeModule
+  StreamingFeeModule,
+  WETH9
 } from "../contracts/setV2";
-import { WETH9, StandardTokenMock } from "../contracts/index";
+import { StandardTokenMock } from "../contracts/index";
 import DeployHelper from "../deploys";
 import {
   ether,
@@ -26,7 +27,7 @@ import {
   MAX_UINT_256,
 } from "../constants";
 
-import { SetToken__factory } from "../../typechain/factories/SetToken__factory";
+import { SetToken__factory } from "@setprotocol/set-protocol-v2/typechain/factories/SetToken__factory";
 
 export class SetFixture {
   private _provider: providers.Web3Provider | providers.JsonRpcProvider;
