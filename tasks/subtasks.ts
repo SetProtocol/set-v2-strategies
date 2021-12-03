@@ -7,7 +7,7 @@ import {
 import { TASK_TYPECHAIN_GENERATE_TYPES } from "@typechain/hardhat/dist/constants";
 
 import { subtask } from "hardhat/config";
-import { addGasToAbiMethods, removeGasFromAbiMethods } from "../utils/tasks";
+import { addGasToAbiMethods, removeGasFromAbiMethods } from "@setprotocol/set-protocol-v2/dist/utils/tasks";
 
 // Injects network block limit (minus 1 million) in the abi so
 // ethers uses it instead of running gas estimation.

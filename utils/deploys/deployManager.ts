@@ -1,5 +1,4 @@
 import { Signer } from "ethers";
-import { BigNumber } from "ethers";
 import { Address } from "../types";
 import { BaseManagerV2 } from "../contracts/index";
 import { BaseManagerV2__factory } from "../../typechain/factories/BaseManagerV2__factory";

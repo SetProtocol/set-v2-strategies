@@ -9,11 +9,6 @@ export {
   preciseDivCeilInt,
   sqrt
 } from "./mathUtils";
-export {
-  getPostFeePositionUnits,
-  getStreamingFee,
-  getStreamingFeeInflationAmount
-} from "./feeModuleUtils";
 export { bitcoin, ether, gWei, usdc, wbtc } from "./unitsUtils";
 export { Blockchain } from "./blockchainUtils";
 export { ProtocolUtils } from "./protocolUtils";
