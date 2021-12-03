@@ -1,6 +1,5 @@
 import "module-alias/register";
 import { BigNumber } from "ethers";
-import { ethers } from "hardhat";
 
 import {
   Address,
@@ -10,41 +9,34 @@ import {
   PerpV2ExecutionSettings,
   PerpV2IncentiveSettings,
   PerpV2ExchangeSettings
-} from "../../utils/types";
-import { ADDRESS_ZERO, ZERO, EMPTY_BYTES, MAX_UINT_256, THREE, TWO, ONE } from "../../utils/constants";
-import { BaseManagerV2, ChainlinkAggregatorMock, PerpV2LeverageStrategyExtension, StandardTokenMock } from "../../utils/contracts/index";
-import { PerpV2LeverageModule, ContractCallerMock, DebtIssuanceModule, SetToken } from "../../utils/contracts/setV2";
+} from "@utils/types"
+
+import { ADDRESS_ZERO, ZERO } from "../../utils/constants";
+import {PerpV2LeverageModule, SetToken, ChainlinkAggregatorMock, PerpV2 } from "@setprotocol/set-protocol-v2/dist/utils/contracts";
 import DeployHelper from "../../utils/deploys";
 import {
   cacheBeforeEach,
   ether,
   getAccounts,
-  getEthBalance,
-  getSetFixture,
-  getPerpV2Fixture,
   getWaffleExpect,
-  getRandomAccount,
-  getLastBlockTimestamp,
-  increaseTimeAsync,
-  preciseDiv,
-  preciseMul,
-  // calculateNewLeverageRatio,
-  // calculateCollateralRebalanceUnits,
-  // calculateMaxBorrowForDelever,
   usdc,
 } from "../../utils/index";
 
-import { SetFixture, PerpV2Fixture } from "../../utils/fixtures";
+
+import { PerpV2Fixture, SystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
+import { DebtIssuanceModuleV2, DebtIssuanceModuleV2__factory } from "@setprotocol/set-protocol-v2/dist/typechain";
+import { getPerpV2Fixture, getSystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/test";
+
+import { BaseManagerV2, PerpV2LeverageStrategyExtension } from "@utils/contracts/index";
 
 const expect = getWaffleExpect();
-const provider = ethers.provider;
 
 describe.only("LeverageStrategyExtension", () => {
   let owner: Account;
   let methodologist: Account;
   let maker: Account;
   let taker: Account;
-  let setV2Setup: SetFixture;
+  let systemSetup: SystemFixture;
   let perpV2Setup: PerpV2Fixture;
 
   let deployer: DeployHelper;
@@ -61,7 +53,8 @@ describe.only("LeverageStrategyExtension", () => {
 
   let leverageStrategyExtension: PerpV2LeverageStrategyExtension;
   let perpV2LeverageModule: PerpV2LeverageModule;
-  let issuanceModule: DebtIssuanceModule;
+  let perpLib: PerpV2;
+  let issuanceModule: DebtIssuanceModuleV2;
   let baseManagerV2: BaseManagerV2;
 
   let chainlinkBasePriceMock: ChainlinkAggregatorMock;
@@ -77,8 +70,8 @@ describe.only("LeverageStrategyExtension", () => {
 
     deployer = new DeployHelper(owner.wallet);
 
-    setV2Setup = getSetFixture(owner.address);
-    await setV2Setup.initialize();
+    systemSetup = getSystemFixture(owner.address);
+    await systemSetup.initialize();
     perpV2Setup = getPerpV2Fixture(owner.address);
     await perpV2Setup.initialize(maker, taker);
 
@@ -99,21 +92,24 @@ describe.only("LeverageStrategyExtension", () => {
     );
 
     console.log("here2")
-
-    perpV2LeverageModule = await deployer.setV2.deployPerpV2LeverageModule(
-      setV2Setup.controller.address,
+    
+    perpLib = await deployer.setDeployer.libraries.deployPerpV2();
+    perpV2LeverageModule = await deployer.setDeployer.modules.deployPerpV2LeverageModule(
+      systemSetup.controller.address,
       perpV2Setup.vault.address,
       perpV2Setup.quoter.address,
       perpV2Setup.marketRegistry.address,
+      "contracts/protocol/integration/lib/PerpV2.sol:PerpV2",
+      perpLib.address
     );
     
     console.log("here1")
-    await setV2Setup.controller.addModule(perpV2LeverageModule.address);
+    await systemSetup.controller.addModule(perpV2LeverageModule.address);
     console.log("here0")
-    await setV2Setup.integrationRegistry.addIntegration(
+    await systemSetup.integrationRegistry.addIntegration(
       perpV2LeverageModule.address,
       "DefaultIssuanceModule",
-      setV2Setup.debtIssuanceModule.address
+      issuanceModule.address
     );
 
     // Deploy Chainlink mocks
@@ -124,20 +120,20 @@ describe.only("LeverageStrategyExtension", () => {
   });
 
   const initializeRootScopeContracts = async () => {
-    setToken = await setV2Setup.createSetToken(
+    setToken = await systemSetup.createSetToken(
       [perpV2Setup.usdc.address],
       [usdc(100)],
       [
-        setV2Setup.streamingFeeModule.address,
+        systemSetup.streamingFeeModule.address,
         perpV2LeverageModule.address,
-        setV2Setup.debtIssuanceModule.address,
+        issuanceModule.address
       ]
     );
     await perpV2LeverageModule.updateAnySetAllowed(true);
 
     // Initialize modules
     await issuanceModule.initialize(setToken.address, ether(1), ZERO, ZERO, owner.address, ADDRESS_ZERO);
-    await setV2Setup.issuanceModule.initialize(setToken.address, ADDRESS_ZERO);
+    await systemSetup.issuanceModule.initialize(setToken.address, ADDRESS_ZERO);
     const feeRecipient = owner.address;
     const maxStreamingFeePercentage = ether(.1);
     const streamingFeePercentage = ether(.02);
@@ -147,7 +143,7 @@ describe.only("LeverageStrategyExtension", () => {
       streamingFeePercentage,
       lastStreamingFeeTimestamp: ZERO,
     };
-    await setV2Setup.streamingFeeModule.initialize(setToken.address, streamingFeeSettings);
+    await systemSetup.streamingFeeModule.initialize(setToken.address, streamingFeeSettings);
     await perpV2LeverageModule.initialize(setToken.address);
 
     // Deposit into Perp
@@ -475,14 +471,14 @@ describe.only("LeverageStrategyExtension", () => {
   //       await initializeRootScopeContracts();
 
   //       // Approve tokens to issuance module and call issue
-  //       await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //       await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //       // Issue 1 SetToken
   //       issueQuantity = ether(1);
-  //       await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //       await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
   //       destinationTokenQuantity = ether(0.5);
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
   //     };
 
   //     const initializeSubjectVariables = () => {
@@ -557,7 +553,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //         expect(initialPositions.length).to.eq(1);
   //         expect(currentPositions.length).to.eq(2);
-  //         expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //         expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //         expect(newSecondPosition.positionState).to.eq(1); // External
   //         expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //         expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -591,7 +587,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       describe("when SetToken has 0 supply", async () => {
   //         beforeEach(async () => {
-  //           await setV2Setup.issuanceModule.redeem(setToken.address, ether(1), owner.address);
+  //           await systemSetup.issuanceModule.redeem(setToken.address, ether(1), owner.address);
   //         });
 
   //         it("should revert", async () => {
@@ -633,11 +629,11 @@ describe.only("LeverageStrategyExtension", () => {
   //       await initializeRootScopeContracts();
 
   //       // Approve tokens to issuance module and call issue
-  //       await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //       await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //       // Issue 1 SetToken
   //       const issueQuantity = ether(1);
-  //       await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //       await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
   //       const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
   //         twapMaxTradeSize: ether(1.9),
@@ -652,7 +648,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       // Traded amount is equal to account liquidity * buffer percentage
   //       destinationTokenQuantity = ether(0.80 * 0.99);
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
   //     });
 
   //     beforeEach(() => {
@@ -722,7 +718,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       expect(initialPositions.length).to.eq(1);
   //       expect(currentPositions.length).to.eq(2);
-  //       expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //       expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //       expect(newSecondPosition.positionState).to.eq(1); // External
   //       expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //       expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -744,15 +740,15 @@ describe.only("LeverageStrategyExtension", () => {
   //       await initializeRootScopeContracts();
 
   //       // Approve tokens to issuance module and call issue
-  //       await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //       await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //       // Issue 1 SetToken
   //       const issueQuantity = ether(1);
-  //       await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //       await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
   //       // Traded amount is equal to account liquidity * buffer percentage
   //       destinationTokenQuantity = ether(0.25);
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
   //     });
 
   //     beforeEach(() => {
@@ -822,7 +818,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       expect(initialPositions.length).to.eq(1);
   //       expect(currentPositions.length).to.eq(2);
-  //       expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //       expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //       expect(newSecondPosition.positionState).to.eq(1); // External
   //       expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //       expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -845,13 +841,13 @@ describe.only("LeverageStrategyExtension", () => {
   //     await initializeRootScopeContracts();
 
   //     // Approve tokens to issuance module and call issue
-  //     await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //     await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //     // Issue 1 SetToken
   //     const issueQuantity = ether(1);
-  //     await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //     await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
-  //     await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //     await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //     // Add allowed trader
   //     await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
@@ -860,7 +856,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       // Engage to initial leverage
   //       await leverageStrategyExtension.engage(subjectExchangeName);
   //       await increaseTimeAsync(BigNumber.from(100000));
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
   //       await leverageStrategyExtension.iterateRebalance(subjectExchangeName);
   //     }
   //   };
@@ -872,7 +868,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       destinationTokenQuantity = ether(0.1);
   //       await increaseTimeAsync(BigNumber.from(100000));
   //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1010).mul(10 ** 8));
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
   //     });
 
   //     beforeEach(() => {
@@ -941,7 +937,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       expect(initialPositions.length).to.eq(2);
   //       expect(currentPositions.length).to.eq(2);
-  //       expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //       expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //       expect(newSecondPosition.positionState).to.eq(1); // External
   //       expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //       expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -986,7 +982,7 @@ describe.only("LeverageStrategyExtension", () => {
   //         };
   //         await leverageStrategyExtension.updateEnabledExchange(subjectExchangeName, newPerpV2ExchangeSettings);
   //         destinationTokenQuantity = ether(1);
-  //         await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
+  //         await systemSetup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
   //       });
 
   //       it("should set the last trade timestamp", async () => {
@@ -1047,7 +1043,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //         expect(initialPositions.length).to.eq(2);
   //         expect(currentPositions.length).to.eq(2);
-  //         expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //         expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //         expect(newSecondPosition.positionState).to.eq(1); // External
   //         expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //         expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -1069,7 +1065,7 @@ describe.only("LeverageStrategyExtension", () => {
   //         };
   //         await leverageStrategyExtension.updateEnabledExchange(subjectExchangeName, newPerpV2ExchangeSettings);
   //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1500).mul(10 ** 8));
-  //         await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
+  //         await systemSetup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
   //       });
 
   //       it("should set the last trade timestamp", async () => {
@@ -1139,7 +1135,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //         expect(initialPositions.length).to.eq(2);
   //         expect(currentPositions.length).to.eq(2);
-  //         expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //         expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //         expect(newSecondPosition.positionState).to.eq(1); // External
   //         expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //         expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -1169,7 +1165,7 @@ describe.only("LeverageStrategyExtension", () => {
   //           deleverExchangeData: EMPTY_BYTES,
   //         };
   //         await leverageStrategyExtension.updateEnabledExchange(subjectExchangeName, newPerpV2ExchangeSettings);
-  //         await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.01));
+  //         await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.01));
 
   //         await subject();
   //       });
@@ -1182,7 +1178,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when borrow balance is 0", async () => {
   //       beforeEach(async () => {
   //         // Repay entire borrow balance of USDC on behalf of SetToken
-  //         await perpV2Setup.lendingPool.repay(setV2Setup.usdc.address, await usdcVariableDebtToken.balanceOf(setToken.address), 2, setToken.address);
+  //         await perpV2Setup.lendingPool.repay(systemSetup.usdc.address, await usdcVariableDebtToken.balanceOf(setToken.address), 2, setToken.address);
   //       });
 
   //       it("should revert", async () => {
@@ -1230,7 +1226,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when SetToken has 0 supply", async () => {
   //       beforeEach(async () => {
-  //         await setV2Setup.usdc.approve(issuanceModule.address, MAX_UINT_256);
+  //         await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
   //         await issuanceModule.redeem(setToken.address, ether(1), owner.address);
   //       });
 
@@ -1243,12 +1239,12 @@ describe.only("LeverageStrategyExtension", () => {
   //   context("when current leverage ratio is above target (delever)", async () => {
   //     cacheBeforeEach(async () => {
   //       // Withdraw balance of USDC from exchange contract from engage
-  //       await tradeAdapterMock.withdraw(setV2Setup.usdc.address);
+  //       await tradeAdapterMock.withdraw(systemSetup.usdc.address);
   //       await increaseTimeAsync(BigNumber.from(100000));
   //       // Set to $990 so need to delever
   //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
-  //       await perpV2Setup.setAssetLatestAnswerInOracle(setV2Setup.usdc.address, ether(1 / 990));
-  //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(2500000));
+  //       await perpV2Setup.setAssetLatestAnswerInOracle(systemSetup.usdc.address, ether(1 / 990));
+  //       await systemSetup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(2500000));
   //     });
 
   //     beforeEach(() => {
@@ -1334,7 +1330,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       expect(initialPositions.length).to.eq(2);
   //       expect(currentPositions.length).to.eq(2);
-  //       expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //       expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //       expect(newSecondPosition.positionState).to.eq(1); // External
   //       expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //       expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -1353,7 +1349,7 @@ describe.only("LeverageStrategyExtension", () => {
   //           deleverExchangeData: EMPTY_BYTES,
   //         };
   //         await leverageStrategyExtension.updateEnabledExchange(subjectExchangeName, newPerpV2ExchangeSettings);
-  //         await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(100000000));
+  //         await systemSetup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(100000000));
   //       });
 
   //       it("should set the last trade timestamp", async () => {
@@ -1431,7 +1427,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //         expect(initialPositions.length).to.eq(2);
   //         expect(currentPositions.length).to.eq(2);
-  //         expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //         expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //         expect(newSecondPosition.positionState).to.eq(1); // External
   //         expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //         expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -1456,7 +1452,7 @@ describe.only("LeverageStrategyExtension", () => {
   //         await leverageStrategyExtension.updateEnabledExchange(subjectExchangeName, newPerpV2ExchangeSettings);
   //         // ~2.4x leverage
   //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
-  //         await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(10000000));
+  //         await systemSetup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(10000000));
   //       });
 
   //       it("should set the last trade timestamp", async () => {
@@ -1528,7 +1524,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //         expect(initialPositions.length).to.eq(2);
   //         expect(currentPositions.length).to.eq(2);
-  //         expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //         expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //         expect(newSecondPosition.positionState).to.eq(1); // External
   //         expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //         expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -1551,8 +1547,8 @@ describe.only("LeverageStrategyExtension", () => {
   //         await leverageStrategyExtension.addEnabledExchange(exchangeName2, newPerpV2ExchangeSettings);
 
   //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
-  //         await setV2Setup.usdc.transfer(tradeAdapterMock.address, usdc(100));
-  //         await setV2Setup.usdc.transfer(tradeAdapterMock2.address, usdc(100));
+  //         await systemSetup.usdc.transfer(tradeAdapterMock.address, usdc(100));
+  //         await systemSetup.usdc.transfer(tradeAdapterMock2.address, usdc(100));
   //       });
 
   //       beforeEach(() => {
@@ -1671,13 +1667,13 @@ describe.only("LeverageStrategyExtension", () => {
   //     await initializeRootScopeContracts();
 
   //     // Approve tokens to issuance module and call issue
-  //     await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //     await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //     // Issue 1 SetToken
   //     issueQuantity = ether(1);
-  //     await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //     await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
-  //     await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //     await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //     // Add allowed trader
   //     await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
@@ -1686,7 +1682,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       // Engage to initial leverage
   //       await leverageStrategyExtension.engage(subjectExchangeName);
   //       await increaseTimeAsync(BigNumber.from(100000));
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
   //       await leverageStrategyExtension.iterateRebalance(subjectExchangeName);
   //     }
   //   };
@@ -1707,12 +1703,12 @@ describe.only("LeverageStrategyExtension", () => {
   //         deleverExchangeData: EMPTY_BYTES,
   //       };
   //       await leverageStrategyExtension.updateEnabledExchange(subjectExchangeName, newPerpV2ExchangeSettings);
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
 
   //       await leverageStrategyExtension.connect(owner.wallet).rebalance(subjectExchangeName);
 
   //       await increaseTimeAsync(BigNumber.from(4000));
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
   //     });
 
   //     beforeEach(() => {
@@ -1779,7 +1775,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       expect(initialPositions.length).to.eq(2);
   //       expect(currentPositions.length).to.eq(2);
-  //       expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //       expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //       expect(newSecondPosition.positionState).to.eq(1); // External
   //       expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //       expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -1802,13 +1798,13 @@ describe.only("LeverageStrategyExtension", () => {
   //         deleverExchangeData: EMPTY_BYTES,
   //       };
   //       await leverageStrategyExtension.updateEnabledExchange(subjectExchangeName, newPerpV2ExchangeSettings);
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
   //       preTwapLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
 
   //       // Initialize TWAP
   //       await leverageStrategyExtension.connect(owner.wallet).rebalance(subjectExchangeName);
   //       await increaseTimeAsync(BigNumber.from(4000));
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
   //     });
 
   //     beforeEach(() => {
@@ -1885,7 +1881,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       expect(initialPositions.length).to.eq(2);
   //       expect(currentPositions.length).to.eq(2);
-  //       expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //       expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //       expect(newSecondPosition.positionState).to.eq(1); // External
   //       expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //       expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -1990,7 +1986,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when borrow balance is 0", async () => {
   //       beforeEach(async () => {
   //         // Repay entire balance of USDC on behalf of SetToken
-  //         await perpV2Setup.lendingPool.repay(setV2Setup.usdc.address, await usdcVariableDebtToken.balanceOf(setToken.address), 2, setToken.address);
+  //         await perpV2Setup.lendingPool.repay(systemSetup.usdc.address, await usdcVariableDebtToken.balanceOf(setToken.address), 2, setToken.address);
   //       });
 
   //       it("should revert", async () => {
@@ -2038,7 +2034,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when SetToken has 0 supply", async () => {
   //       beforeEach(async () => {
-  //         await setV2Setup.usdc.approve(issuanceModule.address, MAX_UINT_256);
+  //         await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
   //         await issuanceModule.redeem(setToken.address, ether(1), owner.address);
   //       });
 
@@ -2064,7 +2060,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     cacheBeforeEach(async () => {
   //       await increaseTimeAsync(BigNumber.from(10000000));
   //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
-  //       await perpV2Setup.setAssetLatestAnswerInOracle(setV2Setup.usdc.address, ether(0.00111111111));
+  //       await perpV2Setup.setAssetLatestAnswerInOracle(systemSetup.usdc.address, ether(0.00111111111));
 
   //       destinationTokenQuantity = ether(0.0001);
   //       const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
@@ -2076,12 +2072,12 @@ describe.only("LeverageStrategyExtension", () => {
   //       };
   //       subjectExchangeName = exchangeName;
   //       await leverageStrategyExtension.updateEnabledExchange(subjectExchangeName, newPerpV2ExchangeSettings);
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
   //       preTwapLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
 
   //       await leverageStrategyExtension.connect(owner.wallet).rebalance(subjectExchangeName);
   //       await increaseTimeAsync(BigNumber.from(4000));
-  //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(2500000));
+  //       await systemSetup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(2500000));
   //     });
 
   //     beforeEach(() => {
@@ -2160,13 +2156,13 @@ describe.only("LeverageStrategyExtension", () => {
   //       };
   //       await leverageStrategyExtension.updateEnabledExchange(subjectExchangeName, newPerpV2ExchangeSettings);
   //       await leverageStrategyExtension.addEnabledExchange(exchangeName2, newPerpV2ExchangeSettings);
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
 
   //       // Initialize TWAP
   //       await leverageStrategyExtension.connect(owner.wallet).rebalance(subjectExchangeName);
   //       await increaseTimeAsync(BigNumber.from(4000));
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
-  //       await setV2Setup.weth.transfer(tradeAdapterMock2.address, destinationTokenQuantity);
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, destinationTokenQuantity);
+  //       await systemSetup.weth.transfer(tradeAdapterMock2.address, destinationTokenQuantity);
   //     });
 
   //     beforeEach(() => {
@@ -2251,13 +2247,13 @@ describe.only("LeverageStrategyExtension", () => {
   //     await initializeRootScopeContracts();
 
   //     // Approve tokens to issuance module and call issue
-  //     await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //     await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //     // Issue 1 SetToken
   //     const issueQuantity = ether(1);
-  //     await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //     await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
-  //     await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //     await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //     // Add allowed trader
   //     await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
@@ -2266,7 +2262,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       // Engage to initial leverage
   //       await leverageStrategyExtension.engage(subjectExchangeName);
   //       await increaseTimeAsync(BigNumber.from(100000));
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
   //       await leverageStrategyExtension.iterateRebalance(subjectExchangeName);
   //     }
   //   };
@@ -2282,12 +2278,12 @@ describe.only("LeverageStrategyExtension", () => {
   //   context("when not in a TWAP rebalance", async () => {
   //     cacheBeforeEach(async () => {
   //       // Withdraw balance of USDC from exchange contract from engage
-  //       await tradeAdapterMock.withdraw(setV2Setup.usdc.address);
+  //       await tradeAdapterMock.withdraw(systemSetup.usdc.address);
   //       await increaseTimeAsync(BigNumber.from(100000));
 
   //       // Set to above incentivized ratio
   //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
-  //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(450000000));
+  //       await systemSetup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(450000000));
 
   //       transferredEth = ether(1);
   //       await owner.wallet.sendTransaction({to: leverageStrategyExtension.address, value: transferredEth});
@@ -2372,7 +2368,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       expect(initialPositions.length).to.eq(2);
   //       expect(currentPositions.length).to.eq(2);
-  //       expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //       expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //       expect(newSecondPosition.positionState).to.eq(1); // External
   //       expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //       expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -2475,7 +2471,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //         expect(initialPositions.length).to.eq(2);
   //         expect(currentPositions.length).to.eq(2);
-  //         expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //         expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //         expect(newSecondPosition.positionState).to.eq(1); // External
   //         expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //         expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -2496,7 +2492,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when greater than max borrow", async () => {
   //       beforeEach(async () => {
   //         // Set to above max borrow
-  //         await perpV2Setup.setAssetLatestAnswerInOracle(setV2Setup.usdc.address, preciseDiv(ether(1), ether(650)));
+  //         await perpV2Setup.setAssetLatestAnswerInOracle(systemSetup.usdc.address, preciseDiv(ether(1), ether(650)));
   //         await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(650).mul(10 ** 8));
   //       });
 
@@ -2527,7 +2523,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //         const basePrice = ether(650);
   //         const quotePrice = ether(1);
-  //         const reserveConfig = await perpV2Setup.protocolDataProvider.getReserveConfigurationData(setV2Setup.weth.address);
+  //         const reserveConfig = await perpV2Setup.protocolDataProvider.getReserveConfigurationData(systemSetup.weth.address);
   //         const collateralFactor = reserveConfig.liquidationThreshold.mul(BigNumber.from(10).pow(14));
 
   //         await subject();
@@ -2569,7 +2565,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //         expect(initialPositions.length).to.eq(2);
   //         expect(currentPositions.length).to.eq(2);
-  //         expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //         expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //         expect(newSecondPosition.positionState).to.eq(1); // External
   //         expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //         expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -2589,7 +2585,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     describe("when borrow balance is 0", async () => {
   //       beforeEach(async () => {
   //         // Repay entire balance of USDC on behalf of SetToken
-  //         await perpV2Setup.lendingPool.repay(setV2Setup.usdc.address, await usdcVariableDebtToken.balanceOf(setToken.address), 2, setToken.address);
+  //         await perpV2Setup.lendingPool.repay(systemSetup.usdc.address, await usdcVariableDebtToken.balanceOf(setToken.address), 2, setToken.address);
   //       });
 
   //       it("should revert", async () => {
@@ -2627,7 +2623,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     describe("when SetToken has 0 supply", async () => {
   //       beforeEach(async () => {
-  //         await setV2Setup.usdc.approve(issuanceModule.address, MAX_UINT_256);
+  //         await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
   //         await issuanceModule.redeem(setToken.address, ether(1), owner.address);
   //       });
 
@@ -2652,7 +2648,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //     cacheBeforeEach(async () => {
   //       // Withdraw balance of USDC from exchange contract from engage
-  //       await tradeAdapterMock.withdraw(setV2Setup.usdc.address);
+  //       await tradeAdapterMock.withdraw(systemSetup.usdc.address);
   //       await increaseTimeAsync(BigNumber.from(100000));
   //       transferredEth = ether(1);
   //       await owner.wallet.sendTransaction({to: leverageStrategyExtension.address, value: transferredEth});
@@ -2671,12 +2667,12 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
 
-  //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
+  //       await systemSetup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
 
   //       // Start TWAP rebalance
   //       await leverageStrategyExtension.rebalance(subjectExchangeName);
   //       await increaseTimeAsync(BigNumber.from(100));
-  //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
+  //       await systemSetup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
 
   //       // Set to above incentivized ratio
   //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
@@ -2718,13 +2714,13 @@ describe.only("LeverageStrategyExtension", () => {
   //     cacheBeforeEach(async () => {
 
   //       // Withdraw balance of USDC from exchange contract from engage
-  //       await tradeAdapterMock.withdraw(setV2Setup.usdc.address);
+  //       await tradeAdapterMock.withdraw(systemSetup.usdc.address);
   //       await increaseTimeAsync(BigNumber.from(100000));
 
   //       // Set to above incentivized ratio
   //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
-  //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(300000000));
-  //       await setV2Setup.usdc.transfer(tradeAdapterMock2.address, BigNumber.from(300000000));
+  //       await systemSetup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(300000000));
+  //       await systemSetup.usdc.transfer(tradeAdapterMock2.address, BigNumber.from(300000000));
 
   //       await leverageStrategyExtension.updateEnabledExchange(exchangeName, exchange);
   //       await leverageStrategyExtension.addEnabledExchange(exchangeName2, exchange);
@@ -2800,13 +2796,13 @@ describe.only("LeverageStrategyExtension", () => {
   //       await initializeRootScopeContracts();
 
   //       // Approve tokens to issuance module and call issue
-  //       await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //       await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //       // Issue 1 SetToken
   //       const issueQuantity = ether(1);
-  //       await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //       await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //       if (ifEngaged) {
   //         // Add allowed trader
@@ -2814,12 +2810,12 @@ describe.only("LeverageStrategyExtension", () => {
   //         // Engage to initial leverage
   //         await leverageStrategyExtension.engage(subjectExchangeName);
   //         await increaseTimeAsync(BigNumber.from(100000));
-  //         await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //         await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
   //         await leverageStrategyExtension.iterateRebalance(subjectExchangeName);
 
   //         // Withdraw balance of USDC from exchange contract from engage
-  //         await tradeAdapterMock.withdraw(setV2Setup.usdc.address);
-  //         await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(550000000));
+  //         await tradeAdapterMock.withdraw(systemSetup.usdc.address);
+  //         await systemSetup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(550000000));
   //       }
   //     };
 
@@ -2869,7 +2865,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //         expect(initialPositions.length).to.eq(2);
   //         expect(currentPositions.length).to.eq(2);
-  //         expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //         expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //         expect(newSecondPosition.positionState).to.eq(1); // External
   //         expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //         expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -2878,7 +2874,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       describe("when borrow balance is 0", async () => {
   //         beforeEach(async () => {
   //           // Repay entire balance of cUSDC on behalf of SetToken
-  //           await perpV2Setup.lendingPool.repay(setV2Setup.usdc.address, await usdcVariableDebtToken.balanceOf(setToken.address), 2, setToken.address);
+  //           await perpV2Setup.lendingPool.repay(systemSetup.usdc.address, await usdcVariableDebtToken.balanceOf(setToken.address), 2, setToken.address);
   //         });
 
   //         it("should revert", async () => {
@@ -2888,7 +2884,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       describe("when SetToken has 0 supply", async () => {
   //         beforeEach(async () => {
-  //           await setV2Setup.usdc.approve(issuanceModule.address, MAX_UINT_256);
+  //           await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
   //           await issuanceModule.redeem(setToken.address, ether(1), owner.address);
   //         });
 
@@ -2936,24 +2932,24 @@ describe.only("LeverageStrategyExtension", () => {
   //       await initializeRootScopeContracts();
 
   //       // Approve tokens to issuance module and call issue
-  //       await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //       await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //       // Issue 1 SetToken
   //       const issueQuantity = ether(1);
-  //       await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //       await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //       // Engage to initial leverage
   //       await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
   //       await leverageStrategyExtension.engage(subjectExchangeName);
   //       await increaseTimeAsync(BigNumber.from(4000));
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
   //       await leverageStrategyExtension.iterateRebalance(subjectExchangeName);
 
   //       // Clear balance of USDC from exchange contract from engage
-  //       await tradeAdapterMock.withdraw(setV2Setup.usdc.address);
-  //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(800000000));
+  //       await tradeAdapterMock.withdraw(systemSetup.usdc.address);
+  //       await systemSetup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(800000000));
 
   //       const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
   //         twapMaxTradeSize: ether(1.9),
@@ -2985,7 +2981,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       const basePrice = ether(1000);
   //       const quotePrice = ether(1);
-  //       const reserveConfig = await perpV2Setup.protocolDataProvider.getReserveConfigurationData(setV2Setup.weth.address);
+  //       const reserveConfig = await perpV2Setup.protocolDataProvider.getReserveConfigurationData(systemSetup.weth.address);
   //       const collateralFactor = reserveConfig.liquidationThreshold.mul(BigNumber.from(10).pow(14));
 
   //       await subject();
@@ -3024,7 +3020,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       const expectedSecondPositionUnit = (await usdcVariableDebtToken.balanceOf(setToken.address)).mul(-1);
   //       expect(initialPositions.length).to.eq(2);
   //       expect(currentPositions.length).to.eq(2);
-  //       expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //       expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //       expect(newSecondPosition.positionState).to.eq(1); // External
   //       expect(newSecondPosition.unit).to.eq(expectedSecondPositionUnit);
   //       expect(newSecondPosition.module).to.eq(perpV2LeverageModule.address);
@@ -3046,23 +3042,23 @@ describe.only("LeverageStrategyExtension", () => {
   //       await initializeRootScopeContracts();
 
   //       // Approve tokens to issuance module and call issue
-  //       await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //       await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //       // Issue 1 SetToken
   //       const issueQuantity = ether(1);
-  //       await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //       await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.25));
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.25));
 
   //       // Engage to initial leverage
   //       await leverageStrategyExtension.engage(subjectExchangeName);
 
   //       // Withdraw balance of USDC from exchange contract from engage
-  //       await tradeAdapterMock.withdraw(setV2Setup.usdc.address);
+  //       await tradeAdapterMock.withdraw(systemSetup.usdc.address);
 
   //       const usdcBorrowBalance = await usdcVariableDebtToken.balanceOf(setToken.address);
   //       // Transfer more than the borrow balance to the exchange
-  //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, usdcBorrowBalance.add(1000000000));
+  //       await systemSetup.usdc.transfer(tradeAdapterMock.address, usdcBorrowBalance.add(1000000000));
   //       subjectCaller = owner;
   //     });
 
@@ -3112,13 +3108,13 @@ describe.only("LeverageStrategyExtension", () => {
   //     it("should remove any external positions on the borrow asset", async () => {
   //       await subject();
 
-  //       const borrowAssetExternalModules = await setToken.getExternalPositionModules(setV2Setup.usdc.address);
+  //       const borrowAssetExternalModules = await setToken.getExternalPositionModules(systemSetup.usdc.address);
   //       const borrowExternalUnit = await setToken.getExternalPositionRealUnit(
-  //         setV2Setup.usdc.address,
+  //         systemSetup.usdc.address,
   //         perpV2LeverageModule.address
   //       );
   //       const isPositionModule = await setToken.isExternalPositionModule(
-  //         setV2Setup.usdc.address,
+  //         systemSetup.usdc.address,
   //         perpV2LeverageModule.address
   //       );
 
@@ -3132,7 +3128,7 @@ describe.only("LeverageStrategyExtension", () => {
 
   //       // The USDC position is positive and represents equity
   //       const newSecondPosition = (await setToken.getPositions())[1];
-  //       expect(newSecondPosition.component).to.eq(setV2Setup.usdc.address);
+  //       expect(newSecondPosition.component).to.eq(systemSetup.usdc.address);
   //       expect(newSecondPosition.positionState).to.eq(0); // Default
   //       expect(BigNumber.from(newSecondPosition.unit)).to.gt(ZERO);
   //       expect(newSecondPosition.module).to.eq(ADDRESS_ZERO);
@@ -3272,13 +3268,13 @@ describe.only("LeverageStrategyExtension", () => {
   //       initializeSubjectVariables();
 
   //       // Approve tokens to issuance module and call issue
-  //       await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //       await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //       // Issue 1 SetToken
   //       const issueQuantity = ether(1);
-  //       await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //       await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //       // Engage to initial leverage
   //       await leverageStrategyExtension.engage(exchangeName);
@@ -3385,13 +3381,13 @@ describe.only("LeverageStrategyExtension", () => {
   //       initializeSubjectVariables();
 
   //       // Approve tokens to issuance module and call issue
-  //       await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //       await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //       // Issue 1 SetToken
   //       const issueQuantity = ether(1);
-  //       await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //       await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //       // Engage to initial leverage
   //       await leverageStrategyExtension.engage(exchangeName);
@@ -3492,13 +3488,13 @@ describe.only("LeverageStrategyExtension", () => {
   //       initializeSubjectVariables();
 
   //       // Approve tokens to issuance module and call issue
-  //       await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //       await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //       // Issue 1 SetToken
   //       const issueQuantity = ether(1);
-  //       await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //       await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //       // Engage to initial leverage
   //       await leverageStrategyExtension.engage(exchangeName);
@@ -3796,13 +3792,13 @@ describe.only("LeverageStrategyExtension", () => {
   //       initializeSubjectVariables();
 
   //       // Approve tokens to issuance module and call issue
-  //       await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //       await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //       // Issue 1 SetToken
   //       const issueQuantity = ether(1);
-  //       await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //       await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
-  //       await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //       await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //       // Engage to initial leverage
   //       await leverageStrategyExtension.engage(exchangeName);
@@ -3819,13 +3815,13 @@ describe.only("LeverageStrategyExtension", () => {
   //     await initializeRootScopeContracts();
 
   //     // Approve tokens to issuance module and call issue
-  //     await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //     await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //     // Issue 1 SetToken
   //     const issueQuantity = ether(1);
-  //     await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //     await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
-  //     await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //     await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //     // Add allowed trader
   //     await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
@@ -3833,7 +3829,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     // Engage to initial leverage
   //     await leverageStrategyExtension.engage(exchangeName);
   //     await increaseTimeAsync(BigNumber.from(100000));
-  //     await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //     await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //     await leverageStrategyExtension.iterateRebalance(exchangeName);
   //   });
@@ -3887,13 +3883,13 @@ describe.only("LeverageStrategyExtension", () => {
   //     await initializeRootScopeContracts();
 
   //     // Approve tokens to issuance module and call issue
-  //     await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //     await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //     // Issue 1 SetToken
   //     const issueQuantity = ether(1);
-  //     await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //     await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
-  //     await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //     await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //     // Add allowed trader
   //     await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
@@ -3901,7 +3897,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     // Engage to initial leverage
   //     await leverageStrategyExtension.engage(exchangeName);
   //     await increaseTimeAsync(BigNumber.from(100000));
-  //     await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //     await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //     await leverageStrategyExtension.iterateRebalance(exchangeName);
   //   });
@@ -3913,7 +3909,7 @@ describe.only("LeverageStrategyExtension", () => {
   //   context("when in the midst of a TWAP rebalance", async () => {
   //     cacheBeforeEach(async () => {
   //       // Withdraw balance of USDC from exchange contract from engage
-  //       await tradeAdapterMock.withdraw(setV2Setup.usdc.address);
+  //       await tradeAdapterMock.withdraw(systemSetup.usdc.address);
 
   //       // > Max trade size
   //       const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
@@ -3926,7 +3922,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       await leverageStrategyExtension.updateEnabledExchange(exchangeName, newPerpV2ExchangeSettings);
 
   //       // Set up new rebalance TWAP
-  //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
+  //       await systemSetup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
   //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
   //       await increaseTimeAsync(BigNumber.from(100000));
   //       await leverageStrategyExtension.rebalance(exchangeName);
@@ -4083,13 +4079,13 @@ describe.only("LeverageStrategyExtension", () => {
   //     await initializeRootScopeContracts();
 
   //     // Approve tokens to issuance module and call issue
-  //     await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //     await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //     // Issue 1 SetToken
   //     const issueQuantity = ether(1);
-  //     await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //     await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
-  //     await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //     await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //     // Add allowed trader
   //     await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
@@ -4097,7 +4093,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     // Engage to initial leverage
   //     await leverageStrategyExtension.engage(exchangeName);
   //     await increaseTimeAsync(BigNumber.from(100000));
-  //     await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //     await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //     await leverageStrategyExtension.iterateRebalance(exchangeName);
   //   });
@@ -4117,7 +4113,7 @@ describe.only("LeverageStrategyExtension", () => {
   //   context("when in the midst of a TWAP rebalance", async () => {
   //     beforeEach(async () => {
   //       // Withdraw balance of USDC from exchange contract from engage
-  //       await tradeAdapterMock.withdraw(setV2Setup.usdc.address);
+  //       await tradeAdapterMock.withdraw(systemSetup.usdc.address);
 
   //       // > Max trade size
   //       const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
@@ -4130,7 +4126,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       await leverageStrategyExtension.updateEnabledExchange(exchangeName, newPerpV2ExchangeSettings);
 
   //       // Set up new rebalance TWAP
-  //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
+  //       await systemSetup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
   //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
   //       await increaseTimeAsync(BigNumber.from(100000));
   //       await leverageStrategyExtension.rebalance(exchangeName);
@@ -4304,13 +4300,13 @@ describe.only("LeverageStrategyExtension", () => {
   //     await initializeRootScopeContracts();
 
   //     // Approve tokens to issuance module and call issue
-  //     await aWeth.approve(setV2Setup.issuanceModule.address, ether(1000));
+  //     await aWeth.approve(systemSetup.issuanceModule.address, ether(1000));
 
   //     // Issue 1 SetToken
   //     const issueQuantity = ether(1);
-  //     await setV2Setup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
+  //     await systemSetup.issuanceModule.issue(setToken.address, issueQuantity, owner.address);
 
-  //     await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //     await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //     // Add allowed trader
   //     await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
@@ -4324,7 +4320,7 @@ describe.only("LeverageStrategyExtension", () => {
   //     // Engage to initial leverage
   //     await leverageStrategyExtension.engage(exchangeName);
   //     await increaseTimeAsync(BigNumber.from(100000));
-  //     await setV2Setup.weth.transfer(tradeAdapterMock.address, ether(0.5));
+  //     await systemSetup.weth.transfer(tradeAdapterMock.address, ether(0.5));
 
   //     await leverageStrategyExtension.iterateRebalance(exchangeName);
   //   });
@@ -4336,7 +4332,7 @@ describe.only("LeverageStrategyExtension", () => {
   //   context("when in the midst of a TWAP rebalance", async () => {
   //     beforeEach(async () => {
   //       // Withdraw balance of USDC from exchange contract from engage
-  //       await tradeAdapterMock.withdraw(setV2Setup.usdc.address);
+  //       await tradeAdapterMock.withdraw(systemSetup.usdc.address);
 
   //       // > Max trade size
   //       const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
@@ -4349,7 +4345,7 @@ describe.only("LeverageStrategyExtension", () => {
   //       await leverageStrategyExtension.updateEnabledExchange(exchangeName, newPerpV2ExchangeSettings);
 
   //       // Set up new rebalance TWAP
-  //       await setV2Setup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
+  //       await systemSetup.usdc.transfer(tradeAdapterMock.address, BigNumber.from(4000000));
   //       await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
   //       await increaseTimeAsync(BigNumber.from(100000));
   //       await leverageStrategyExtension.rebalance(exchangeName);

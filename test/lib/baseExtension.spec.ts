@@ -4,19 +4,28 @@ import { BigNumber } from "ethers";
 import { Account, Address, Bytes } from "@utils/types";
 import { ZERO, ADDRESS_ZERO } from "@utils/constants";
 import { BaseExtensionMock, BaseManagerV2 } from "@utils/contracts/index";
-import { SetToken } from "@utils/contracts/setV2";
-import { ContractCallerMock } from "@utils/contracts/setV2";
 
 import DeployHelper from "@utils/deploys";
+
 import {
   addSnapshotBeforeRestoreAfterEach,
   getAccounts,
   getWaffleExpect,
   getRandomAccount,
-  getSetFixture,
   ether,
 } from "@utils/index";
-import { SetFixture } from "@utils/fixtures";
+
+import {
+  ContractCallerMock,
+  SetToken
+} from "@setprotocol/set-protocol-v2/dist/utils/contracts"
+
+import { getSystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/test";
+
+import {
+  SystemFixture
+} from "@setprotocol/set-protocol-v2/dist/utils/fixtures"
+
 import { ContractTransaction } from "ethers";
 
 const expect = getWaffleExpect();
@@ -27,7 +36,7 @@ describe("BaseExtension", () => {
   let otherAccount: Account;
   let deployer: DeployHelper;
   let setToken: SetToken;
-  let setV2Setup: SetFixture;
+  let systemSetup: SystemFixture;
 
   let baseManagerV2: BaseManagerV2;
   let baseExtensionMock: BaseExtensionMock;
@@ -41,17 +50,17 @@ describe("BaseExtension", () => {
 
     deployer = new DeployHelper(owner.wallet);
 
-    setV2Setup = getSetFixture(owner.address);
-    await setV2Setup.initialize();
+    systemSetup = getSystemFixture(owner.address);
+    await systemSetup.initialize();
 
-    setToken = await setV2Setup.createSetToken(
-      [setV2Setup.dai.address],
+    setToken = await systemSetup.createSetToken(
+      [systemSetup.dai.address],
       [ether(1)],
-      [setV2Setup.issuanceModule.address, setV2Setup.streamingFeeModule.address]
+      [systemSetup.issuanceModule.address, systemSetup.streamingFeeModule.address]
     );
 
     // Initialize modules
-    await setV2Setup.issuanceModule.initialize(setToken.address, ADDRESS_ZERO);
+    await systemSetup.issuanceModule.initialize(setToken.address, ADDRESS_ZERO);
     const feeRecipient = owner.address;
     const maxStreamingFeePercentage = ether(.1);
     const streamingFeePercentage = ether(.02);
@@ -61,7 +70,7 @@ describe("BaseExtension", () => {
       streamingFeePercentage,
       lastStreamingFeeTimestamp: ZERO,
     };
-    await setV2Setup.streamingFeeModule.initialize(setToken.address, streamingFeeSettings);
+    await systemSetup.streamingFeeModule.initialize(setToken.address, streamingFeeSettings);
 
     // Deploy BaseManager
     baseManagerV2 = await deployer.manager.deployBaseManagerV2(
@@ -157,7 +166,7 @@ describe("BaseExtension", () => {
       let contractCaller: ContractCallerMock;
 
       beforeEach(async () => {
-        contractCaller = await deployer.setV2.deployContractCallerMock();
+        contractCaller = await deployer.setDeployer.mocks.deployContractCallerMock();
 
         subjectTarget = baseExtensionMock.address;
         subjectCallData = baseExtensionMock.interface.encodeFunctionData("testOnlyEOA");
@@ -220,8 +229,8 @@ describe("BaseExtension", () => {
     let subjectCaller: Account;
 
     beforeEach(async () => {
-      subjectModule = setV2Setup.streamingFeeModule.address;
-      subjectCallData = setV2Setup.streamingFeeModule.interface.encodeFunctionData("updateFeeRecipient", [
+      subjectModule = systemSetup.streamingFeeModule.address;
+      subjectCallData = systemSetup.streamingFeeModule.interface.encodeFunctionData("updateFeeRecipient", [
         setToken.address,
         otherAccount.address,
       ]);
@@ -234,7 +243,7 @@ describe("BaseExtension", () => {
 
     it("should call updateFeeRecipient on the streaming fee module from the SetToken", async () => {
       await subject();
-      const feeStates = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
+      const feeStates = await systemSetup.streamingFeeModule.feeStates(setToken.address);
       expect(feeStates.feeRecipient).to.eq(otherAccount.address);
     });
   });
@@ -245,11 +254,11 @@ describe("BaseExtension", () => {
     let subjectAmount: BigNumber;
 
     beforeEach(async () => {
-      subjectToken = setV2Setup.weth.address;
+      subjectToken = systemSetup.weth.address;
       subjectDestination = otherAccount.address;
       subjectAmount = ether(1);
 
-      await setV2Setup.weth.transfer(baseManagerV2.address, subjectAmount);
+      await systemSetup.weth.transfer(baseManagerV2.address, subjectAmount);
     });
 
     async function subject(): Promise<ContractTransaction> {
@@ -261,13 +270,13 @@ describe("BaseExtension", () => {
     }
 
     it("should send the given amount from the manager to the address", async () => {
-      const preManagerAmount = await setV2Setup.weth.balanceOf(baseManagerV2.address);
-      const preDestinationAmount = await setV2Setup.weth.balanceOf(subjectDestination);
+      const preManagerAmount = await systemSetup.weth.balanceOf(baseManagerV2.address);
+      const preDestinationAmount = await systemSetup.weth.balanceOf(subjectDestination);
 
       await subject();
 
-      const postManagerAmount = await setV2Setup.weth.balanceOf(baseManagerV2.address);
-      const postDestinationAmount = await setV2Setup.weth.balanceOf(subjectDestination);
+      const postManagerAmount = await systemSetup.weth.balanceOf(baseManagerV2.address);
+      const postDestinationAmount = await systemSetup.weth.balanceOf(subjectDestination);
 
       expect(preManagerAmount.sub(postManagerAmount)).to.eq(subjectAmount);
       expect(postDestinationAmount.sub(preDestinationAmount)).to.eq(subjectAmount);

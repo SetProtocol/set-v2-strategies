@@ -4,24 +4,26 @@ import { solidityKeccak256 } from "ethers/lib/utils";
 import { Address, Account } from "@utils/types";
 import { ADDRESS_ZERO, ZERO, ONE_DAY_IN_SECONDS, ONE_YEAR_IN_SECONDS } from "@utils/constants";
 import { StreamingFeeSplitExtension, BaseManagerV2 } from "@utils/contracts/index";
-import { StreamingFeeModule } from "@utils/contracts/setV2";
-import { SetToken } from "@utils/contracts/setV2";
+import { SetToken, StreamingFeeModule } from "@setprotocol/set-protocol-v2/dist/utils/contracts";
 import DeployHelper from "@utils/deploys";
 import {
   addSnapshotBeforeRestoreAfterEach,
   ether,
   getAccounts,
   getLastBlockTimestamp,
-  getSetFixture,
-  getStreamingFee,
-  getStreamingFeeInflationAmount,
   getTransactionTimestamp,
   getWaffleExpect,
   increaseTimeAsync,
   preciseMul,
   getRandomAccount
 } from "@utils/index";
-import { SetFixture } from "@utils/fixtures";
+
+import { getStreamingFee, getStreamingFeeInflationAmount } from "@setprotocol/set-protocol-v2/dist/utils/common";
+
+import { getSystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/test";
+
+import { SystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
+
 import { BigNumber, ContractTransaction } from "ethers";
 
 const expect = getWaffleExpect();
@@ -31,7 +33,7 @@ describe("StreamingFeeSplitExtension", () => {
   let methodologist: Account;
   let operator: Account;
   let operatorFeeRecipient: Account;
-  let setV2Setup: SetFixture;
+  let systemSetup: SystemFixture;
 
   let deployer: DeployHelper;
   let setToken: SetToken;
@@ -49,13 +51,13 @@ describe("StreamingFeeSplitExtension", () => {
 
     deployer = new DeployHelper(owner.wallet);
 
-    setV2Setup = getSetFixture(owner.address);
-    await setV2Setup.initialize();
+    systemSetup = getSystemFixture(owner.address);
+    await systemSetup.initialize();
 
-    setToken = await setV2Setup.createSetToken(
-      [setV2Setup.dai.address],
+    setToken = await systemSetup.createSetToken(
+      [systemSetup.dai.address],
       [ether(1)],
-      [setV2Setup.issuanceModule.address, setV2Setup.streamingFeeModule.address]
+      [systemSetup.issuanceModule.address, systemSetup.streamingFeeModule.address]
     );
 
     // Deploy BaseManager
@@ -75,9 +77,9 @@ describe("StreamingFeeSplitExtension", () => {
       streamingFeePercentage,
       lastStreamingFeeTimestamp: ZERO,
     };
-    await setV2Setup.streamingFeeModule.initialize(setToken.address, streamingFeeSettings);
+    await systemSetup.streamingFeeModule.initialize(setToken.address, streamingFeeSettings);
 
-    await setV2Setup.issuanceModule.initialize(
+    await systemSetup.issuanceModule.initialize(
       setToken.address,
       ADDRESS_ZERO
     );
@@ -93,7 +95,7 @@ describe("StreamingFeeSplitExtension", () => {
 
     beforeEach(async () => {
       subjectManager = baseManagerV2.address;
-      subjectStreamingFeeModule = setV2Setup.streamingFeeModule.address;
+      subjectStreamingFeeModule = systemSetup.streamingFeeModule.address;
       subjectOperatorFeeSplit = ether(.7);
       subjectOperatorFeeRecipient = operatorFeeRecipient.address;
     });
@@ -149,7 +151,7 @@ describe("StreamingFeeSplitExtension", () => {
     beforeEach(async () => {
       feeExtension = await deployer.extensions.deployStreamingFeeSplitExtension(
         baseManagerV2.address,
-        setV2Setup.streamingFeeModule.address,
+        systemSetup.streamingFeeModule.address,
         operatorSplit,
         operatorFeeRecipient.address
       );
@@ -162,7 +164,7 @@ describe("StreamingFeeSplitExtension", () => {
       // Protect StreamingFeeModule
       await baseManagerV2
         .connect(operator.wallet)
-        .protectModule(setV2Setup.streamingFeeModule.address, [feeExtension.address]);
+        .protectModule(systemSetup.streamingFeeModule.address, [feeExtension.address]);
 
       // Set extension as fee recipient
       await feeExtension.connect(operator.wallet).updateFeeRecipient(feeExtension.address);
@@ -175,8 +177,8 @@ describe("StreamingFeeSplitExtension", () => {
 
       beforeEach(async () => {
         mintedTokens = ether(2);
-        await setV2Setup.dai.approve(setV2Setup.issuanceModule.address, ether(3));
-        await setV2Setup.issuanceModule.issue(setToken.address, mintedTokens, owner.address);
+        await systemSetup.dai.approve(systemSetup.issuanceModule.address, ether(3));
+        await systemSetup.issuanceModule.issue(setToken.address, mintedTokens, owner.address);
 
         await increaseTimeAsync(timeFastForward);
       });
@@ -186,13 +188,13 @@ describe("StreamingFeeSplitExtension", () => {
       }
 
       it("should send correct amount of fees to operator fee recipient and methodologist", async () => {
-        const feeState: any = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
+        const feeState: any = await systemSetup.streamingFeeModule.feeStates(setToken.address);
         const totalSupply = await setToken.totalSupply();
 
         const txnTimestamp = await getTransactionTimestamp(subject());
 
         const expectedFeeInflation = await getStreamingFee(
-          setV2Setup.streamingFeeModule,
+          systemSetup.streamingFeeModule,
           setToken.address,
           feeState.lastStreamingFeeTimestamp,
           txnTimestamp
@@ -253,16 +255,16 @@ describe("StreamingFeeSplitExtension", () => {
         let totalSupply: BigNumber;
 
         beforeEach(async () => {
-          feeState = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
+          feeState = await systemSetup.streamingFeeModule.feeStates(setToken.address);
           totalSupply = await setToken.totalSupply();
 
           // Accrue fees to extension by StreamingFeeModule by direct call
           txnTimestamp = await getTransactionTimestamp(
-            setV2Setup.streamingFeeModule.accrueFee(setToken.address)
+            systemSetup.streamingFeeModule.accrueFee(setToken.address)
           );
 
           expectedFeeInflation = await getStreamingFee(
-            setV2Setup.streamingFeeModule,
+            systemSetup.streamingFeeModule,
             setToken.address,
             feeState.lastStreamingFeeTimestamp,
             txnTimestamp
@@ -274,12 +276,12 @@ describe("StreamingFeeSplitExtension", () => {
 
           // Revoke extension authorization
           await baseManagerV2.connect(operator.wallet).revokeExtensionAuthorization(
-            setV2Setup.streamingFeeModule.address,
+            systemSetup.streamingFeeModule.address,
             feeExtension.address
           );
 
           await baseManagerV2.connect(methodologist.wallet).revokeExtensionAuthorization(
-            setV2Setup.streamingFeeModule.address,
+            systemSetup.streamingFeeModule.address,
             feeExtension.address
           );
 
@@ -320,8 +322,8 @@ describe("StreamingFeeSplitExtension", () => {
         subjectOperatorFeeRecipient = operator.address;
 
         // Deploy new fee module
-        subjectModule = await deployer.setV2.deployStreamingFeeModule(setV2Setup.controller.address);
-        await setV2Setup.controller.addModule(subjectModule.address);
+        subjectModule = await deployer.setDeployer.modules.deployStreamingFeeModule(systemSetup.controller.address);
+        await systemSetup.controller.addModule(subjectModule.address);
 
         // Deploy new fee extension
         subjectExtension = await deployer.extensions.deployStreamingFeeSplitExtension(
@@ -333,13 +335,13 @@ describe("StreamingFeeSplitExtension", () => {
 
         // Replace module and extension
         await baseManagerV2.connect(operator.wallet).replaceProtectedModule(
-          setV2Setup.streamingFeeModule.address,
+          systemSetup.streamingFeeModule.address,
           subjectModule.address,
           [subjectExtension.address]
         );
 
         await baseManagerV2.connect(methodologist.wallet).replaceProtectedModule(
-          setV2Setup.streamingFeeModule.address,
+          systemSetup.streamingFeeModule.address,
           subjectModule.address,
           [subjectExtension.address]
         );
@@ -419,8 +421,8 @@ describe("StreamingFeeSplitExtension", () => {
 
       beforeEach(async () => {
         mintedTokens = ether(2);
-        await setV2Setup.dai.approve(setV2Setup.issuanceModule.address, ether(3));
-        await setV2Setup.issuanceModule.issue(setToken.address, mintedTokens, owner.address);
+        await systemSetup.dai.approve(systemSetup.issuanceModule.address, ether(3));
+        await systemSetup.issuanceModule.issue(setToken.address, mintedTokens, owner.address);
 
         await increaseTimeAsync(timeFastForward);
 
@@ -456,21 +458,21 @@ describe("StreamingFeeSplitExtension", () => {
             await subject(subjectOperatorCaller);
             await subject(subjectMethodologistCaller);
 
-            const feeState = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
+            const feeState = await systemSetup.streamingFeeModule.feeStates(setToken.address);
 
             expect(feeState.streamingFeePercentage).to.eq(subjectNewFee);
           });
 
           it("should send correct amount of fees to the fee extension", async () => {
             const preExtensionBalance = await setToken.balanceOf(feeExtension.address);
-            const feeState: any = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
+            const feeState: any = await systemSetup.streamingFeeModule.feeStates(setToken.address);
             const totalSupply = await setToken.totalSupply();
 
             await subject(subjectOperatorCaller);
             const txnTimestamp = await getTransactionTimestamp(subject(subjectMethodologistCaller));
 
             const expectedFeeInflation = await getStreamingFee(
-              setV2Setup.streamingFeeModule,
+              systemSetup.streamingFeeModule,
               setToken.address,
               feeState.lastStreamingFeeTimestamp,
               txnTimestamp,
@@ -513,21 +515,21 @@ describe("StreamingFeeSplitExtension", () => {
             await subject(subjectOperatorCaller);
             await subject(subjectMethodologistCaller);
 
-            const feeState = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
+            const feeState = await systemSetup.streamingFeeModule.feeStates(setToken.address);
 
             expect(feeState.streamingFeePercentage).to.eq(subjectNewFee);
           });
 
           it("should send correct amount of fees to the fee extension", async () => {
             const preExtensionBalance = await setToken.balanceOf(feeExtension.address);
-            const feeState: any = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
+            const feeState: any = await systemSetup.streamingFeeModule.feeStates(setToken.address);
             const totalSupply = await setToken.totalSupply();
 
             await subject(subjectOperatorCaller);
             const txnTimestamp = await getTransactionTimestamp(subject(subjectMethodologistCaller));
 
             const expectedFeeInflation = await getStreamingFee(
-              setV2Setup.streamingFeeModule,
+              systemSetup.streamingFeeModule,
               setToken.address,
               feeState.lastStreamingFeeTimestamp,
               txnTimestamp,
@@ -573,7 +575,7 @@ describe("StreamingFeeSplitExtension", () => {
         await subject(subjectOperatorCaller);
         await subject(subjectMethodologistCaller);
 
-        const streamingFeeState = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
+        const streamingFeeState = await systemSetup.streamingFeeModule.feeStates(setToken.address);
 
         expect(streamingFeeState.feeRecipient).to.eq(subjectNewFeeRecipient);
       });
@@ -615,8 +617,8 @@ describe("StreamingFeeSplitExtension", () => {
       const timeFastForward: BigNumber = ONE_YEAR_IN_SECONDS;
 
       beforeEach(async () => {
-        await setV2Setup.dai.approve(setV2Setup.issuanceModule.address, ether(3));
-        await setV2Setup.issuanceModule.issue(setToken.address, mintedTokens, owner.address);
+        await systemSetup.dai.approve(systemSetup.issuanceModule.address, ether(3));
+        await systemSetup.issuanceModule.issue(setToken.address, mintedTokens, owner.address);
 
         await increaseTimeAsync(timeFastForward);
 
@@ -630,14 +632,14 @@ describe("StreamingFeeSplitExtension", () => {
       }
 
       it("should accrue fees and send correct amount to operator fee recipient and methodologist", async () => {
-        const feeState: any = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
+        const feeState: any = await systemSetup.streamingFeeModule.feeStates(setToken.address);
         const totalSupply = await setToken.totalSupply();
 
         await subject(subjectOperatorCaller);
         const txnTimestamp = await getTransactionTimestamp(subject(subjectMethodologistCaller));
 
         const expectedFeeInflation = await getStreamingFee(
-          setV2Setup.streamingFeeModule,
+          systemSetup.streamingFeeModule,
           setToken.address,
           feeState.lastStreamingFeeTimestamp,
           txnTimestamp
