@@ -33,7 +33,7 @@ jobs:
     docker:
       - image: circleci/node:12.16.0
     working_directory: ~/set-v2-strategies
-    parallelism: 3
+    parallelism: 2
     steps:
       - restore_cache:
           key: compiled-env-{{ .Environment.CIRCLE_SHA1 }}
@@ -72,7 +72,7 @@ jobs:
     # need to update the `persist_to_workspace` paths
     # in this job (below) as well as the list of files passed
     # to istanbul-combine in the `report_coverage` job
-    parallelism: 5
+    parallelism: 2
     steps:
       - restore_cache:
           key: compiled-env-{{ .Environment.CIRCLE_SHA1 }}
@@ -98,9 +98,6 @@ jobs:
           paths:
             - cov_0.json
             - cov_1.json
-            - cov_2.json
-            - cov_3.json
-            - cov_4.json
 
   report_coverage:
     docker:
@@ -117,10 +114,8 @@ jobs:
             cp -R /tmp/coverage/* .
             npx istanbul-combine-updated -r lcov \
               cov_0.json \
-              cov_1.json \
-              cov_2.json \
-              cov_3.json \
-              cov_4.json
+              cov_1.json
+
       - run:
           name: Upload coverage
           command: |
