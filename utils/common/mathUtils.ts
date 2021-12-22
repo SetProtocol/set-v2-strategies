@@ -69,8 +69,8 @@ export function sqrt(value: BigNumber) {
   let z = value.add(ONE).div(TWO);
   let y = value;
   while (z.sub(y).isNegative()) {
-      y = z;
-      z = value.div(z).add(z).div(TWO);
+    y = z;
+    z = value.div(z).add(z).div(TWO);
   }
   return y;
 }

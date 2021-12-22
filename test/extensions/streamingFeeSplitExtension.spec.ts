@@ -302,7 +302,7 @@ describe("StreamingFeeSplitExtension", () => {
 
           expect(operatorFeeRecipientBalance).to.eq(expectedOperatorTake);
           expect(methodologistBalance).to.eq(expectedMethodologistTake);
-          });
+        });
       });
     });
 
@@ -355,7 +355,7 @@ describe("StreamingFeeSplitExtension", () => {
       });
 
       async function subject(caller: Account): Promise<ContractTransaction> {
-         return await subjectExtension.connect(caller.wallet).initializeModule(subjectFeeSettings);
+        return await subjectExtension.connect(caller.wallet).initializeModule(subjectFeeSettings);
       }
 
       context("when both parties call the method", async () => {

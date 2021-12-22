@@ -1517,14 +1517,14 @@ describe("BaseManagerV2", () => {
     });
 
     describe("when the caller is not an extension", async () => {
-        beforeEach(async () => {
-          await baseManager.connect(operator.wallet).removeExtension(baseExtension.address);
-        });
-
-        it("should revert", async () => {
-          await expect(subject()).to.be.revertedWith("Must be extension");
-        });
+      beforeEach(async () => {
+        await baseManager.connect(operator.wallet).removeExtension(baseExtension.address);
       });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be extension");
+      });
+    });
   });
 
   describe("#removeModule", async () => {

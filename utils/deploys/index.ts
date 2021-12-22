@@ -1,6 +1,6 @@
 import { Signer } from "ethers";
 
-import SetDeployHelper from "@setprotocol/set-protocol-v2/dist/utils/deploys"
+import SetDeployHelper from "@setprotocol/set-protocol-v2/dist/utils/deploys";
 
 import DeployManager from "./deployManager";
 import DeployMocks from "./deployMocks";

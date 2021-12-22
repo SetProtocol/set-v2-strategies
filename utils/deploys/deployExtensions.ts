@@ -21,7 +21,7 @@ export default class DeployExtensions {
   constructor(deployerSigner: Signer) {
     this._deployerSigner = deployerSigner;
   }
- 
+
   public async deployPerpV2LeverageStrategyExtension(
     manager: Address,
     contractSettings: PerpV2ContractSettings,
