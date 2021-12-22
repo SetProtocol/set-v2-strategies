@@ -36,3 +36,10 @@ export {
   usdc,
   wbtc,
 } from "./common";
+
+export {
+  calculateNewLeverageRatio,
+  calculateCollateralRebalanceUnits,
+  calculateMaxBorrowForDelever,
+  calculateMaxRedeemForDeleverToZero
+} from "./flexibleLeverageUtils";

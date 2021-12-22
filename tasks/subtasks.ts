@@ -1,13 +1,9 @@
-import fs from "fs-extra";
-
 import {
   TASK_COMPILE_SOLIDITY_GET_ARTIFACT_FROM_COMPILATION_OUTPUT,
 } from "hardhat/builtin-tasks/task-names";
 
-import { TASK_TYPECHAIN_GENERATE_TYPES } from "@typechain/hardhat/dist/constants";
-
 import { subtask } from "hardhat/config";
-import { addGasToAbiMethods, removeGasFromAbiMethods } from "@setprotocol/set-protocol-v2/dist/utils/tasks";
+import { addGasToAbiMethods } from "@setprotocol/set-protocol-v2/dist/utils/tasks";
 
 // Injects network block limit (minus 1 million) in the abi so
 // ethers uses it instead of running gas estimation.
