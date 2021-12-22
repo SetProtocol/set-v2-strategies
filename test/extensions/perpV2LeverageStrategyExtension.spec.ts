@@ -177,11 +177,11 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
     const rebalanceInterval = BigNumber.from(86400);
 
     const unutilizedLeveragePercentage = ether(0.01);
-    const twapMaxTradeSize = ether(1);
+    const twapMaxTradeSize = ether(20);
     const twapCooldownPeriod = BigNumber.from(3000);
     const slippageTolerance = ether(0.015);
 
-    const incentivizedTwapMaxTradeSize = ether(2);
+    const incentivizedTwapMaxTradeSize = ether(25);
     const incentivizedTwapCooldownPeriod = BigNumber.from(60);
     const incentivizedSlippageTolerance = ether(0.05);
     const etherReward = ether(1);
@@ -232,8 +232,8 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
     await baseManagerV2.connect(owner.wallet).addExtension(leverageStrategyExtension.address);
     await baseManagerV2.connect(methodologist.wallet).authorizeInitialization();
 
-    await perpV2Setup.usdc.approve(issuanceModule.address, usdc(1000));
-    await issuanceModule.connect(owner.wallet).issue(setToken.address, ether(10), owner.address);
+    await perpV2Setup.usdc.approve(issuanceModule.address, usdc(10000));
+    await issuanceModule.connect(owner.wallet).issue(setToken.address, ether(100), owner.address);
   };
 
   describe("#constructor", async () => {
@@ -276,8 +276,8 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
         incentivizedLeverageRatio: ether(3.5),
       };
       subjectPerpV2ExchangeSettings = {
-        twapMaxTradeSize: ether(0.1),
-        incentivizedTwapMaxTradeSize: ether(1),
+        twapMaxTradeSize: ether(5),
+        incentivizedTwapMaxTradeSize: ether(10),
       };
     });
 
@@ -527,8 +527,61 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
         return leverageStrategyExtension.engage();
       }
 
+      context("when rebalance notional is less than max trade size", async () => {
+        it("should open a base token position on Perpetual Protocol", async () => {
+          const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
+
+          const currentCollateral = (await perpV2LeverageModule.getAccountInfo(setToken.address)).collateralBalance;
+          const targetLeverageRatio = (await leverageStrategyExtension.getMethodology()).targetLeverageRatio;
+          const basePrice = (await perpV2Setup.ethPriceFeed.latestAnswer()).div(usdc(1));
+
+          const totalRebalanceNotional = preciseMul(currentCollateral, targetLeverageRatio).div(basePrice);
+
+          await subject();
+
+          const finalPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
+
+          expect(initialPositions.length).to.eq(0);
+          expect(finalPositions.length).to.eq(1);
+          expect(finalPositions[0].baseBalance).to.eq(totalRebalanceNotional);
+          expect(finalPositions[0].baseToken).to.eq(strategy.virtualBaseAddress);
+        });
+
+        it("should NOT set the TWAP leverage ratio", async () => {
+          await subject();
+
+          const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
+
+          expect(twapLeverageRatio).to.eq(ZERO);
+        });
+
+        it("should emit Engaged event", async () => {
+          const currentCollateral = (await perpV2LeverageModule.getAccountInfo(setToken.address)).collateralBalance;
+          const targetLeverageRatio = (await leverageStrategyExtension.getMethodology()).targetLeverageRatio;
+          const basePrice = (await perpV2Setup.ethPriceFeed.latestAnswer()).div(usdc(1));
+
+          const totalRebalanceNotional = preciseMul(currentCollateral, targetLeverageRatio).div(basePrice);
+
+          await expect(subject()).to.emit(leverageStrategyExtension, "Engaged").withArgs(
+            ZERO,
+            methodology.targetLeverageRatio,
+            totalRebalanceNotional,
+            totalRebalanceNotional,
+          );
+        });
+      });
+
       context("when rebalance notional is greater than max trade size", async () => {
         describe("when the collateral balance is not zero", () => {
+          let newPerpV2ExchangeSettings: PerpV2ExchangeSettings;
+
+          beforeEach(async () => {
+            newPerpV2ExchangeSettings = {
+              twapMaxTradeSize: ether(10),
+              incentivizedTwapMaxTradeSize: ether(15),
+            };
+            await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+          });
 
           it("should set the last trade timestamp", async () => {
             await subject();
@@ -555,7 +608,7 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
 
             expect(initialPositions.length).to.eq(0);
             expect(finalPositions.length).to.eq(1);
-            expect(finalPositions[0].baseBalance).to.eq(exchange.twapMaxTradeSize);
+            expect(finalPositions[0].baseBalance).to.eq(newPerpV2ExchangeSettings.twapMaxTradeSize);
             expect(finalPositions[0].baseToken).to.eq(strategy.virtualBaseAddress);
           });
 
@@ -563,7 +616,7 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
             const currentCollateral = (await perpV2LeverageModule.getAccountInfo(setToken.address)).collateralBalance;
             const basePrice = (await perpV2Setup.ethPriceFeed.latestAnswer()).div(usdc(1));
 
-            const chunkRebalanceNotional = exchange.twapMaxTradeSize;
+            const chunkRebalanceNotional = newPerpV2ExchangeSettings.twapMaxTradeSize;
             const totalRebalanceNotional = preciseMul(currentCollateral, methodology.targetLeverageRatio).div(basePrice);
 
             await expect(subject()).to.emit(leverageStrategyExtension, "Engaged").withArgs(
@@ -610,13 +663,18 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
         });
       });
 
-      context("when rebalance notional is less than max trade size", async () => {
+      context("when engaging a short position", async () => {
+        let newMethodologySettings: PerpV2MethodologySettings;
+
         beforeEach(async () => {
-          const newSettings = {
-            twapMaxTradeSize: ether(2.5),
-            incentivizedTwapMaxTradeSize: ether(5),
+          newMethodologySettings = {
+            targetLeverageRatio: ether(2).mul(-1),
+            minLeverageRatio: ether(1.5).mul(-1),
+            maxLeverageRatio: ether(2.5).mul(-1),
+            recenteringSpeed: ether(0.1),
+            rebalanceInterval: BigNumber.from(43200),
           };
-          await leverageStrategyExtension.setExchangeSettings(newSettings);
+          await leverageStrategyExtension.setMethodologySettings(newMethodologySettings);
         });
 
         it("should open a base token position on Perpetual Protocol", async () => {
@@ -655,83 +713,27 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
 
           await expect(subject()).to.emit(leverageStrategyExtension, "Engaged").withArgs(
             ZERO,
-            methodology.targetLeverageRatio,
-            totalRebalanceNotional,
-            totalRebalanceNotional,
-          );
-        });
-      });
-
-      context("when engaging a short position", async () => {
-        let newMethodologySettings: PerpV2MethodologySettings;
-
-        beforeEach(async () => {
-          newMethodologySettings = {
-            targetLeverageRatio: ether(2).mul(-1),
-            minLeverageRatio: ether(1.5).mul(-1),
-            maxLeverageRatio: ether(2.5).mul(-1),
-            recenteringSpeed: ether(0.1),
-            rebalanceInterval: BigNumber.from(43200),
-          };
-          await leverageStrategyExtension.setMethodologySettings(newMethodologySettings);
-        });
-
-        it("should open a base token position on Perpetual Protocol", async () => {
-          const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-
-          const totalRebalanceNotional = exchange.twapMaxTradeSize.mul(-1);
-
-          await subject();
-
-          const finalPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-
-          expect(initialPositions.length).to.eq(0);
-          expect(finalPositions.length).to.eq(1);
-          expect(finalPositions[0].baseBalance).to.eq(totalRebalanceNotional);
-          expect(finalPositions[0].baseToken).to.eq(strategy.virtualBaseAddress);
-        });
-
-        it("should set the TWAP leverage ratio", async () => {
-          await subject();
-
-          const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-
-          expect(twapLeverageRatio).to.eq(methodology.targetLeverageRatio.mul(-1));
-        });
-
-        it("should emit Engaged event", async () => {
-          const currentCollateral = (await perpV2LeverageModule.getAccountInfo(setToken.address)).collateralBalance;
-          const targetLeverageRatio = (await leverageStrategyExtension.getMethodology()).targetLeverageRatio;
-          const basePrice = (await perpV2Setup.ethPriceFeed.latestAnswer()).div(usdc(1));
-
-          const chunkRebalanceNotional = exchange.twapMaxTradeSize.mul(-1);
-          const totalRebalanceNotional = preciseMul(currentCollateral, targetLeverageRatio).div(basePrice);
-
-          await expect(subject()).to.emit(leverageStrategyExtension, "Engaged").withArgs(
-            ZERO,
             newMethodologySettings.targetLeverageRatio,
-            chunkRebalanceNotional,
+            totalRebalanceNotional,
             totalRebalanceNotional,
           );
         });
 
-        describe("when rebalance notional is less than max trade size ", async () => {
+        describe("when rebalance notional is greater than max trade size ", async () => {
+          let newPerpV2ExchangeSettings: PerpV2ExchangeSettings;
+
           beforeEach(async () => {
-            const newSettings = {
-              twapMaxTradeSize: ether(2.5),
-              incentivizedTwapMaxTradeSize: ether(5),
+            newPerpV2ExchangeSettings = {
+              twapMaxTradeSize: ether(10),
+              incentivizedTwapMaxTradeSize: ether(15),
             };
-            await leverageStrategyExtension.setExchangeSettings(newSettings);
+            await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
           });
 
           it("should open a base token position on Perpetual Protocol", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
 
-            const currentCollateral = (await perpV2LeverageModule.getAccountInfo(setToken.address)).collateralBalance;
-            const targetLeverageRatio = (await leverageStrategyExtension.getMethodology()).targetLeverageRatio;
-            const basePrice = (await perpV2Setup.ethPriceFeed.latestAnswer()).div(usdc(1));
-
-            const totalRebalanceNotional = preciseMul(currentCollateral, targetLeverageRatio).div(basePrice);
+            const totalRebalanceNotional = newPerpV2ExchangeSettings.twapMaxTradeSize.mul(-1);
 
             await subject();
 
@@ -743,12 +745,12 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
             expect(finalPositions[0].baseToken).to.eq(strategy.virtualBaseAddress);
           });
 
-          it("should NOT set the TWAP leverage ratio", async () => {
+          it("should set the TWAP leverage ratio", async () => {
             await subject();
 
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
 
-            expect(twapLeverageRatio).to.eq(ZERO);
+            expect(twapLeverageRatio).to.eq(newMethodologySettings.targetLeverageRatio);
           });
 
           it("should emit Engaged event", async () => {
@@ -756,12 +758,13 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
             const targetLeverageRatio = (await leverageStrategyExtension.getMethodology()).targetLeverageRatio;
             const basePrice = (await perpV2Setup.ethPriceFeed.latestAnswer()).div(usdc(1));
 
+            const chunkRebalanceNotional = newPerpV2ExchangeSettings.twapMaxTradeSize.mul(-1);
             const totalRebalanceNotional = preciseMul(currentCollateral, targetLeverageRatio).div(basePrice);
 
             await expect(subject()).to.emit(leverageStrategyExtension, "Engaged").withArgs(
               ZERO,
               newMethodologySettings.targetLeverageRatio,
-              totalRebalanceNotional,
+              chunkRebalanceNotional,
               totalRebalanceNotional,
             );
           });
@@ -777,8 +780,6 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
 
         await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
         await leverageStrategyExtension.engage();
-        await increaseTimeAsync(execution.twapCooldownPeriod);
-        await leverageStrategyExtension.iterateRebalance();
 
         subjectCaller = owner;
       });
@@ -851,7 +852,7 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
           expect(updatedPosition.baseUnit).to.eq(expectedNewPositionUnit);
         });
 
-        it.only("should emit Rebalanced event", async () => {
+        it("should emit Rebalanced event", async () => {
           const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
           const expectedNewLeverageRatio = calculateNewLeverageRatio(
             currentLeverageRatio,
@@ -939,7 +940,7 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
           await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1500).mul(10 ** 8));
 
           newSettings = {
-            twapMaxTradeSize: ether(0.2),
+            twapMaxTradeSize: ether(1),
             incentivizedTwapMaxTradeSize: ether(2),
           };
           await leverageStrategyExtension.setExchangeSettings(newSettings);
@@ -1037,7 +1038,8 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
             initialPositions[0].baseBalance
           );
           const totalSupply = await setToken.totalSupply();
-
+          console.log(initialPositions[0].baseBalance.toString());
+          console.log(await perpV2LeverageModule.getPositionNotionalInfo(setToken.address));
           const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(totalRebalanceNotional), totalSupply);
 
           expect(initialPositions.length).to.eq(1);
@@ -1047,7 +1049,7 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
         });
       });
 
-      describe.only("when rebalance interval has not elapsed above max leverage ratio and greater than max trade size", async () => {
+      describe("when rebalance interval has not elapsed, above max leverage ratio and greater than max trade size", async () => {
         let newSettings: PerpV2ExchangeSettings;
 
         cacheBeforeEach(async () => {
@@ -1055,7 +1057,7 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
           await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
 
           newSettings = {
-            twapMaxTradeSize: ether(0.2),
+            twapMaxTradeSize: ether(1),
             incentivizedTwapMaxTradeSize: ether(2),
           };
           await leverageStrategyExtension.setExchangeSettings(newSettings);
@@ -1084,8 +1086,8 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
             methodology.maxLeverageRatio,
             methodology.recenteringSpeed
           );
-          expect(previousTwapLeverageRatio).to.eq(ZERO);
-          expect(currentTwapLeverageRatio).to.eq(expectedNewLeverageRatio);
+          expect(ZERO).to.eq(previousTwapLeverageRatio);
+          expect(expectedNewLeverageRatio).to.eq(currentTwapLeverageRatio);
         });
 
         it("should update the collateral position on the SetToken correctly", async () => {
@@ -1097,12 +1099,12 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
           const updatedPosition = newPositions[0];
           const totalSupply = await setToken.totalSupply();
 
-          const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(newSettings.twapMaxTradeSize), totalSupply);
+          const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.sub(newSettings.twapMaxTradeSize), totalSupply);
 
           expect(initialPositions.length).to.eq(1);
           expect(newPositions.length).to.eq(1);
-          expect(updatedPosition.baseToken).to.eq(perpV2Setup.vETH.address);
-          expect(updatedPosition.baseUnit).to.eq(expectedNewPositionUnit);
+          expect(perpV2Setup.vETH.address).to.eq(updatedPosition.baseToken);
+          expect(expectedNewPositionUnit).to.eq(updatedPosition.baseUnit);
         });
       });
     });
