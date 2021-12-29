@@ -74,14 +74,14 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         int256 baseBalance;                                 // Balance of virtual base asset from Perp in precise units (10e18). E.g. vWBTC = 10e18
         int256 quoteBalance;                                // Balance of virtual quote asset from Perp in precise units (10e18)
         IPerpV2LeverageModule.AccountInfo accountInfo;      // Info on perpetual account including, collateral amount, owedRealizedPnl and pendingFunding
-        int256 baseValue;                                   // Valuation in USD adjusted for decimals in precise units (10e18)
+        int256 basePositionValue;                           // Valuation in USD adjusted for decimals in precise units (10e18)
         int256 quoteValue;                                  // Valuation in USD adjusted for decimals in precise units (10e18)
         int256 basePrice;                                   // Price of collateral in precise units (10e18) from Chainlink
         int256 quotePrice;                                  // Price of collateral in precise units (10e18) from Chainlink
         uint256 setTotalSupply;                             // Total supply of SetToken
     }
 
-     struct LeverageInfo {
+    struct LeverageInfo {
         ActionInfo action;
         int256 currentLeverageRatio;                    // Current leverage ratio of Set. For short tokens, this will be negative
         uint256 slippageTolerance;                      // Allowable percent trade slippage in preciseUnits (1% = 10^16)
@@ -275,7 +275,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * Note: If the calculated current leverage ratio is above the incentivized leverage ratio or in TWAP then rebalance cannot be called. Instead, you must call
      * ripcord() which is incentivized with a reward in Ether or iterateRebalance().
      */
-     function rebalance() external onlyEOA onlyAllowedCaller(msg.sender) {
+    function rebalance() external onlyEOA onlyAllowedCaller(msg.sender) {
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
             execution.slippageTolerance,
             exchange.twapMaxTradeSize
@@ -418,6 +418,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         invokeManager(address(strategy.perpV2LeverageModule), tradeCallData);
     }
 
+    /*
     function withdraw() external onlyOperator {
         ISetToken setToken = strategy.setToken;
         uint256 depositPositionUnit = setToken.getDefaultPositionRealUnit(
@@ -434,7 +435,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
         invokeManager(address(strategy.perpV2LeverageModule), tradeCallData);
     }
-
+    */
+    
     /**
      * OPERATOR ONLY: Set methodology settings and check new settings are valid. Note: Need to pass in existing parameters if only changing a few settings. Must not be
      * in a rebalance.
@@ -656,10 +658,10 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     /* ============ Internal Functions ============ */
 
     /**
-     * Calculate notional rebalance quantity, whether to chunk rebalance based on max trade size and max quote and invoke lever on AaveLeverageModule
+     * Calculate notional rebalance quantity, whether to chunk rebalance based on max trade size and max quote and invoke lever on PerpV2LeverageModule
      *
      */
-     function _trade(
+    function _trade(
         LeverageInfo memory _leverageInfo,
         int256 _chunkRebalanceNotional
     )
@@ -706,7 +708,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         ActionInfo memory actionInfo = _createActionInfo();
 
         require(actionInfo.setTotalSupply > 0, "SetToken must have > 0 supply");
-        // TBD
+        // TBD: Can instead check for CLR != 0
         // require(actionInfo.baseBalance > 0, "Collateral balance must be > 0");
         // require(actionInfo.quoteBalance > 0, "Borrow balance must exist");
 
@@ -738,10 +740,11 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         rebalanceInfo.quotePrice = rawBorrowPrice.mul(10 ** 10);
 
         rebalanceInfo.baseBalance = strategy.perpV2AccountBalance.getBase(address(strategy.setToken), strategy.virtualBaseAddress);
+        // Note: Fetching quote balance associated with a single position and not the net quote balance
         rebalanceInfo.quoteBalance = strategy.perpV2AccountBalance.getQuote(address(strategy.setToken), strategy.virtualBaseAddress);
         rebalanceInfo.accountInfo = strategy.perpV2LeverageModule.getAccountInfo(strategy.setToken);
 
-        rebalanceInfo.baseValue = rebalanceInfo.basePrice.preciseMul(rebalanceInfo.baseBalance);
+        rebalanceInfo.basePositionValue = rebalanceInfo.basePrice.preciseMul(rebalanceInfo.baseBalance);
         rebalanceInfo.quoteValue = rebalanceInfo.quotePrice.preciseMul(rebalanceInfo.quoteBalance);
 
         rebalanceInfo.setTotalSupply = strategy.setToken.totalSupply();
@@ -871,13 +874,21 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * return int256            Current leverage ratio
      */
     function _calculateCurrentLeverageRatio(ActionInfo memory _actionInfo) internal view returns(int256) {
-        console.logInt(_actionInfo.baseValue);
+        console.logInt(_actionInfo.basePositionValue);
         console.logInt(_actionInfo.quoteValue);
         console.logInt(_actionInfo.accountInfo.collateralBalance);
-        console.logInt(_actionInfo.baseValue.add(_actionInfo.quoteValue).add(_actionInfo.accountInfo.collateralBalance));
-        return _actionInfo.baseValue.preciseDiv(
-            _actionInfo.baseValue.add(_actionInfo.quoteValue).add(_actionInfo.accountInfo.collateralBalance)
-        );
+        console.logInt(_actionInfo.accountInfo.owedRealizedPnl);
+        console.logInt(_actionInfo.accountInfo.pendingFundingPayments);
+        console.logInt(_actionInfo.basePositionValue.add(_actionInfo.quoteValue).add(_actionInfo.accountInfo.collateralBalance));
+        int256 accountValue = _actionInfo.accountInfo.collateralBalance
+            .add(_actionInfo.accountInfo.owedRealizedPnl)
+            .add(_actionInfo.accountInfo.pendingFundingPayments)
+            .add(_actionInfo.basePositionValue)
+            .add(_actionInfo.quoteValue);
+        
+        // accountMarginRatio = accountValue / sum(abs(positionValue[ith_market]))
+        // CLR = 1 / accountMarginRatio = sum(abs(positionValue[ith_market])) / accountValue
+        return _absUint256(_actionInfo.basePositionValue).toInt256().preciseDiv(accountValue);
     }
 
     /**
@@ -953,6 +964,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         pure
         returns (int256, int256)
     {
+        // TBD: This doesn't work if other factors which contribute to the leverage ratio are part of the set's position.
         int256 totalRebalanceNotional = _leverageInfo.action.accountInfo.collateralBalance.preciseMul(_newLeverageRatio).preciseDiv(_leverageInfo.action.basePrice);
 
         uint256 chunkRebalanceNotionalAbs = Math.min(_absUint256(totalRebalanceNotional), _leverageInfo.twapMaxTradeSize);

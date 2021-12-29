@@ -42,7 +42,7 @@ import { BaseManagerV2, PerpV2LeverageStrategyExtension } from "@utils/contracts
 
 const expect = getWaffleExpect();
 
-describe.only("PerpV2LeverageStrategyExtension", () => {
+describe("PerpV2LeverageStrategyExtension", () => {
   let owner: Account;
   let methodologist: Account;
   let maker: Account;
@@ -84,6 +84,10 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
     await systemSetup.initialize();
     perpV2Setup = getPerpV2Fixture(owner.address);
     await perpV2Setup.initialize(maker, taker);
+
+    // set funding rate to zero; allows us to avoid calculating small amounts of funding
+    // accrued in our test cases
+    await perpV2Setup.clearingHouseConfig.setMaxFundingRate(ZERO);
 
     // Create liquidity
     await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1000));
@@ -825,8 +829,6 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
 
           const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
 
-          await subject();
-
           const expectedNewLeverageRatio = calculateNewLeverageRatio(
             currentLeverageRatio,
             methodology.targetLeverageRatio,
@@ -835,6 +837,8 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
             methodology.recenteringSpeed
           );
 
+          await subject();
+
           const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
           const updatedPosition = newPositions[0];
 
@@ -842,8 +846,8 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
             preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
             initialPositions[0].baseBalance
           );
-          const totalSupply = await setToken.totalSupply();
 
+          const totalSupply = await setToken.totalSupply();
           const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(totalRebalanceNotional), totalSupply);
 
           expect(initialPositions.length).to.eq(1);
@@ -993,8 +997,8 @@ describe.only("PerpV2LeverageStrategyExtension", () => {
 
       context("when current leverage ratio is above target (delever)", async () => {
         cacheBeforeEach(async () => {
-          await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
-          await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(900));
+          await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(950).mul(10 ** 8));
+          await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(950));
 
           await increaseTimeAsync(ONE_DAY_IN_SECONDS);
         });
