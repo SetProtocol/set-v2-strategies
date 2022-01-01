@@ -1,4 +1,6 @@
 import { BigNumber } from "@ethersproject/bignumber";
+import { PerpV2BaseToken, SetToken } from "@setprotocol/set-protocol-v2/dist/typechain";
+import { PerpV2Fixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
 import { ether, preciseMul, preciseDiv } from "../common";
 
 export function calculateNewLeverageRatio(
@@ -55,6 +57,19 @@ export function calculateCollateralRebalanceUnits(
 //   const b = preciseDiv(a, currentLeverageRatio);
 //   return preciseMul(b, collateralBalance);
 // }
+
+export async function calculateTotalRebalanceNotionalPerpV2(
+  setToken: SetToken,
+  baseToken: PerpV2BaseToken,
+  currentLeverageRatio: BigNumber,
+  newLeverageRatio: BigNumber,
+  perpV2Setup: PerpV2Fixture
+): Promise<BigNumber> {
+  const baseBalance = await perpV2Setup.accountBalance.getBase(setToken.address, baseToken.address);
+  const a = newLeverageRatio.sub(currentLeverageRatio);
+  const b = preciseDiv(a, currentLeverageRatio);
+  return preciseMul(b, baseBalance);
+}
 
 export function calculateMaxBorrowForDelever(
   collateralBalance: BigNumber,

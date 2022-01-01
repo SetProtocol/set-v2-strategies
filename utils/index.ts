@@ -41,5 +41,6 @@ export {
   calculateNewLeverageRatio,
   calculateCollateralRebalanceUnits,
   calculateMaxBorrowForDelever,
-  calculateMaxRedeemForDeleverToZero
+  calculateMaxRedeemForDeleverToZero,
+  calculateTotalRebalanceNotionalPerpV2
 } from "./flexibleLeverageUtils";
