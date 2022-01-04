@@ -1652,8 +1652,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
           };
           await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
 
-          preTwapLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-
           await leverageStrategyExtension.connect(owner.wallet).rebalance();
 
           await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
