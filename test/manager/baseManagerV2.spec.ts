@@ -776,7 +776,7 @@ describe("BaseManagerV2", () => {
       });
     });
 
-    describe("when an emergency is already in progress", async () => {
+    describe.skip("when an emergency is already in progress", async () => {
       beforeEach(async () => {
         baseManager.connect(operator.wallet);
 
@@ -918,7 +918,7 @@ describe("BaseManagerV2", () => {
       });
     });
 
-    describe("when an emergency is in progress", async () => {
+    describe.skip("when an emergency is in progress", async () => {
       beforeEach(async () => {
         await baseManager.protectModule(subjectAdditionalModule, []);
         await baseManager.emergencyRemoveProtectedModule(subjectAdditionalModule);
@@ -1301,7 +1301,7 @@ describe("BaseManagerV2", () => {
       });
     });
 
-    describe("when more than one emergency is in progress", async () => {
+    describe.skip("when more than one emergency is in progress", async () => {
       beforeEach(async () => {
         baseManager.connect(operator.wallet);
         await baseManager.protectModule(subjectOldModule, []);
