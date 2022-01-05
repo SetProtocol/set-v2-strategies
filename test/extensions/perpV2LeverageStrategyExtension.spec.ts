@@ -524,6 +524,43 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
     });
 
+    describe.only("#withdraw", async () => {
+      let subjectCaller: Account;
+      beforeEach(async () => {
+        await leverageStrategyExtension.deposit();
+        subjectCaller = owner;
+      });
+
+      async function subject(): Promise<ContractTransaction> {
+        return await leverageStrategyExtension.connect(subjectCaller.wallet).withdraw();
+      }
+
+      it("should withdraw USDC from Perpetual Protocol", async () => {
+        const preUsdcBalance = await perpV2Setup.vault.getBalance(setToken.address);
+
+        await subject();
+
+        const postUsdcExternalUnit = await setToken.getExternalPositionRealUnit(perpV2Setup.usdc.address, perpV2LeverageModule.address);
+        const postUsdcDefaultUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+
+        const totalSupply = await setToken.totalSupply();
+        const expectedPostUsdcDefaultUnit = preciseDiv(preUsdcBalance, totalSupply);
+
+        expect(postUsdcDefaultUnit).to.eq(expectedPostUsdcDefaultUnit);
+        expect(postUsdcExternalUnit).to.eq(ZERO);
+      });
+
+      describe("when no USDC to withdraw", async () => {
+        beforeEach(async () => {
+          await subject();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("No USDC to withdraw");
+        });
+      });
+    });
+
     describe("#engage", async () => {
       let subjectCaller: Account;
 
@@ -1847,7 +1884,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
     });
 
-    describe.only("#ripcord", async () => {
+    describe("#ripcord", async () => {
       let transferredEth: BigNumber;
       let subjectCaller: Account;
       let ifEngaged: boolean;
@@ -2160,7 +2197,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
     });
 
-    describe.only("#disengage", async () => {
+    describe("#disengage", async () => {
       let subjectCaller: Account;
       let ifEngaged: boolean;
 

@@ -33,6 +33,7 @@ import { BaseExtension } from "../lib/BaseExtension.sol";
 import { IBaseManager } from "../interfaces/IBaseManager.sol";
 import { IChainlinkAggregatorV3 } from "../interfaces/IChainlinkAggregatorV3.sol";
 import { IAccountBalance } from "../interfaces/IAccountBalance.sol";
+import { IVault } from "../interfaces/IVault.sol";
 
 import { PreciseUnitMath } from "../lib/PreciseUnitMath.sol";
 import { StringArrayUtils } from "../lib/StringArrayUtils.sol";
@@ -311,6 +312,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
             exchange.twapMaxTradeSize
         );
 
+        // todo: remove this
         // Use the lastTradeTimestamp since cooldown periods are measured on a per-exchange basis, allowing it to rebalance multiple time in quick
         // succession with different exchanges
         _validateNormalRebalance(leverageInfo, execution.twapCooldownPeriod, lastTradeTimestamp);
@@ -371,8 +373,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * token position in one go. If chunk rebalance size is above max quote or max trade size, then operator must continue to call this function to completely
      * unwind position. The function iterateRebalance will not work.
      *
-     * Note: Delever to 0 will likely result in additional units of the quote asset added as equity on the SetToken due to oracle price / market price mismatch
-     *
+     * Note: Delever to 0 will likely result in additional units of the collateral (USDC) asset added as equity on the SetToken due to oracle price / market price mismatch
      */
     function disengage() external onlyOperator {
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
@@ -409,33 +410,33 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
         require(depositPositionUnit > 0, "No USDC to deposit");
 
-        bytes memory tradeCallData = abi.encodeWithSignature(
+        bytes memory depositCalldata = abi.encodeWithSignature(
             "deposit(address,uint256)",
             address(setToken),
             depositPositionUnit
         );
 
-        invokeManager(address(strategy.perpV2LeverageModule), tradeCallData);
+        invokeManager(address(strategy.perpV2LeverageModule), depositCalldata);
     }
 
-    /*
     function withdraw() external onlyOperator {
         ISetToken setToken = strategy.setToken;
-        uint256 depositPositionUnit = setToken.getDefaultPositionRealUnit(
-            address(strategy.perpV2LeverageModule.collateralToken())
-        ).toUint256();
+        IVault vault = IVault(address(strategy.perpV2LeverageModule.perpVault()));
+        address withdrawAsset = address(strategy.perpV2LeverageModule.collateralToken());
+                
+        uint256 withdrawNotional = vault.getBalance(address(setToken)).toUint256();
+        uint256 withdrawUnits = withdrawNotional.preciseDiv(setToken.totalSupply());
 
-        require(depositPositionUnit > 0, "No USDC to deposit");
+        require(withdrawUnits > 0, "No USDC to withdraw");
 
-        bytes memory tradeCallData = abi.encodeWithSignature(
-            "deposit(address,uint256)",
-            address(setToken),
-            depositPositionUnit
+        bytes memory withdrawCalldata = abi.encodeWithSignature(
+            "withdraw(address,uint256)",
+            address(setToken),  
+            withdrawUnits
         );
 
-        invokeManager(address(strategy.perpV2LeverageModule), tradeCallData);
+        invokeManager(address(strategy.perpV2LeverageModule), withdrawCalldata);
     }
-    */
     
     /**
      * OPERATOR ONLY: Set methodology settings and check new settings are valid. Note: Need to pass in existing parameters if only changing a few settings. Must not be
@@ -820,8 +821,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      */
     function _validateNormalRebalance(LeverageInfo memory _leverageInfo, uint256 _coolDown, uint256 _lastTradeTimestamp) internal view {
         uint256 currentLeverageRatioAbs = _absUint256(_leverageInfo.currentLeverageRatio);
-        console.logInt(_leverageInfo.currentLeverageRatio);
         require(currentLeverageRatioAbs < _absUint256(incentive.incentivizedLeverageRatio), "Must be below incentivized leverage ratio");
+        // todo: this needs a fix
         require(
             block.timestamp.sub(_lastTradeTimestamp) > _coolDown
             || currentLeverageRatioAbs > _absUint256(methodology.maxLeverageRatio)
@@ -879,7 +880,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         console.logInt(_actionInfo.accountInfo.collateralBalance);
         console.logInt(_actionInfo.accountInfo.owedRealizedPnl);
         console.logInt(_actionInfo.accountInfo.pendingFundingPayments);
-        console.logInt(_actionInfo.basePositionValue.add(_actionInfo.quoteValue).add(_actionInfo.accountInfo.collateralBalance));
         int256 accountValue = _actionInfo.accountInfo.collateralBalance
             .add(_actionInfo.accountInfo.owedRealizedPnl)
             .add(_actionInfo.accountInfo.pendingFundingPayments)
@@ -946,7 +946,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         int256 leverageRatioDifference = _newLeverageRatio.sub(_leverageInfo.currentLeverageRatio);
 
         int256 totalRebalanceNotional = leverageRatioDifference.preciseDiv(_leverageInfo.currentLeverageRatio).preciseMul(_leverageInfo.action.baseBalance);
-
+        
         uint256 chunkRebalanceNotionalAbs = Math.min(_absUint256(totalRebalanceNotional), _leverageInfo.twapMaxTradeSize);
         console.logInt(totalRebalanceNotional);
         return (
@@ -1024,7 +1024,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     function _updateIterateState(int256 _chunkRebalanceNotional, int256 _totalRebalanceNotional) internal {
 
         _updateLastTradeTimestamp();
-
+        
         // If the chunk size is equal to the total notional meaning that rebalances are not chunked, then clear TWAP state.
         if (_chunkRebalanceNotional == _totalRebalanceNotional) {
             delete twapLeverageRatio;
