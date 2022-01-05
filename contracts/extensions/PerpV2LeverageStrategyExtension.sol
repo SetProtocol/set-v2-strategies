@@ -419,7 +419,12 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         invokeManager(address(strategy.perpV2LeverageModule), depositCalldata);
     }
 
+    /**
+     * Withdraws all USDC tokens from Perpetual Protocol.
+     */
     function withdraw() external onlyOperator {
+        // todo: Add a check to make sure we dont' get liquidated?
+
         ISetToken setToken = strategy.setToken;
         IVault vault = IVault(address(strategy.perpV2LeverageModule.perpVault()));
         address withdrawAsset = address(strategy.perpV2LeverageModule.collateralToken());
@@ -709,9 +714,11 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         ActionInfo memory actionInfo = _createActionInfo();
 
         require(actionInfo.setTotalSupply > 0, "SetToken must have > 0 supply");
-        // TBD: Can instead check for CLR != 0
-        // require(actionInfo.baseBalance > 0, "Collateral balance must be > 0");
-        // require(actionInfo.quoteBalance > 0, "Borrow balance must exist");
+        
+        require(_absUint256(actionInfo.baseBalance) > 0, "Base asset balance must be > 0");
+        // This function is called during rebalance, iterateRebalance, ripcord and disengage.
+        // |baseBalance| > 0, shows the position exists, and the Set has been engaged. We should not
+        // check for |quoteBalance| > 0, as it is redundant.
 
         // Get current leverage ratio
         int256 currentLeverageRatio = _calculateCurrentLeverageRatio(actionInfo);
@@ -875,11 +882,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * return int256            Current leverage ratio
      */
     function _calculateCurrentLeverageRatio(ActionInfo memory _actionInfo) internal view returns(int256) {
-        console.logInt(_actionInfo.basePositionValue);
-        console.logInt(_actionInfo.quoteValue);
-        console.logInt(_actionInfo.accountInfo.collateralBalance);
-        console.logInt(_actionInfo.accountInfo.owedRealizedPnl);
-        console.logInt(_actionInfo.accountInfo.pendingFundingPayments);
         int256 accountValue = _actionInfo.accountInfo.collateralBalance
             .add(_actionInfo.accountInfo.owedRealizedPnl)
             .add(_actionInfo.accountInfo.pendingFundingPayments)
@@ -948,7 +950,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         int256 totalRebalanceNotional = leverageRatioDifference.preciseDiv(_leverageInfo.currentLeverageRatio).preciseMul(_leverageInfo.action.baseBalance);
         
         uint256 chunkRebalanceNotionalAbs = Math.min(_absUint256(totalRebalanceNotional), _leverageInfo.twapMaxTradeSize);
-        console.logInt(totalRebalanceNotional);
+        
         return (
             // Return int256 chunkRebalanceNotional
             totalRebalanceNotional >= 0 ? chunkRebalanceNotionalAbs.toInt256() : chunkRebalanceNotionalAbs.toInt256().mul(-1),
