@@ -241,7 +241,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
         LeverageInfo memory leverageInfo = LeverageInfo({
             action: engageInfo,
-            currentLeverageRatio: 0, // 0 position leverage due 100% of value in quote asset
+            currentLeverageRatio: 0, // 0 position leverage
             slippageTolerance: execution.slippageTolerance,
             twapMaxTradeSize: exchange.twapMaxTradeSize
         });
@@ -887,10 +887,18 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
             .add(_actionInfo.accountInfo.pendingFundingPayments)
             .add(_actionInfo.basePositionValue)
             .add(_actionInfo.quoteValue);
-        
+        console.logInt(_actionInfo.accountInfo.collateralBalance);
+        console.logInt(_actionInfo.accountInfo.owedRealizedPnl);
+        console.logInt(_actionInfo.accountInfo.pendingFundingPayments);
+        console.logInt(_actionInfo.basePositionValue);
+        console.logInt(_actionInfo.quoteValue);
+        console.logInt(accountValue);
         // accountMarginRatio = accountValue / sum(abs(positionValue[ith_market]))
         // CLR = 1 / accountMarginRatio = sum(abs(positionValue[ith_market])) / accountValue
-        return _absUint256(_actionInfo.basePositionValue).toInt256().preciseDiv(accountValue);
+
+        // Assuming accountValue is always positive, we do not use absolute value of basePositionValue in the 
+        // below equation, to keep the sign of CLR same as basePositionValue.
+        return _actionInfo.basePositionValue.preciseDiv(accountValue);
     }
 
     /**
@@ -950,7 +958,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         int256 totalRebalanceNotional = leverageRatioDifference.preciseDiv(_leverageInfo.currentLeverageRatio).preciseMul(_leverageInfo.action.baseBalance);
         
         uint256 chunkRebalanceNotionalAbs = Math.min(_absUint256(totalRebalanceNotional), _leverageInfo.twapMaxTradeSize);
-        
         return (
             // Return int256 chunkRebalanceNotional
             totalRebalanceNotional >= 0 ? chunkRebalanceNotionalAbs.toInt256() : chunkRebalanceNotionalAbs.toInt256().mul(-1),
@@ -970,7 +977,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         int256 totalRebalanceNotional = _leverageInfo.action.accountInfo.collateralBalance.preciseMul(_newLeverageRatio).preciseDiv(_leverageInfo.action.basePrice);
 
         uint256 chunkRebalanceNotionalAbs = Math.min(_absUint256(totalRebalanceNotional), _leverageInfo.twapMaxTradeSize);
-
+        
         return (
             // Return int256 chunkRebalanceNotional
             totalRebalanceNotional >= 0 ? chunkRebalanceNotionalAbs.toInt256() : chunkRebalanceNotionalAbs.toInt256().mul(-1),
