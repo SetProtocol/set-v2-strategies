@@ -428,7 +428,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
         ISetToken setToken = strategy.setToken;
         IVault vault = IVault(address(strategy.perpV2LeverageModule.perpVault()));
-        address withdrawAsset = address(strategy.perpV2LeverageModule.collateralToken());
                 
         uint256 withdrawNotional = vault.getBalance(address(setToken)).toUint256();
         uint256 withdrawUnits = withdrawNotional.preciseDiv(setToken.totalSupply());
@@ -878,7 +877,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      *
      * return int256            Current leverage ratio
      */
-    function _calculateCurrentLeverageRatio(ActionInfo memory _actionInfo) internal view returns(int256) {
+    function _calculateCurrentLeverageRatio(ActionInfo memory _actionInfo) internal pure returns(int256) {
         int256 accountValue = _actionInfo.accountInfo.collateralBalance
             .add(_actionInfo.accountInfo.owedRealizedPnl)
             .add(_actionInfo.accountInfo.pendingFundingPayments)
@@ -941,7 +940,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         int256 _newLeverageRatio
     )
         internal
-        view
+        pure
         returns (int256, int256)
     {
         // Calculate difference between new and current leverage ratio
