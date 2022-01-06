@@ -22,12 +22,12 @@
     "./deploy/**/*.ts",
     "./typechain/**/*.ts",
     "./tasks/**/*.ts",
-    "node_modules/@setprotocol/set-protocol-v2"
+    "./node_modules/@setprotocol/set-protocol-v2"
   ],
   "files": [
     "hardhat.config.ts",
   ],
   "exclude": [
-    "node_modules/@setprotocol/set-protocol-v2/dist"
+    "./node_modules/@setprotocol/set-protocol-v2/dist"
   ]
 }
