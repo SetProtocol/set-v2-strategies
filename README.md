@@ -1,14 +1,14 @@
 <p align="center">
-  <a href="https://circleci.com/gh/SetProtocol/set-protocol-v2/tree/master">
-    <img src="https://img.shields.io/circleci/project/github/SetProtocol/set-protocol-v2/master.svg" />
+  <a href="https://circleci.com/gh/SetProtocol/set-v2-strategies/tree/master">
+    <img src="https://img.shields.io/circleci/project/github/SetProtocol/set-v2-strategies/master.svg" />
   </a>
-  <a href='https://coveralls.io/github/SetProtocol/set-protocol-v2?branch=master'><img src='https://coveralls.io/repos/github/SetProtocol/set-protocol-v2/badge.svg?branch=master&amp;t=4pzROZ' alt='Coverage Status' /></a>
+  <a href='https://coveralls.io/github/SetProtocol/set-v2-strategies?branch=master'><img src='https://coveralls.io/repos/github/SetProtocol/set-v2-strategies/badge.svg?branch=master&amp;t=4pzROZ' alt='Coverage Status' /></a>
 </p>
 
-# Set Protocol V2 Contract Repository
+# Set V2 Strategies Contract Repository
 
 ## Contracts
-[Set Protocol](https://setprotocol.com/) is a specification for tokenized asset management strategies on the ethereum blockchain written in the Solidity programming language. We use [Hardhat](https://hardhat.org/) as a development environment for compiling, testing, and deploying our contracts.
+This repo contains management contracts for assets built with [Set Protocol](https://setprotocol.com/). It uses [Hardhat](https://hardhat.org/) as a development environment for compiling, testing, and deploying.
 
 ## Development
 
@@ -23,11 +23,6 @@ To use console.log during Solidity development, follow the [guides](https://hard
 ### Build Contracts
 
 `yarn compile`
-
-To speed up compilation, install solc 0.6.10 natively with the following command.
-```
-brew install https://raw.githubusercontent.com/ethereum/homebrew-ethereum/06d13a8499801dc3ea4f19b2d24ed2eeb3072ebb/solidity.rb
-```
 
 ### Generate TypeChain Typings
 
@@ -47,11 +42,8 @@ OR `yarn test:clean` if contracts have been typings need to be updated
 
 We publish our contracts as well as [hardhat][22] and [typechain][23] compilation artifacts to npm.
 
-The distribution also comes with fixtures for mocking and testing SetProtocol's interactions with
-other protocols including Uniswap, Balancer, Compound (and many more.) To use these you'll need to install the peer dependencies listed in `package.json`.
-
 ```
-npm install @setprotocol/set-protocol-v2
+npm install @setprotocol/set-v2-strategies
 ```
 
 [22]: https://www.npmjs.com/package/hardhat
