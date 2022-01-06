@@ -1,4 +1,4 @@
-import { BigNumber, constants, ethers, providers } from "ethers";
+import { ethers, providers } from "ethers";
 
 export class ProtocolUtils {
   public _provider: providers.Web3Provider | providers.JsonRpcProvider;

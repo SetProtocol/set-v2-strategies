@@ -41,4 +41,5 @@ interface IPerpV2LeverageModule {
     ) external;
 
     function getPositionInfo(ISetToken _setToken) external view returns (PositionInfo[] memory);
+    function collateralToken() external view returns (address);
 }

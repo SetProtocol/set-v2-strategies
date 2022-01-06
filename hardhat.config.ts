@@ -72,7 +72,7 @@ const config: HardhatUserConfig = {
   external: {
     contracts: [
       {
-        artifacts: "./node_modules/@setprotocol/set-protocol-v2/artifacts",
+        artifacts: "node_modules/@setprotocol/set-protocol-v2/artifacts",
       },
     ],
   },

@@ -1,23 +1,21 @@
 import { Signer } from "ethers";
 
+import SetDeployHelper from "@setprotocol/set-protocol-v2/utils/deploys";
+
 import DeployManager from "./deployManager";
 import DeployMocks from "./deployMocks";
-import DeploySetV2 from "./deploySetV2";
-import DeployExternalContracts from "./deployExternal";
 import DeployExtensions from "./deployExtensions";
 
 export default class DeployHelper {
   public extensions: DeployExtensions;
-  public setV2: DeploySetV2;
   public manager: DeployManager;
   public mocks: DeployMocks;
-  public external: DeployExternalContracts;
+  public setDeployer: SetDeployHelper;
 
   constructor(deployerSigner: Signer) {
     this.extensions = new DeployExtensions(deployerSigner);
-    this.setV2 = new DeploySetV2(deployerSigner);
     this.manager = new DeployManager(deployerSigner);
     this.mocks = new DeployMocks(deployerSigner);
-    this.external = new DeployExternalContracts(deployerSigner);
+    this.setDeployer = new SetDeployHelper(deployerSigner);
   }
 }

@@ -21,17 +21,17 @@ export interface MerkleDistributorInfo {
   tokenTotal: string;
   claims: {
     [account: string]: {
-      index: number
-      amount: string
-      proof: string[]
+      index: number;
+      amount: string;
+      proof: string[];
       flags?: {
-        [flag: string]: boolean
-      }
-    }
+        [flag: string]: boolean;
+      };
+    };
   };
 }
 
-export type DistributionFormat = { address: string; earnings: BigNumber; };
+export type DistributionFormat = { address: string; earnings: BigNumber };
 
 export interface PerpV2ContractSettings {
   setToken: Address;
