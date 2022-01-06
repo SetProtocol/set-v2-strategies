@@ -149,7 +149,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
   });
 
   const initializeRootScopeContracts = async () => {
-    console.log("initiRootScope");
     setToken = await systemSetup.createSetToken(
       [perpV2Setup.usdc.address],
       [usdc(100)],
@@ -193,7 +192,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
     const recenteringSpeed = ether(0.05);
     const rebalanceInterval = ONE_DAY_IN_SECONDS;
 
-    const unutilizedLeveragePercentage = ether(0.01);
     const twapMaxTradeSize = ether(20);
     const twapCooldownPeriod = BigNumber.from(3000);
     const slippageTolerance = ether(0.015);
@@ -221,7 +219,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
       rebalanceInterval: rebalanceInterval,
     };
     execution = {
-      unutilizedLeveragePercentage: unutilizedLeveragePercentage,
       twapCooldownPeriod: twapCooldownPeriod,
       slippageTolerance: slippageTolerance,
     };
@@ -285,7 +282,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
         rebalanceInterval: BigNumber.from(86400),
       };
       subjectExecutionSettings = {
-        unutilizedLeveragePercentage: ether(0.01),
         twapCooldownPeriod: BigNumber.from(120),
         slippageTolerance: ether(0.01),
       };
@@ -348,7 +344,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
       const retrievedAdapter = await subject();
       const execution = await retrievedAdapter.getExecution();
 
-      expect(execution.unutilizedLeveragePercentage).to.eq(subjectExecutionSettings.unutilizedLeveragePercentage);
       expect(execution.twapCooldownPeriod).to.eq(subjectExecutionSettings.twapCooldownPeriod);
       expect(execution.slippageTolerance).to.eq(subjectExecutionSettings.slippageTolerance);
     });
@@ -418,16 +413,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Must be valid recentering speed");
-      });
-    });
-
-    describe("when unutilizedLeveragePercentage is >100%", async () => {
-      beforeEach(async () => {
-        subjectExecutionSettings.unutilizedLeveragePercentage = ether(1.1);
-      });
-
-      it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("Unutilized leverage must be <100%");
       });
     });
 
@@ -3524,7 +3509,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
       const initializeSubjectVariables = () => {
         subjectExecutionSettings = {
-          unutilizedLeveragePercentage: ether(0.05),
           twapCooldownPeriod: BigNumber.from(360),
           slippageTolerance: ether(0.02),
         };
@@ -3543,14 +3527,12 @@ describe("PerpV2LeverageStrategyExtension", () => {
           await subject();
           const execution = await leverageStrategyExtension.getExecution();
 
-          expect(execution.unutilizedLeveragePercentage).to.eq(subjectExecutionSettings.unutilizedLeveragePercentage);
           expect(execution.twapCooldownPeriod).to.eq(subjectExecutionSettings.twapCooldownPeriod);
           expect(execution.slippageTolerance).to.eq(subjectExecutionSettings.slippageTolerance);
         });
 
         it("should emit ExecutionSettingsUpdated event", async () => {
           await expect(subject()).to.emit(leverageStrategyExtension, "ExecutionSettingsUpdated").withArgs(
-            subjectExecutionSettings.unutilizedLeveragePercentage,
             subjectExecutionSettings.twapCooldownPeriod,
             subjectExecutionSettings.slippageTolerance
           );
@@ -3563,16 +3545,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Must be operator");
-          });
-        });
-
-        describe("when unutilizedLeveragePercentage is >100%", async () => {
-          beforeEach(async () => {
-            subjectExecutionSettings.unutilizedLeveragePercentage = ether(1.1);
-          });
-
-          it("should revert", async () => {
-            await expect(subject()).to.be.revertedWith("Unutilized leverage must be <100%");
           });
         });
 

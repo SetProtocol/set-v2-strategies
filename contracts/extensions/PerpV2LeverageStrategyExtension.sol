@@ -113,7 +113,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     struct ExecutionSettings {
-        uint256 unutilizedLeveragePercentage;            // Percent of max quote left unutilized in precise units (1% = 10e16)
         uint256 slippageTolerance;                       // % in precise units to price min token receive amount from trade quantities
         uint256 twapCooldownPeriod;                      // Cooldown period required since last trade timestamp in seconds
     }
@@ -161,7 +160,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         uint256 _rebalanceInterval
     );
     event ExecutionSettingsUpdated(
-        uint256 _unutilizedLeveragePercentage,
         uint256 _twapCooldownPeriod,
         uint256 _slippageTolerance
     );
@@ -478,7 +476,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         _validateNonExchangeSettings(methodology, execution, incentive);
 
         emit ExecutionSettingsUpdated(
-            execution.unutilizedLeveragePercentage,
             execution.twapCooldownPeriod,
             execution.slippageTolerance
         );
@@ -791,10 +788,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         require (
             _methodology.recenteringSpeed <= PreciseUnitMath.preciseUnit() && _methodology.recenteringSpeed > 0,
             "Must be valid recentering speed"
-        );
-        require (
-            _execution.unutilizedLeveragePercentage <= PreciseUnitMath.preciseUnit(),
-            "Unutilized leverage must be <100%"
         );
         require (
             _execution.slippageTolerance <= PreciseUnitMath.preciseUnit(),
