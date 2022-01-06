@@ -1,5 +1,8 @@
 import { Signer, BigNumber } from "ethers";
 import {
+  Address
+} from "../types";
+import {
   StreamingFeeSplitExtension
 } from "../contracts/index";
 
