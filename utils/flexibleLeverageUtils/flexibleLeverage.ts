@@ -1,6 +1,6 @@
 import { BigNumber } from "@ethersproject/bignumber";
-import { PerpV2BaseToken, SetToken } from "@setprotocol/set-protocol-v2/dist/typechain";
-import { PerpV2Fixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
+import { PerpV2BaseToken, SetToken } from "@setprotocol/set-protocol-v2/typechain";
+import { PerpV2Fixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
 import { ether, preciseMul, preciseDiv } from "../common";
 
 export function calculateNewLeverageRatio(

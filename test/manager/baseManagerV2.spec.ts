@@ -3,7 +3,7 @@ import "module-alias/register";
 import { Address, Account, Bytes } from "@utils/types";
 import { ADDRESS_ZERO, ZERO } from "@utils/constants";
 import { BaseManagerV2, BaseExtensionMock, StreamingFeeSplitExtension } from "@utils/contracts/index";
-import { SetToken } from "@setprotocol/set-protocol-v2/dist/utils/contracts";
+import { SetToken } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "@utils/deploys";
 import {
   addSnapshotBeforeRestoreAfterEach,
@@ -14,8 +14,8 @@ import {
   getRandomAddress
 } from "@utils/index";
 
-import { SystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
-import { getSystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/test";
+import { SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
+import { getSystemFixture } from "@setprotocol/set-protocol-v2/utils/test";
 
 import { solidityKeccak256 } from "ethers/lib/utils";
 import { ContractTransaction } from "ethers";

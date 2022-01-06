@@ -11,11 +11,11 @@ import {
 
 import {
   ChainlinkAggregatorMock,
-} from "@setprotocol/set-protocol-v2/dist/typechain";
+} from "@setprotocol/set-protocol-v2/typechain";
 
 import { AddressArrayUtilsMock__factory } from "../../typechain/factories/AddressArrayUtilsMock__factory";
 import { BaseExtensionMock__factory } from "../../typechain/factories/BaseExtensionMock__factory";
-import { ChainlinkAggregatorMock__factory  } from "@setprotocol/set-protocol-v2/dist/typechain";
+import { ChainlinkAggregatorMock__factory  } from "@setprotocol/set-protocol-v2/typechain";
 import { MutualUpgradeMock__factory } from "../../typechain/factories/MutualUpgradeMock__factory";
 import { StandardTokenMock__factory  } from "../../typechain/factories/StandardTokenMock__factory";
 import { StringArrayUtilsMock__factory  } from "../../typechain/factories/StringArrayUtilsMock__factory";

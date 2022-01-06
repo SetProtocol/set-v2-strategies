@@ -4,7 +4,7 @@ import { solidityKeccak256 } from "ethers/lib/utils";
 import { Address, Account } from "@utils/types";
 import { ADDRESS_ZERO, ZERO, ONE_DAY_IN_SECONDS, ONE_YEAR_IN_SECONDS } from "@utils/constants";
 import { StreamingFeeSplitExtension, BaseManagerV2 } from "@utils/contracts/index";
-import { SetToken, StreamingFeeModule } from "@setprotocol/set-protocol-v2/dist/utils/contracts";
+import { SetToken, StreamingFeeModule } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "@utils/deploys";
 import {
   addSnapshotBeforeRestoreAfterEach,
@@ -18,11 +18,11 @@ import {
   getRandomAccount
 } from "@utils/index";
 
-import { getStreamingFee, getStreamingFeeInflationAmount } from "@setprotocol/set-protocol-v2/dist/utils/common";
+import { getStreamingFee, getStreamingFeeInflationAmount } from "@setprotocol/set-protocol-v2/utils/common";
 
-import { getSystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/test";
+import { getSystemFixture } from "@setprotocol/set-protocol-v2/utils/test";
 
-import { SystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
+import { SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
 
 import { BigNumber, ContractTransaction } from "ethers";
 

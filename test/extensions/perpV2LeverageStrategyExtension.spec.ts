@@ -20,7 +20,7 @@ import {
   PerpV2,
   SlippageIssuanceModule,
   // ContractCallerMock
-} from "@setprotocol/set-protocol-v2/dist/utils/contracts";
+} from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "../../utils/deploys";
 import {
   cacheBeforeEach,
@@ -38,8 +38,8 @@ import {
   calculateTotalRebalanceNotionalPerpV2
 } from "../../utils/index";
 
-import { PerpV2Fixture, SystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
-import { getPerpV2Fixture, getSystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/test";
+import { PerpV2Fixture, SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
+import { getPerpV2Fixture, getSystemFixture } from "@setprotocol/set-protocol-v2/utils/test";
 
 import { BaseManagerV2, PerpV2LeverageStrategyExtension } from "@utils/contracts/index";
 
@@ -979,7 +979,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
             initialPositions[0].baseBalance
           );
-          
+
           const totalSupply = await setToken.totalSupply();
           const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(totalRebalanceNotional), totalSupply);
 
@@ -1111,7 +1111,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
             initialPositions[0].baseBalance
           );
-          
+
           const totalSupply = await setToken.totalSupply();
           const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(totalRebalanceNotional), totalSupply);
 
@@ -1266,7 +1266,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
       });
 
-      describe.only("when not engaged", async () => {
+      describe("when not engaged", async () => {
         before(async () => {
           ifEngaged = false;
         });
@@ -1274,12 +1274,12 @@ describe("PerpV2LeverageStrategyExtension", () => {
         after(async () => {
           ifEngaged = true;
         });
-      
+
         it("should revert", async () => {
           await expect(subject()).to.be.revertedWith("Base asset balance must be > 0");
         });
       });
-      
+
       describe("when caller is not an allowed trader", async () => {
         beforeEach(async () => {
           subjectCaller = await getRandomAccount();
@@ -1368,7 +1368,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             incentivizedTwapMaxTradeSize: ether(1)
           };
           await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
-          
+
           await leverageStrategyExtension.connect(owner.wallet).rebalance();
           await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
         });
@@ -1507,7 +1507,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
             initialPositions[0].baseBalance
           );
-          
+
           const chunkRebalanceNotional = newExchangeSettings.twapMaxTradeSize.gt(totalRebalanceNotional)
             ? totalRebalanceNotional
             : newExchangeSettings.twapMaxTradeSize;
@@ -1597,7 +1597,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
             initialPositions[0].baseBalance
           );
-         
+
           const chunkRebalanceNotional = newExchangeSettings.twapMaxTradeSize.gt(totalRebalanceNotional.abs())
             ? totalRebalanceNotional
             : totalRebalanceNotional.gt(ZERO) ? newExchangeSettings.twapMaxTradeSize : newExchangeSettings.twapMaxTradeSize.mul(-1);
@@ -1780,7 +1780,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
       });
 
-      describe.only("when not engaged", async () => {
+      describe("when not engaged", async () => {
         before(async () => {
           ifEngaged = false;
         });
@@ -1788,7 +1788,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         after(async () => {
           ifEngaged = true;
         });
-      
+
         it("should revert", async () => {
           await expect(subject()).to.be.revertedWith("Base asset balance must be > 0");
         });
@@ -1807,7 +1807,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       cacheBeforeEach(async () => {
         await initializeRootScopeContracts();
         await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
-        await leverageStrategyExtension.deposit();        
+        await leverageStrategyExtension.deposit();
       });
 
       beforeEach(async () => {
@@ -2060,7 +2060,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
       });
 
-      describe.only("when not engaged", async () => {
+      describe("when not engaged", async () => {
         before(async () => {
           ifEngaged = false;
         });
@@ -2068,7 +2068,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         after(async () => {
           ifEngaged = true;
         });
-      
+
         it("should revert", async () => {
           await expect(subject()).to.be.revertedWith("Base asset balance must be > 0");
         });
@@ -2140,18 +2140,18 @@ describe("PerpV2LeverageStrategyExtension", () => {
           });
         });
 
-        describe.only("when not engaged", async () => {          
+        describe("when not engaged", async () => {
           before(async () => {
             ifEngaged = false;
           });
 
           cacheBeforeEach(intializeContracts);
           beforeEach(initializeSubjectVariables);
-  
+
           after(async () => {
             ifEngaged = true;
           });
-        
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Base asset balance must be > 0");
           });
@@ -2160,7 +2160,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
       context("when notional is greater than max trade size", async () => {
         let newExchangeSettings: PerpV2ExchangeSettings;
-        
+
         before(async () => {
           ifEngaged = true;
         });
@@ -2231,18 +2231,18 @@ describe("PerpV2LeverageStrategyExtension", () => {
           });
         });
 
-        describe.only("when not engaged", async () => {          
+        describe("when not engaged", async () => {
           before(async () => {
             ifEngaged = false;
           });
 
           cacheBeforeEach(intializeContracts);
           beforeEach(initializeSubjectVariables);
-  
+
           after(async () => {
             ifEngaged = true;
           });
-        
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Base asset balance must be > 0");
           });
@@ -3343,7 +3343,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
                 : exchangeSettings.twapMaxTradeSize
               )
               : totalRebalanceNotional;
-            
+
             expect(sellAsset).to.eq(strategy.virtualBaseAddress);
             expect(buyAsset).to.eq(strategy.virtualQuoteAddress);
             expect(chunkRebalance).to.eq(expectedTotalRebalance);

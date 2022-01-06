@@ -18,13 +18,13 @@ import {
 import {
   ContractCallerMock,
   SetToken
-} from "@setprotocol/set-protocol-v2/dist/utils/contracts";
+} from "@setprotocol/set-protocol-v2/utils/contracts";
 
-import { getSystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/test";
+import { getSystemFixture } from "@setprotocol/set-protocol-v2/utils/test";
 
 import {
   SystemFixture
-} from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
+} from "@setprotocol/set-protocol-v2/utils/fixtures";
 
 import { ContractTransaction } from "ethers";
 

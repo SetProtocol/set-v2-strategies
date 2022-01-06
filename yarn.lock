@@ -1503,10 +1503,10 @@
     "@sentry/types" "5.29.2"
     tslib "^1.9.3"
 
-"@setprotocol/set-protocol-v2@0.1.6":
-  version "0.1.6"
-  resolved "https://registry.yarnpkg.com/@setprotocol/set-protocol-v2/-/set-protocol-v2-0.1.6.tgz#6fa9aa649dcfb8301cb3749c2df62ff6b54d80a3"
-  integrity sha512-NWNWM0SAhBjG+PLWlhOJsxoWzKWcDF8BRHYIG7Ks89aqQ1Mb9xGqf+RKnBNsYoYDXcFDn6D71U5Ju4QKPTO88w==
+"@setprotocol/set-protocol-v2@^0.1.9":
+  version "0.1.9"
+  resolved "https://registry.yarnpkg.com/@setprotocol/set-protocol-v2/-/set-protocol-v2-0.1.9.tgz#1b0eef8667d01405f0b259bc5129986e5db7b53b"
+  integrity sha512-sPbCD6ngw4yIosXyOT+ytFZbFeMyHNOgDA6hdhrXkllsSKoJ2thc9Y6SqzF5kCPkK+bKmVhNF+cMTDMX0lemZg==
   dependencies:
     "@uniswap/v3-sdk" "^3.5.1"
     ethers "^5.5.2"
