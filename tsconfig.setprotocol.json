@@ -5,7 +5,6 @@
     "strict": true,
     "esModuleInterop": true,
     "strictPropertyInitialization": false,
-    "outDir": "dist",
     "resolveJsonModule": true,
     "declaration": true,
     "declarationDir": "./dist/types",
@@ -17,13 +16,9 @@
     }
   },
   "include": [
-    "./test/**/*.ts",
-    "./utils/**/*.ts",
-    "./deploy/**/*.ts",
-    "./typechain/**/*.ts",
-    "./tasks/**/*.ts"
+    "./node_modules/@setprotocol/set-protocol-v2"
   ],
-  "files": [
-    "hardhat.config.ts",
+  "exclude": [
+    "./node_modules/@setprotocol/set-protocol-v2/dist"
   ]
 }

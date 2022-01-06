@@ -15,9 +15,11 @@
     "tsconfig.json"
   ],
   "scripts": {
-    "build": "yarn clean && yarn compile && yarn build:typechain",
+    "build": "yarn clean && yarn build:setprotocol && yarn compile && yarn build:typechain",
     "build:npm": "yarn clean && yarn compile:npm && yarn build:typechain",
     "build:typechain": "yarn typechain && yarn transpile-dist",
+    "build:setprotocol": "yarn copy:config && tsc -p tsconfig.setprotocol.json",
+    "copy:config": "cp hardhat.config.ts node_modules/@setprotocol/set-protocol-v2",
     "chain": "npx hardhat node",
     "clean": "rm -rf coverage.json .coverage_cache .coverage_contracts cache coverage typechain artifacts dist",
     "compile": "npx hardhat compile",
