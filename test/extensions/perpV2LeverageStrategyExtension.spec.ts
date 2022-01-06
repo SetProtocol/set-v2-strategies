@@ -52,6 +52,7 @@ const provider = ethers.provider;
 // todo: Fix "when SetToken has 0 supply" test cases
 // todo: Fix "when caller is a contract" test cases
 // todo: Update chainlink oracles + perp oracles.
+// todo: Fix skipped test cases in iterateRebalance short positions
 describe("PerpV2LeverageStrategyExtension", () => {
   let owner: Account;
   let methodologist: Account;
@@ -149,7 +150,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
   });
 
   const initializeRootScopeContracts = async () => {
-    console.log('initiRootScope')
+    console.log("initiRootScope");
     setToken = await systemSetup.createSetToken(
       [perpV2Setup.usdc.address],
       [usdc(100)],
@@ -254,8 +255,8 @@ describe("PerpV2LeverageStrategyExtension", () => {
   };
 
   const printLeverageRatio = async () => {
-    console.log('clr', (await leverageStrategyExtension.getCurrentLeverageRatio()).toString())
-  }
+    console.log("clr", (await leverageStrategyExtension.getCurrentLeverageRatio()).toString());
+  };
   describe("#constructor", async () => {
     let subjectManagerAddress: Address;
     let subjectContractSettings: PerpV2ContractSettings;
@@ -848,41 +849,41 @@ describe("PerpV2LeverageStrategyExtension", () => {
         cacheBeforeEach(async () => {
           await leverageStrategyExtension.engage();
         });
-  
+
         describe("when current leverage ratio is below target (lever), does not need a TWAP, and is inside bounds", async () => {
           cacheBeforeEach(async () => {
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1100));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1100).mul(10 ** 8));
-  
+
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             expect(currentLeverageRatio).to.be.gt(methodology.minLeverageRatio);
             expect(currentLeverageRatio).to.be.lt(methodology.targetLeverageRatio);
           });
-  
+
           it("should set the global last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should not set the TWAP leverage ratio", async () => {
             await subject();
-  
+
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(twapLeverageRatio).to.eq(ZERO);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               methodology.targetLeverageRatio,
@@ -890,26 +891,26 @@ describe("PerpV2LeverageStrategyExtension", () => {
               methodology.maxLeverageRatio,
               methodology.recenteringSpeed
             );
-  
+
             await subject();
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const updatedPosition = newPositions[0];
-  
+
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
-  
+
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(totalRebalanceNotional), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(updatedPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(updatedPosition.baseUnit).to.eq(expectedNewPositionUnit);
           });
-  
+
           it("should emit Rebalanced event", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
@@ -919,13 +920,13 @@ describe("PerpV2LeverageStrategyExtension", () => {
               methodology.maxLeverageRatio,
               methodology.recenteringSpeed
             );
-  
+
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
-  
+
             await expect(subject()).to.emit(leverageStrategyExtension, "Rebalanced").withArgs(
               currentLeverageRatio,
               expectedNewLeverageRatio,
@@ -934,41 +935,41 @@ describe("PerpV2LeverageStrategyExtension", () => {
             );
           });
         });
-  
+
         describe("when rebalance interval has not elapsed but is below min leverage ratio and lower than max trade size", async () => {
           beforeEach(async () => {
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1250));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1250).mul(10 ** 8));
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             expect(currentLeverageRatio).to.be.lt(methodology.minLeverageRatio);
           });
-  
+
           it("should set the last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should not set the TWAP leverage ratio", async () => {
             await subject();
-  
+
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(twapLeverageRatio).to.eq(ZERO);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-  
+
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-  
+
             await subject();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               methodology.targetLeverageRatio,
@@ -976,60 +977,60 @@ describe("PerpV2LeverageStrategyExtension", () => {
               methodology.maxLeverageRatio,
               methodology.recenteringSpeed
             );
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const updatedPosition = newPositions[0];
-  
+
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
-            
+
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(totalRebalanceNotional), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(updatedPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(updatedPosition.baseUnit).to.eq(expectedNewPositionUnit);
           });
         });
-  
+
         describe("when rebalance interval has not elapsed below min leverage ratio and greater than max trade size", async () => {
           let newSettings: PerpV2ExchangeSettings;
-  
+
           cacheBeforeEach(async () => {
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1500));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1500).mul(10 ** 8));
-  
+
             newSettings = {
               twapMaxTradeSize: ether(1),
               incentivizedTwapMaxTradeSize: ether(2),
             };
             await leverageStrategyExtension.setExchangeSettings(newSettings);
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             expect(currentLeverageRatio).to.be.lt(methodology.minLeverageRatio);
           });
-  
+
           it("should set the last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should set the TWAP leverage ratio", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const previousTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             await subject();
-  
+
             const currentTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               methodology.targetLeverageRatio,
@@ -1040,68 +1041,68 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(previousTwapLeverageRatio).to.eq(ZERO);
             expect(currentTwapLeverageRatio).to.eq(expectedNewLeverageRatio);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-  
+
             await subject();
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const updatedPosition = newPositions[0];
             const totalSupply = await setToken.totalSupply();
-  
+
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(newSettings.twapMaxTradeSize), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(updatedPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(updatedPosition.baseUnit).to.eq(expectedNewPositionUnit);
           });
         });
-  
+
         describe("when rebalance interval has not elapsed and within bounds", async () => {
-  
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Cooldown not elapsed or not valid leverage ratio");
           });
         });
-  
+
         describe("when current leverage ratio is above target (delever)", async () => {
           cacheBeforeEach(async () => {
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(950).mul(10 ** 8));
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(950));
-  
+
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             expect(currentLeverageRatio).to.be.gt(methodology.targetLeverageRatio);
           });
-  
+
           it("should set the last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should not set the TWAP leverage ratio", async () => {
             await subject();
-  
+
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(twapLeverageRatio).to.eq(ZERO);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-  
+
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-  
+
             await subject();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               methodology.targetLeverageRatio,
@@ -1109,58 +1110,58 @@ describe("PerpV2LeverageStrategyExtension", () => {
               methodology.maxLeverageRatio,
               methodology.recenteringSpeed
             );
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const updatedPosition = newPositions[0];
-  
+
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
-            
+
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(totalRebalanceNotional), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(updatedPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(updatedPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
           });
         });
-  
+
         describe("when rebalance interval has not elapsed, above max leverage ratio and lower than max trade size", async () => {
           cacheBeforeEach(async () => {
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(850));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             expect(currentLeverageRatio).to.be.gt(methodology.maxLeverageRatio);
           });
-  
+
           it("should set the last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should not set the TWAP leverage ratio", async () => {
             await subject();
-  
+
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(twapLeverageRatio).to.eq(ZERO);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-  
+
             await subject();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               methodology.targetLeverageRatio,
@@ -1168,60 +1169,60 @@ describe("PerpV2LeverageStrategyExtension", () => {
               methodology.maxLeverageRatio,
               methodology.recenteringSpeed
             );
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const updatedPosition = newPositions[0];
-  
+
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(totalRebalanceNotional), totalSupply);
-  
-  
+
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(perpV2Setup.vETH.address).to.eq(updatedPosition.baseToken);
             expect(expectedNewPositionUnit).to.closeTo(updatedPosition.baseUnit, 1);
           });
         });
-  
+
         describe("when rebalance interval has not elapsed, above max leverage ratio and greater than max trade size", async () => {
           let newSettings: PerpV2ExchangeSettings;
-  
+
           cacheBeforeEach(async () => {
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(850));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
-  
+
             newSettings = {
               twapMaxTradeSize: ether(1),
               incentivizedTwapMaxTradeSize: ether(2),
             };
             await leverageStrategyExtension.setExchangeSettings(newSettings);
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             expect(currentLeverageRatio).to.be.gt(methodology.maxLeverageRatio);
           });
-  
+
           it("should set the last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should set the TWAP leverage ratio", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const previousTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             await subject();
-  
+
             const currentTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               methodology.targetLeverageRatio,
@@ -1232,28 +1233,28 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(ZERO).to.eq(previousTwapLeverageRatio);
             expect(expectedNewLeverageRatio).to.eq(currentTwapLeverageRatio);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-  
+
             await subject();
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const updatedPosition = newPositions[0];
             const totalSupply = await setToken.totalSupply();
-  
+
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.sub(newSettings.twapMaxTradeSize), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(perpV2Setup.vETH.address).to.eq(updatedPosition.baseToken);
             expect(expectedNewPositionUnit).to.eq(updatedPosition.baseUnit);
           });
         });
-  
+
         describe("when in a TWAP rebalance", async () => {
           let newSettings: PerpV2ExchangeSettings;
-  
+
           beforeEach(async () => {
             // Setup a TWAP rebalance
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1500).mul(10 ** 8));
@@ -1262,41 +1263,41 @@ describe("PerpV2LeverageStrategyExtension", () => {
               incentivizedTwapMaxTradeSize: ether(2),
             };
             await leverageStrategyExtension.setExchangeSettings(newSettings);
-  
+
             await subject();
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
           });
-  
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Must call iterate");
           });
         });
-        
+
         describe("when caller is not an allowed trader", async () => {
           beforeEach(async () => {
             subjectCaller = await getRandomAccount();
           });
-  
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Address not permitted to call");
           });
         });
-  
+
         // describe.skip("when caller is a contract", async () => {
         //   let subjectTarget: Address;
         //   let subjectCallData: string;
         //   let subjectValue: BigNumber;
-  
+
         //   let contractCaller: ContractCallerMock;
-  
+
         //   beforeEach(async () => {
         //     contractCaller = await deployer.mocks.deployContractCallerMock();
-  
+
         //     subjectTarget = leverageStrategyExtension.address;
         //     subjectCallData = leverageStrategyExtension.interface.encodeFunctionData("rebalance", []);
         //     subjectValue = ZERO;
         //   });
-  
+
         //   async function subjectContractCaller(): Promise<any> {
         //     return await contractCaller.invoke(
         //       subjectTarget,
@@ -1304,28 +1305,27 @@ describe("PerpV2LeverageStrategyExtension", () => {
         //       subjectCallData
         //     );
         //   }
-  
+
         //   it("the trade reverts", async () => {
         //     await expect(subjectContractCaller()).to.be.revertedWith("Caller must be EOA Address");
         //   });
         // });
-  
+
         describe.skip("when SetToken has 0 supply", async () => {
           beforeEach(async () => {
             await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
             await issuanceModule.redeem(setToken.address, ether(1), owner.address);
           });
-  
+
           it("should revert", async () => {
-            const totalSupply = await setToken.totalSupply();
             await expect(subject()).to.be.revertedWith("SetToken must have > 0 supply");
           });
         });
       });
-      
+
       context("when rebalancing a short position", async () => {
         let newMethodologySettings: PerpV2MethodologySettings;
-  
+
         cacheBeforeEach(async () => {
           newMethodologySettings = {
             targetLeverageRatio: methodology.targetLeverageRatio.mul(-1),
@@ -1333,47 +1333,47 @@ describe("PerpV2LeverageStrategyExtension", () => {
             maxLeverageRatio: methodology.maxLeverageRatio.mul(-1),
             recenteringSpeed: methodology.recenteringSpeed,
             rebalanceInterval: methodology.rebalanceInterval,
-          }
+          };
           await leverageStrategyExtension.setMethodologySettings(newMethodologySettings);
 
           // Engage short position
           await leverageStrategyExtension.engage();
         });
-  
+
         context("when current leverage ratio is below target (lever), does not need a TWAP, and is inside bounds", async () => {
           cacheBeforeEach(async () => {
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(990));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
-  
+
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             expect(currentLeverageRatio.abs()).to.be.gt(newMethodologySettings.minLeverageRatio.abs());
             expect(currentLeverageRatio.abs()).to.be.lt(newMethodologySettings.targetLeverageRatio.abs());
           });
-  
+
           it("should set the global last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should not set the TWAP leverage ratio", async () => {
             await subject();
-  
+
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(twapLeverageRatio).to.eq(ZERO);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               newMethodologySettings.targetLeverageRatio,
@@ -1381,26 +1381,26 @@ describe("PerpV2LeverageStrategyExtension", () => {
               newMethodologySettings.maxLeverageRatio,
               newMethodologySettings.recenteringSpeed
             );
-  
+
             await subject();
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const updatedPosition = newPositions[0];
-            
+
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
-  
+
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(totalRebalanceNotional), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(updatedPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(updatedPosition.baseUnit).to.eq(expectedNewPositionUnit);
           });
-  
+
           it("should emit Rebalanced event", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
@@ -1410,13 +1410,13 @@ describe("PerpV2LeverageStrategyExtension", () => {
               newMethodologySettings.maxLeverageRatio,
               newMethodologySettings.recenteringSpeed
             );
-  
+
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
-  
+
             await expect(subject()).to.emit(leverageStrategyExtension, "Rebalanced").withArgs(
               currentLeverageRatio,
               expectedNewLeverageRatio,
@@ -1425,41 +1425,41 @@ describe("PerpV2LeverageStrategyExtension", () => {
             );
           });
         });
-  
+
         describe("when rebalance interval has not elapsed but is below min leverage ratio and lower than max trade size", async () => {
           beforeEach(async () => {
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(900));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             expect(currentLeverageRatio.abs()).to.be.lt(newMethodologySettings.minLeverageRatio.abs());
           });
-  
+
           it("should set the last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should not set the TWAP leverage ratio", async () => {
             await subject();
-  
+
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(twapLeverageRatio).to.eq(ZERO);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-  
+
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-  
+
             await subject();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               newMethodologySettings.targetLeverageRatio,
@@ -1467,60 +1467,60 @@ describe("PerpV2LeverageStrategyExtension", () => {
               newMethodologySettings.maxLeverageRatio,
               newMethodologySettings.recenteringSpeed
             );
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const updatedPosition = newPositions[0];
-  
+
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
-            
+
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(totalRebalanceNotional), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(updatedPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(updatedPosition.baseUnit).to.eq(expectedNewPositionUnit);
           });
         });
-  
+
         describe("when rebalance interval has not elapsed below min leverage ratio and greater than max trade size", async () => {
           let newExchangeSettings: PerpV2ExchangeSettings;
-  
+
           cacheBeforeEach(async () => {
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(900));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
-  
+
             newExchangeSettings = {
               twapMaxTradeSize: ether(1),
               incentivizedTwapMaxTradeSize: ether(2),
             };
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             expect(currentLeverageRatio.abs()).to.be.lt(newMethodologySettings.minLeverageRatio.abs());
           });
-  
+
           it("should set the last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should set the TWAP leverage ratio", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const previousTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             await subject();
-  
+
             const currentTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               newMethodologySettings.targetLeverageRatio,
@@ -1531,68 +1531,68 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(previousTwapLeverageRatio).to.eq(ZERO);
             expect(currentTwapLeverageRatio).to.eq(expectedNewLeverageRatio);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-  
+
             await subject();
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const updatedPosition = newPositions[0];
             const totalSupply = await setToken.totalSupply();
-  
+
             // subtract since shorting
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.sub(newExchangeSettings.twapMaxTradeSize), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(updatedPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(updatedPosition.baseUnit).to.eq(expectedNewPositionUnit);
           });
         });
-  
+
         describe("when rebalance interval has not elapsed and within bounds", async () => {
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Cooldown not elapsed or not valid leverage ratio");
           });
         });
-  
+
         context("when current leverage ratio is above target (delever)", async () => {
           cacheBeforeEach(async () => {
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1030).mul(10 ** 8));
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1030));
-  
+
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             expect(currentLeverageRatio.abs()).to.be.gt(newMethodologySettings.targetLeverageRatio.abs());
           });
-  
+
           it("should set the last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should not set the TWAP leverage ratio", async () => {
             await subject();
-  
+
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(twapLeverageRatio).to.eq(ZERO);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-  
+
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-  
+
             await subject();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               newMethodologySettings.targetLeverageRatio,
@@ -1600,67 +1600,67 @@ describe("PerpV2LeverageStrategyExtension", () => {
               newMethodologySettings.maxLeverageRatio,
               newMethodologySettings.recenteringSpeed
             );
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const updatedPosition = newPositions[0];
-  
+
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
-            
-            console.log(currentLeverageRatio.toString())
-            console.log(expectedNewLeverageRatio.toString())
-            console.log(initialPositions[0].baseBalance.toString())
-            console.log(totalRebalanceNotional.toString())
+
+            console.log(currentLeverageRatio.toString());
+            console.log(expectedNewLeverageRatio.toString());
+            console.log(initialPositions[0].baseBalance.toString());
+            console.log(totalRebalanceNotional.toString());
             const max = await (await leverageStrategyExtension.getExchangeSettings()).twapMaxTradeSize;
             console.log(max.toString());
-            console.log(updatedPosition.baseUnit.toString())
-  
-  
+            console.log(updatedPosition.baseUnit.toString());
+
+
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(totalRebalanceNotional), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(updatedPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(updatedPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
           });
         });
-  
+
         describe("when rebalance interval has not elapsed, above max leverage ratio and lower than max trade size", async () => {
           cacheBeforeEach(async () => {
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1060));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1060).mul(10 ** 8));
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             expect(currentLeverageRatio.abs()).to.be.gt(newMethodologySettings.maxLeverageRatio.abs());
           });
-  
+
           it("should set the last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should not set the TWAP leverage ratio", async () => {
             await subject();
-  
+
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(twapLeverageRatio).to.eq(ZERO);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-  
+
             await subject();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               newMethodologySettings.targetLeverageRatio,
@@ -1668,60 +1668,60 @@ describe("PerpV2LeverageStrategyExtension", () => {
               newMethodologySettings.maxLeverageRatio,
               newMethodologySettings.recenteringSpeed
             );
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const updatedPosition = newPositions[0];
-  
+
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(totalRebalanceNotional), totalSupply);
-  
-  
+
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(perpV2Setup.vETH.address).to.eq(updatedPosition.baseToken);
             expect(expectedNewPositionUnit).to.closeTo(updatedPosition.baseUnit, 1);
           });
         });
-  
+
         describe("when rebalance interval has not elapsed, above max leverage ratio and greater than max trade size", async () => {
           let newSettings: PerpV2ExchangeSettings;
-  
+
           cacheBeforeEach(async () => {
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1060));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1060).mul(10 ** 8));
-  
+
             newSettings = {
               twapMaxTradeSize: ether(1),
               incentivizedTwapMaxTradeSize: ether(2),
             };
             await leverageStrategyExtension.setExchangeSettings(newSettings);
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             expect(currentLeverageRatio.abs()).to.be.gt(newMethodologySettings.maxLeverageRatio.abs());
           });
-  
+
           it("should set the last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should set the TWAP leverage ratio", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const previousTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             await subject();
-  
+
             const currentTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               newMethodologySettings.targetLeverageRatio,
@@ -1732,29 +1732,29 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(ZERO).to.eq(previousTwapLeverageRatio);
             expect(expectedNewLeverageRatio).to.eq(currentTwapLeverageRatio);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-  
+
             await subject();
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const updatedPosition = newPositions[0];
             const totalSupply = await setToken.totalSupply();
-  
+
             // Add since delevering
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(newSettings.twapMaxTradeSize), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(perpV2Setup.vETH.address).to.eq(updatedPosition.baseToken);
             expect(expectedNewPositionUnit).to.eq(updatedPosition.baseUnit);
           });
         });
-  
+
         describe("when in a TWAP rebalance", async () => {
           let newSettings: PerpV2ExchangeSettings;
-  
+
           beforeEach(async () => {
             // Setup a TWAP rebalance
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
@@ -1763,11 +1763,11 @@ describe("PerpV2LeverageStrategyExtension", () => {
               incentivizedTwapMaxTradeSize: ether(2),
             };
             await leverageStrategyExtension.setExchangeSettings(newSettings);
-  
+
             await subject();
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
           });
-  
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Must call iterate");
           });
@@ -1781,7 +1781,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
     });
 
-    describe.only("#iterateRebalance", async () => {
+    describe("#iterateRebalance", async () => {
       let subjectCaller: Account;
 
       cacheBeforeEach(async () => {
@@ -1804,50 +1804,50 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
         context("when currently in the last chunk of a TWAP rebalance", async () => {
           let newExchangeSettings: PerpV2ExchangeSettings;
-  
+
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1340).mul(10 ** 8));
-  
+
             newExchangeSettings = {
               twapMaxTradeSize: ether(1),
               incentivizedTwapMaxTradeSize: ether(1)
             };
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
-            
+
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(currentLeverageRatio).to.be.lt(methodology.minLeverageRatio);
             expect(twapLeverageRatio).to.be.eq(methodology.minLeverageRatio);
           });
-  
+
           it("should set the global last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should remove the TWAP leverage ratio", async () => {
             await subject();
-  
+
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(twapLeverageRatio).to.eq(ZERO);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-  
+
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               methodology.targetLeverageRatio,
@@ -1855,71 +1855,71 @@ describe("PerpV2LeverageStrategyExtension", () => {
               methodology.maxLeverageRatio,
               methodology.recenteringSpeed
             );
-  
+
             await subject();
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const newPosition = newPositions[0];
-  
+
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
-  
+
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(totalRebalanceNotional), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(newPosition.baseUnit).to.eq(expectedNewPositionUnit);
           });
         });
-  
+
         context("when current leverage ratio is below target and in the middle of a TWAP", async () => {
           let newExchangeSettings: PerpV2ExchangeSettings;
           let preTwapLeverageRatio: BigNumber;
-  
+
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1250).mul(10 ** 8));
-  
+
             newExchangeSettings = {
               twapMaxTradeSize: ether(.1),
               incentivizedTwapMaxTradeSize: ether(1)
             };
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
-  
+
             preTwapLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-  
+
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
-  
+
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(currentLeverageRatio).to.be.lt(methodology.targetLeverageRatio);
             expect(twapLeverageRatio).to.be.gt(ZERO);
           });
-  
+
           it("should set the global last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should set the TWAP leverage ratio", async () => {
             const previousTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             await subject();
-  
+
             const currentTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               preTwapLeverageRatio,
               methodology.targetLeverageRatio,
@@ -1930,12 +1930,12 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(previousTwapLeverageRatio).to.eq(expectedNewLeverageRatio);
             expect(currentTwapLeverageRatio).to.eq(expectedNewLeverageRatio);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-  
+
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               methodology.targetLeverageRatio,
@@ -1943,75 +1943,75 @@ describe("PerpV2LeverageStrategyExtension", () => {
               methodology.maxLeverageRatio,
               methodology.recenteringSpeed
             );
-  
+
             await subject();
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const newPosition = newPositions[0];
-  
+
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
-            
+
             const chunkRebalanceNotional = newExchangeSettings.twapMaxTradeSize.gt(totalRebalanceNotional)
               ? totalRebalanceNotional
               : newExchangeSettings.twapMaxTradeSize;
-  
+
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(chunkRebalanceNotional), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
           });
         });
-  
+
         context("when current leverage ratio is above target and in the middle of a TWAP", async () => {
           let newExchangeSettings: PerpV2ExchangeSettings;
           let preTwapLeverageRatio: BigNumber;
-  
+
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
-  
+
             newExchangeSettings = {
               twapMaxTradeSize: ether(.1),
               incentivizedTwapMaxTradeSize: ether(1)
             };
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
-  
+
             preTwapLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-  
+
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
-  
+
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(currentLeverageRatio).to.be.gt(methodology.targetLeverageRatio);
             expect(twapLeverageRatio).to.be.gt(ZERO);
           });
-  
+
           it("should set the global last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should set the TWAP leverage ratio", async () => {
             const previousTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             await subject();
-  
+
             const currentTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               preTwapLeverageRatio,
               methodology.targetLeverageRatio,
@@ -2022,7 +2022,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(previousTwapLeverageRatio).to.eq(expectedNewLeverageRatio);
             expect(currentTwapLeverageRatio).to.eq(expectedNewLeverageRatio);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
@@ -2033,175 +2033,175 @@ describe("PerpV2LeverageStrategyExtension", () => {
               methodology.maxLeverageRatio,
               methodology.recenteringSpeed
             );
-  
+
             await subject();
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const newPosition = newPositions[0];
-  
+
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
-           
+
             const chunkRebalanceNotional = newExchangeSettings.twapMaxTradeSize.gt(totalRebalanceNotional.abs())
               ? totalRebalanceNotional
               : totalRebalanceNotional.gt(ZERO) ? newExchangeSettings.twapMaxTradeSize : newExchangeSettings.twapMaxTradeSize.mul(-1);
-  
+
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(chunkRebalanceNotional), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
           });
         });
-  
+
         describe("when price has moved advantageously towards target leverage ratio", async () => {
           let newExchangeSettings: PerpV2ExchangeSettings;
-  
+
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1500).mul(10 ** 8));
-  
+
             newExchangeSettings = {
               twapMaxTradeSize: ether(1),
               incentivizedTwapMaxTradeSize: ether(1)
             };
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
-  
+
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
-  
+
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
-  
+
             // Move price advantageously towards TLR; decrease price, so leverage increases towards TLR
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1000).mul(10 ** 8));
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
             expect(twapLeverageRatio).to.be.gt(ZERO);
           });
-  
+
           it("should set the global last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should remove the TWAP leverage ratio", async () => {
             await subject();
-  
+
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(twapLeverageRatio).to.eq(ZERO);
           });
-  
+
           it("should not update the positions on the SetToken", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             await subject();
             const currentPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
-  
+
             expect(currentPositions[0].baseToken).to.eq(initialPositions[0].baseToken);
             expect(currentPositions[0].baseUnit).to.eq(initialPositions[0].baseUnit);
           });
         });
-  
+
         describe("when above incentivized leverage ratio threshold", async () => {
           beforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(650).mul(10 ** 8));
           });
-  
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Must be below incentivized leverage ratio");
           });
         });
-  
+
         describe.skip("when cooldown has not elapsed", async () => {
           let newExchangeSettings: PerpV2ExchangeSettings;
-  
+
           beforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
-  
+
             newExchangeSettings = {
               twapMaxTradeSize: ether(1),
               incentivizedTwapMaxTradeSize: ether(1)
             };
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
-  
+
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
           });
-  
+
           it("should be in TWAP rebalance", async () => {
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(twapLeverageRatio).to.be.gt(ZERO);
             console.log("cooldown period", (await (await leverageStrategyExtension.getExecution()).twapCooldownPeriod).toString());
-  
+
           });
-  
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Cooldown not elapsed or not valid leverage ratio");
           });
         });
-  
+
         describe.skip("when SetToken has 0 supply", async () => {
           beforeEach(async () => {
             await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
             const totalSupply = await setToken.totalSupply();
             await issuanceModule.redeem(setToken.address, totalSupply, owner.address);
           });
-  
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("SetToken must have > 0 supply");
           });
         });
-  
+
         describe("when caller is not an allowed trader", async () => {
           let newExchangeSettings: PerpV2ExchangeSettings;
-  
+
           beforeEach(async () => {
             subjectCaller = await getRandomAccount();
-  
+
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
-  
+
             newExchangeSettings = {
               twapMaxTradeSize: ether(.1),
               incentivizedTwapMaxTradeSize: ether(1)
             };
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
-  
+
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
-  
+
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
           });
-  
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Address not permitted to call");
           });
         });
-  
+
         // describe.skip("when caller is a contract", async () => {
         //   let subjectTarget: Address;
         //   let subjectCallData: string;
         //   let subjectValue: BigNumber;
-  
+
         //   let contractCaller: ContractCallerMock;
-  
+
         //   beforeEach(async () => {
         //     contractCaller = await deployer.setV2.deployContractCallerMock();
-  
+
         //     subjectTarget = leverageStrategyExtension.address;
         //     subjectCallData = leverageStrategyExtension.interface.encodeFunctionData("iterateRebalance", [ subjectExchangeName ]);
         //     subjectValue = ZERO;
         //   });
-  
+
         //   async function subjectContractCaller(): Promise<any> {
         //     return await contractCaller.invoke(
         //       subjectTarget,
@@ -2209,18 +2209,18 @@ describe("PerpV2LeverageStrategyExtension", () => {
         //       subjectCallData
         //     );
         //   }
-  
+
         //   it("the trade reverts", async () => {
         //     await expect(subjectContractCaller()).to.be.revertedWith("Caller must be EOA Address");
         //   });
         // });
-  
+
         context("when not in TWAP state", async () => {
           beforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
           });
-  
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Not in TWAP state");
           });
@@ -2229,7 +2229,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
       context("when rebalancing short position", async () => {
         let newMethodologySettings: PerpV2MethodologySettings;
-  
+
         cacheBeforeEach(async () => {
           newMethodologySettings = {
             targetLeverageRatio: methodology.targetLeverageRatio.mul(-1),
@@ -2237,7 +2237,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             maxLeverageRatio: methodology.maxLeverageRatio.mul(-1),
             recenteringSpeed: methodology.recenteringSpeed,
             rebalanceInterval: methodology.rebalanceInterval,
-          }
+          };
           await leverageStrategyExtension.setMethodologySettings(newMethodologySettings);
 
           // Engage short position
@@ -2246,12 +2246,12 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
         context("when currently in the last chunk of a TWAP rebalance", async () => {
           let newExchangeSettings: PerpV2ExchangeSettings;
-  
+
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(920));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(920).mul(10 ** 8));
-  
+
             newExchangeSettings = {
               twapMaxTradeSize: ether(1),
               incentivizedTwapMaxTradeSize: ether(1)
@@ -2262,7 +2262,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             await printLeverageRatio();
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
@@ -2270,28 +2270,28 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(currentLeverageRatio.abs()).to.be.lt(newMethodologySettings.minLeverageRatio.abs());
             expect(twapLeverageRatio.abs()).to.be.eq(newMethodologySettings.minLeverageRatio.abs());
           });
-  
+
           it("should set the global last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should remove the TWAP leverage ratio", async () => {
             await subject();
-  
+
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(twapLeverageRatio).to.eq(ZERO);
           });
-  
+
           it.skip("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-  
+
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               newMethodologySettings.targetLeverageRatio,
@@ -2299,12 +2299,12 @@ describe("PerpV2LeverageStrategyExtension", () => {
               newMethodologySettings.maxLeverageRatio,
               newMethodologySettings.recenteringSpeed
             );
-  
+
             await subject();
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const newPosition = newPositions[0];
-  
+
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
@@ -2312,39 +2312,39 @@ describe("PerpV2LeverageStrategyExtension", () => {
             const chunkRebalanceNotional = totalRebalanceNotional.gt(newExchangeSettings.twapMaxTradeSize)
               ? (totalRebalanceNotional.gt(ZERO) ? newExchangeSettings.twapMaxTradeSize : newExchangeSettings.twapMaxTradeSize.mul(-1))
               : totalRebalanceNotional;
-  
+
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(chunkRebalanceNotional), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(newPosition.baseUnit).to.eq(expectedNewPositionUnit);
           });
         });
-  
+
         context("when current leverage ratio is below target and in the middle of a TWAP", async () => {
           let newExchangeSettings: PerpV2ExchangeSettings;
           let preTwapLeverageRatio: BigNumber;
-  
+
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             // await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(900));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
-  
+
             newExchangeSettings = {
               twapMaxTradeSize: ether(.1),
               incentivizedTwapMaxTradeSize: ether(1)
             };
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
-  
+
             preTwapLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             await printLeverageRatio();
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
-  
+
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
@@ -2352,22 +2352,22 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(currentLeverageRatio.abs()).to.be.lt(newMethodologySettings.targetLeverageRatio.abs());
             expect(twapLeverageRatio.abs()).to.be.gt(ZERO);
           });
-  
+
           it("should set the global last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should set the TWAP leverage ratio", async () => {
             const previousTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             await subject();
-  
+
             const currentTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               preTwapLeverageRatio,
               newMethodologySettings.targetLeverageRatio,
@@ -2378,12 +2378,12 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(previousTwapLeverageRatio).to.eq(expectedNewLeverageRatio);
             expect(currentTwapLeverageRatio).to.eq(expectedNewLeverageRatio);
           });
-  
+
           it.skip("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-  
+
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               currentLeverageRatio,
               newMethodologySettings.targetLeverageRatio,
@@ -2391,52 +2391,52 @@ describe("PerpV2LeverageStrategyExtension", () => {
               newMethodologySettings.maxLeverageRatio,
               newMethodologySettings.recenteringSpeed
             );
-  
+
             await subject();
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const newPosition = newPositions[0];
-  
+
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
-            
+
             const chunkRebalanceNotional = newExchangeSettings.twapMaxTradeSize.gt(totalRebalanceNotional)
               ? totalRebalanceNotional
               : (totalRebalanceNotional.gt(ZERO) ? newExchangeSettings.twapMaxTradeSize : newExchangeSettings.twapMaxTradeSize.mul(-1));
-  
+
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(chunkRebalanceNotional), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
           });
         });
-  
+
         context("when current leverage ratio is above target and in the middle of a TWAP", async () => {
           let newExchangeSettings: PerpV2ExchangeSettings;
           let preTwapLeverageRatio: BigNumber;
-  
+
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1050).mul(10 ** 8));
-  
+
             newExchangeSettings = {
               twapMaxTradeSize: ether(.1),
               incentivizedTwapMaxTradeSize: ether(1)
             };
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
-  
+
             preTwapLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             await printLeverageRatio();
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
-  
+
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
@@ -2444,22 +2444,22 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(currentLeverageRatio.abs()).to.be.gt(newMethodologySettings.targetLeverageRatio.abs());
             expect(twapLeverageRatio.abs()).to.be.gt(ZERO);
           });
-  
+
           it("should set the global last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should set the TWAP leverage ratio", async () => {
             const previousTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             await subject();
-  
+
             const currentTwapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
               preTwapLeverageRatio,
               newMethodologySettings.targetLeverageRatio,
@@ -2470,7 +2470,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(previousTwapLeverageRatio).to.eq(expectedNewLeverageRatio);
             expect(currentTwapLeverageRatio).to.eq(expectedNewLeverageRatio);
           });
-  
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
@@ -2481,38 +2481,38 @@ describe("PerpV2LeverageStrategyExtension", () => {
               newMethodologySettings.maxLeverageRatio,
               newMethodologySettings.recenteringSpeed
             );
-  
+
             await subject();
-  
+
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const newPosition = newPositions[0];
-  
+
             const totalRebalanceNotional = preciseMul(
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
-           
+
             const chunkRebalanceNotional = newExchangeSettings.twapMaxTradeSize.gt(totalRebalanceNotional.abs())
               ? totalRebalanceNotional
               : totalRebalanceNotional.gt(ZERO) ? newExchangeSettings.twapMaxTradeSize : newExchangeSettings.twapMaxTradeSize.mul(-1);
-  
+
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(chunkRebalanceNotional), totalSupply);
-  
+
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
           });
         });
-  
+
         describe("when price has moved advantageously towards target leverage ratio", async () => {
           let newExchangeSettings: PerpV2ExchangeSettings;
-  
+
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
-  
+
             newExchangeSettings = {
               twapMaxTradeSize: ether(1),
               incentivizedTwapMaxTradeSize: ether(1)
@@ -2520,63 +2520,63 @@ describe("PerpV2LeverageStrategyExtension", () => {
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
             await printLeverageRatio();
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
-  
+
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
-  
+
             // Move price advantageously towards TLR; increase price, so leverage increases towards TLR
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(950).mul(10 ** 8));
             await printLeverageRatio();
           });
-  
+
           it("should verify initial leverage conditions", async () => {
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
             await printLeverageRatio();
             expect(twapLeverageRatio.abs()).to.be.gt(ZERO);
           });
-  
+
           it("should set the global last trade timestamp", async () => {
             await subject();
-  
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-  
+
           it("should remove the TWAP leverage ratio", async () => {
             await subject();
-  
+
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-  
+
             expect(twapLeverageRatio).to.eq(ZERO);
           });
-  
+
           it("should not update the positions on the SetToken", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             await subject();
             const currentPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
-  
+
             expect(currentPositions[0].baseToken).to.eq(initialPositions[0].baseToken);
             expect(currentPositions[0].baseUnit).to.eq(initialPositions[0].baseUnit);
           });
         });
-  
+
         describe("when above incentivized leverage ratio threshold", async () => {
           beforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1200).mul(10 ** 8));
           });
-  
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Must be below incentivized leverage ratio");
           });
         });
-  
+
         context("when not in TWAP state", async () => {
           beforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(950).mul(10 ** 8));
           });
-  
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Not in TWAP state");
           });
@@ -2593,24 +2593,13 @@ describe("PerpV2LeverageStrategyExtension", () => {
     describe("#ripcord", async () => {
       let transferredEth: BigNumber;
       let subjectCaller: Account;
-      let ifEngaged: boolean;
-
-      before(async () => {
-        ifEngaged = true;
-      });
 
       cacheBeforeEach(async () => {
-        await initializeRootScopeContracts();
         await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
-        await leverageStrategyExtension.deposit();        
+        await leverageStrategyExtension.deposit();
       });
 
       beforeEach(async () => {
-        if (ifEngaged) {
-          await leverageStrategyExtension.engage();
-          await increaseTimeAsync(BigNumber.from(100000));
-        }
-
         subjectCaller = owner;
       });
 
@@ -2618,112 +2607,230 @@ describe("PerpV2LeverageStrategyExtension", () => {
         return leverageStrategyExtension.connect(subjectCaller.wallet).ripcord();
       }
 
-      context("when not in a TWAP rebalance", async () => {
+      context("when ripcord long position", async () => {
         cacheBeforeEach(async () => {
-          // Set to above incentivized ratio
-          await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
-          transferredEth = ether(1);
-          await owner.wallet.sendTransaction({to: leverageStrategyExtension.address, value: transferredEth});
+          await leverageStrategyExtension.engage();
+          await increaseTimeAsync(BigNumber.from(100000));
         });
 
-        it("should validate NOT in TWAP", async () => {
-          const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-          expect(twapLeverageRatio).to.be.eq(ZERO);
+        context("when not in a TWAP rebalance", async () => {
+          cacheBeforeEach(async () => {
+            // Set to above incentivized ratio
+            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
+            transferredEth = ether(1);
+            await owner.wallet.sendTransaction({to: leverageStrategyExtension.address, value: transferredEth});
+          });
+
+          it("should validate NOT in TWAP", async () => {
+            const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
+            expect(twapLeverageRatio).to.be.eq(ZERO);
+          });
+
+          it("should set the last trade timestamp", async () => {
+            await subject();
+
+            const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
+
+            expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
+          });
+
+          it("should not set the TWAP leverage ratio", async () => {
+            await subject();
+
+            const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
+
+            expect(twapLeverageRatio).to.eq(ZERO);
+          });
+
+          it("should update the baseToken position on the SetToken correctly", async () => {
+            const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
+
+            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+            const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
+              currentLeverageRatio,
+              methodology.targetLeverageRatio,
+              methodology.minLeverageRatio,
+              methodology.maxLeverageRatio,
+              methodology.recenteringSpeed
+            );
+
+            await subject();
+
+            const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
+            const newPosition = newPositions[0];
+
+            const totalRebalanceNotional = preciseMul(
+              preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
+              initialPositions[0].baseBalance
+            );
+
+            const rebalanceNotional = exchange.twapMaxTradeSize.gt(totalRebalanceNotional.abs())
+              ? totalRebalanceNotional
+              : totalRebalanceNotional.gt(ZERO) ? exchange.twapMaxTradeSize : exchange.twapMaxTradeSize.mul(-1);
+
+            const totalSupply = await setToken.totalSupply();
+            const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(rebalanceNotional), totalSupply);
+
+            expect(initialPositions.length).to.eq(1);
+            expect(newPositions.length).to.eq(1);
+            expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
+            expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
+          });
+
+          it("should transfer incentive", async () => {
+            const previousContractEthBalance = await getEthBalance(leverageStrategyExtension.address);
+            const previousOwnerEthBalance = await getEthBalance(owner.address);
+
+            const txHash = await subject();
+            const txReceipt = await provider.getTransactionReceipt(txHash.hash);
+            const currentContractEthBalance = await getEthBalance(leverageStrategyExtension.address);
+            const currentOwnerEthBalance = await getEthBalance(owner.address);
+            const expectedOwnerEthBalance = previousOwnerEthBalance.add(incentive.etherReward).sub(txReceipt.gasUsed.mul(txHash.gasPrice));
+
+            expect(previousContractEthBalance).to.eq(transferredEth);
+            expect(currentContractEthBalance).to.eq(transferredEth.sub(incentive.etherReward));
+            expect(expectedOwnerEthBalance).to.eq(currentOwnerEthBalance);
+          });
+
+          it("should emit RipcordCalled event", async () => {
+            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+            const baseBalance = await perpV2Setup.accountBalance.getBase(setToken.address, perpV2Setup.vETH.address);
+            const chunkRebalanceNotional = preciseMul(
+              preciseDiv(methodology.maxLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
+              baseBalance
+            );
+
+            await expect(subject()).to.emit(leverageStrategyExtension, "RipcordCalled").withArgs(
+              currentLeverageRatio,
+              methodology.maxLeverageRatio,
+              chunkRebalanceNotional,
+              incentive.etherReward,
+            );
+          });
+
+          describe("when greater than incentivized max trade size", async () => {
+            let newIncentivizedMaxTradeSize: BigNumber;
+
+            cacheBeforeEach(async () => {
+              newIncentivizedMaxTradeSize = ether(0.01);
+              const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
+                twapMaxTradeSize: ether(0.001),
+                incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
+              };
+              await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+            });
+
+            it("should set the global last trade timestamp", async () => {
+              await subject();
+
+              const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
+
+              expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
+            });
+
+            it("should update the baseToken position on the SetToken correctly", async () => {
+              const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
+
+              await subject();
+
+              const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
+              const newPosition = newPositions[0];
+
+              const totalSupply = await setToken.totalSupply();
+              const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.sub(newIncentivizedMaxTradeSize), totalSupply);
+
+              expect(initialPositions.length).to.eq(1);
+              expect(newPositions.length).to.eq(1);
+              expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
+              expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
+            });
+
+
+            describe("when incentivized cooldown period has not elapsed", async () => {
+              beforeEach(async () => {
+                await subject();
+                await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(400).mul(10 ** 8));
+              });
+
+              it("should revert", async () => {
+                await expect(subject()).to.be.revertedWith("TWAP cooldown must have elapsed");
+              });
+            });
+          });
+
+          describe("when below incentivized leverage ratio threshold", async () => {
+            beforeEach(async () => {
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(2000).mul(10 ** 8));
+            });
+
+            it("should revert", async () => {
+              await expect(subject()).to.be.revertedWith("Must be above incentivized leverage ratio");
+            });
+          });
+
+          describe.skip("when caller is a contract", async () => {
+          //   let subjectTarget: Address;
+          //   let subjectCallData: string;
+          //   let subjectValue: BigNumber;
+
+            //   let contractCaller: ContractCallerMock;
+
+            //   beforeEach(async () => {
+            //     contractCaller = await deployer.setV2.deployContractCallerMock();
+
+            //     subjectTarget = leverageStrategyExtension.address;
+            //     subjectCallData = leverageStrategyExtension.interface.encodeFunctionData("ripcord", [ subjectExchangeName ]);
+            //     subjectValue = ZERO;
+            //   });
+
+            //   async function subjectContractCaller(): Promise<any> {
+            //     return await contractCaller.invoke(
+            //       subjectTarget,
+            //       subjectValue,
+            //       subjectCallData
+            //     );
+            //   }
+
+          //   it("the trade reverts", async () => {
+          //     await expect(subjectContractCaller()).to.be.revertedWith("Caller must be EOA Address");
+          //   });
+          });
+
+          describe.skip("when SetToken has 0 supply", async () => {
+            beforeEach(async () => {
+              await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
+              await issuanceModule.redeem(setToken.address, ether(1), owner.address);
+            });
+
+            it("should revert", async () => {
+              await expect(subject()).to.be.revertedWith("SetToken must have > 0 supply");
+            });
+          });
         });
 
-        it("should set the last trade timestamp", async () => {
-          await subject();
-
-          const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-
-          expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
-        });
-
-        it("should not set the TWAP leverage ratio", async () => {
-          await subject();
-
-          const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-
-          expect(twapLeverageRatio).to.eq(ZERO);
-        });
-
-        it("should update the baseToken position on the SetToken correctly", async () => {
-          const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-
-          const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-
-          const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
-            currentLeverageRatio,
-            methodology.targetLeverageRatio,
-            methodology.minLeverageRatio,
-            methodology.maxLeverageRatio,
-            methodology.recenteringSpeed
-          );
-
-          await subject();
-
-          const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
-          const newPosition = newPositions[0];
-
-          const totalRebalanceNotional = preciseMul(
-            preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
-            initialPositions[0].baseBalance
-          );
-
-          const rebalanceNotional = exchange.twapMaxTradeSize.gt(totalRebalanceNotional.abs())
-            ? totalRebalanceNotional
-            : totalRebalanceNotional.gt(ZERO) ? exchange.twapMaxTradeSize : exchange.twapMaxTradeSize.mul(-1);
-
-          const totalSupply = await setToken.totalSupply();
-          const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(rebalanceNotional), totalSupply);
-
-          expect(initialPositions.length).to.eq(1);
-          expect(newPositions.length).to.eq(1);
-          expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
-          expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
-        });
-
-        it("should transfer incentive", async () => {
-          const previousContractEthBalance = await getEthBalance(leverageStrategyExtension.address);
-          const previousOwnerEthBalance = await getEthBalance(owner.address);
-
-          const txHash = await subject();
-          const txReceipt = await provider.getTransactionReceipt(txHash.hash);
-          const currentContractEthBalance = await getEthBalance(leverageStrategyExtension.address);
-          const currentOwnerEthBalance = await getEthBalance(owner.address);
-          const expectedOwnerEthBalance = previousOwnerEthBalance.add(incentive.etherReward).sub(txReceipt.gasUsed.mul(txHash.gasPrice));
-
-          expect(previousContractEthBalance).to.eq(transferredEth);
-          expect(currentContractEthBalance).to.eq(transferredEth.sub(incentive.etherReward));
-          expect(expectedOwnerEthBalance).to.eq(currentOwnerEthBalance);
-        });
-
-        it("should emit RipcordCalled event", async () => {
-          const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-          const baseBalance = await perpV2Setup.accountBalance.getBase(setToken.address, perpV2Setup.vETH.address);
-          const chunkRebalanceNotional = preciseMul(
-            preciseDiv(methodology.maxLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
-            baseBalance
-          );
-
-          await expect(subject()).to.emit(leverageStrategyExtension, "RipcordCalled").withArgs(
-            currentLeverageRatio,
-            methodology.maxLeverageRatio,
-            chunkRebalanceNotional,
-            incentive.etherReward,
-          );
-        });
-
-        describe("when greater than incentivized max trade size", async () => {
+        context("when in the midst of a TWAP rebalance", async () => {
           let newIncentivizedMaxTradeSize: BigNumber;
 
           cacheBeforeEach(async () => {
-            newIncentivizedMaxTradeSize = ether(0.01);
+            transferredEth = ether(1);
+            await owner.wallet.sendTransaction({to: leverageStrategyExtension.address, value: transferredEth});
+
+            newIncentivizedMaxTradeSize = ether(0.001);
             const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
               twapMaxTradeSize: ether(0.001),
               incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
             };
             await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+
+            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
+
+            // Start TWAP rebalance
+            await leverageStrategyExtension.rebalance();
+            await increaseTimeAsync(BigNumber.from(100));
+
+            // Set to above incentivized ratio
+            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
           });
 
           it("should set the global last trade timestamp", async () => {
@@ -2734,16 +2841,97 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
 
+          it("should set the TWAP leverage ratio to 0", async () => {
+            await subject();
+
+            const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
+
+            expect(twapLeverageRatio).to.eq(ZERO);
+          });
+        });
+      });
+
+      context("when ripcord short position", async () => {
+        let newMethodologySettings: PerpV2MethodologySettings;
+
+        cacheBeforeEach(async () => {
+          newMethodologySettings = {
+            targetLeverageRatio: methodology.targetLeverageRatio.mul(-1),
+            minLeverageRatio: methodology.minLeverageRatio.mul(-1),
+            maxLeverageRatio: methodology.maxLeverageRatio.mul(-1),
+            recenteringSpeed: methodology.recenteringSpeed,
+            rebalanceInterval: methodology.rebalanceInterval,
+          };
+          await leverageStrategyExtension.setMethodologySettings(newMethodologySettings);
+
+          // Engage short position
+          await leverageStrategyExtension.engage();
+          await increaseTimeAsync(BigNumber.from(100000));
+        });
+
+        context("when not in a TWAP rebalance", async () => {
+          cacheBeforeEach(async () => {
+            // Set to above incentivized ratio
+            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1100).mul(10 ** 8));
+
+            // Deposit ETH to incentivize calling ripcord
+            transferredEth = ether(1);
+            await owner.wallet.sendTransaction({to: leverageStrategyExtension.address, value: transferredEth});
+          });
+
+          it("should validate leverage ratio and NOT in TWAP", async () => {
+            const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
+            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+            expect(currentLeverageRatio.abs()).to.be.gt(incentive.incentivizedLeverageRatio.abs());
+            expect(twapLeverageRatio).to.be.eq(ZERO);
+          });
+
+          it("should set the last trade timestamp", async () => {
+            await subject();
+
+            const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
+
+            expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
+          });
+
+          it("should not set the TWAP leverage ratio", async () => {
+            await subject();
+
+            const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
+
+            expect(twapLeverageRatio).to.eq(ZERO);
+          });
+
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
+
+            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+            const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
+              currentLeverageRatio,
+              newMethodologySettings.targetLeverageRatio,
+              newMethodologySettings.minLeverageRatio,
+              newMethodologySettings.maxLeverageRatio,
+              newMethodologySettings.recenteringSpeed
+            );
 
             await subject();
 
             const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
             const newPosition = newPositions[0];
 
+            const totalRebalanceNotional = preciseMul(
+              preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
+              initialPositions[0].baseBalance
+            );
+
+            const rebalanceNotional = exchange.twapMaxTradeSize.gt(totalRebalanceNotional.abs())
+              ? totalRebalanceNotional
+              : totalRebalanceNotional.gt(ZERO) ? exchange.twapMaxTradeSize : exchange.twapMaxTradeSize.mul(-1);
+
             const totalSupply = await setToken.totalSupply();
-            const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.sub(newIncentivizedMaxTradeSize), totalSupply);
+            const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(rebalanceNotional), totalSupply);
 
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
@@ -2751,119 +2939,149 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
           });
 
+          it("should transfer incentive", async () => {
+            const previousContractEthBalance = await getEthBalance(leverageStrategyExtension.address);
+            const previousOwnerEthBalance = await getEthBalance(owner.address);
 
-          describe("when incentivized cooldown period has not elapsed", async () => {
-            beforeEach(async () => {
+            const txHash = await subject();
+            const txReceipt = await provider.getTransactionReceipt(txHash.hash);
+            const currentContractEthBalance = await getEthBalance(leverageStrategyExtension.address);
+            const currentOwnerEthBalance = await getEthBalance(owner.address);
+            const expectedOwnerEthBalance = previousOwnerEthBalance.add(incentive.etherReward).sub(txReceipt.gasUsed.mul(txHash.gasPrice));
+
+            expect(previousContractEthBalance).to.eq(transferredEth);
+            expect(currentContractEthBalance).to.eq(transferredEth.sub(incentive.etherReward));
+            expect(expectedOwnerEthBalance).to.eq(currentOwnerEthBalance);
+          });
+
+          it("should emit RipcordCalled event", async () => {
+            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+            const baseBalance = await perpV2Setup.accountBalance.getBase(setToken.address, perpV2Setup.vETH.address);
+            const chunkRebalanceNotional = preciseMul(
+              preciseDiv(newMethodologySettings.maxLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
+              baseBalance
+            );
+
+            await expect(subject()).to.emit(leverageStrategyExtension, "RipcordCalled").withArgs(
+              currentLeverageRatio,
+              newMethodologySettings.maxLeverageRatio,
+              chunkRebalanceNotional,
+              incentive.etherReward,
+            );
+          });
+
+          describe("when greater than incentivized max trade size", async () => {
+            let newIncentivizedMaxTradeSize: BigNumber;
+
+            cacheBeforeEach(async () => {
+              newIncentivizedMaxTradeSize = ether(0.01);
+              const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
+                twapMaxTradeSize: ether(0.001),
+                incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
+              };
+              await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+            });
+
+            it("should set the global last trade timestamp", async () => {
               await subject();
-              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(400).mul(10 ** 8));
+
+              const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
+
+              expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
+            });
+
+            it("should update the baseToken position on the SetToken correctly", async () => {
+              const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
+
+              await subject();
+
+              const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
+              const newPosition = newPositions[0];
+
+              const totalSupply = await setToken.totalSupply();
+              const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(newIncentivizedMaxTradeSize), totalSupply);
+
+              expect(initialPositions.length).to.eq(1);
+              expect(newPositions.length).to.eq(1);
+              expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
+              expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
+            });
+
+
+            describe("when incentivized cooldown period has not elapsed", async () => {
+              beforeEach(async () => {
+                await subject();
+                await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1100).mul(10 ** 8));
+              });
+
+              it("should revert", async () => {
+                await expect(subject()).to.be.revertedWith("TWAP cooldown must have elapsed");
+              });
+            });
+          });
+
+          describe("when below incentivized leverage ratio threshold", async () => {
+            beforeEach(async () => {
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1010).mul(10 ** 8));
             });
 
             it("should revert", async () => {
-              await expect(subject()).to.be.revertedWith("TWAP cooldown must have elapsed");
+              await expect(subject()).to.be.revertedWith("Must be above incentivized leverage ratio");
             });
           });
         });
 
-        describe("when below incentivized leverage ratio threshold", async () => {
-          beforeEach(async () => {
-            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(2000).mul(10 ** 8));
+        context("when in the midst of a TWAP rebalance", async () => {
+          let newIncentivizedMaxTradeSize: BigNumber;
+
+          cacheBeforeEach(async () => {
+            transferredEth = ether(1);
+            await owner.wallet.sendTransaction({to: leverageStrategyExtension.address, value: transferredEth});
+
+            newIncentivizedMaxTradeSize = ether(0.001);
+            const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
+              twapMaxTradeSize: ether(0.001),
+              incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
+            };
+            await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+
+            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(950).mul(10 ** 8));
+
+            // Start TWAP rebalance
+            await leverageStrategyExtension.rebalance();
+            await increaseTimeAsync(BigNumber.from(100));
+
+            // Set to above incentivized ratio
+            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1100).mul(10 ** 8));
           });
 
-          it("should revert", async () => {
-            await expect(subject()).to.be.revertedWith("Must be above incentivized leverage ratio");
-          });
-        });
+          it("should validate leverage ratio and in TWAP", async () => {
+            const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
+            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
 
-        // describe("when caller is a contract", async () => {
-        //   let subjectTarget: Address;
-        //   let subjectCallData: string;
-        //   let subjectValue: BigNumber;
-
-        //   let contractCaller: ContractCallerMock;
-
-        //   beforeEach(async () => {
-        //     contractCaller = await deployer.setV2.deployContractCallerMock();
-
-        //     subjectTarget = leverageStrategyExtension.address;
-        //     subjectCallData = leverageStrategyExtension.interface.encodeFunctionData("ripcord", [ subjectExchangeName ]);
-        //     subjectValue = ZERO;
-        //   });
-
-        //   async function subjectContractCaller(): Promise<any> {
-        //     return await contractCaller.invoke(
-        //       subjectTarget,
-        //       subjectValue,
-        //       subjectCallData
-        //     );
-        //   }
-
-        //   it("the trade reverts", async () => {
-        //     await expect(subjectContractCaller()).to.be.revertedWith("Caller must be EOA Address");
-        //   });
-        // });
-
-        describe.skip("when SetToken has 0 supply", async () => {
-          beforeEach(async () => {
-            await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
-            await issuanceModule.redeem(setToken.address, ether(1), owner.address);
+            expect(currentLeverageRatio.abs()).to.be.gt(incentive.incentivizedLeverageRatio.abs());
+            expect(twapLeverageRatio.abs()).to.be.gt(ZERO);
           });
 
-          it("should revert", async () => {
-            await expect(subject()).to.be.revertedWith("SetToken must have > 0 supply");
+          it("should set the global last trade timestamp", async () => {
+            await subject();
+
+            const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
+
+            expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
-        });
-      });
 
-      context("when in the midst of a TWAP rebalance", async () => {
-        let newIncentivizedMaxTradeSize: BigNumber;
+          it("should set the TWAP leverage ratio to 0", async () => {
+            await subject();
 
-        cacheBeforeEach(async () => {
-          transferredEth = ether(1);
-          await owner.wallet.sendTransaction({to: leverageStrategyExtension.address, value: transferredEth});
+            const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
 
-          newIncentivizedMaxTradeSize = ether(0.001);
-          const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
-            twapMaxTradeSize: ether(0.001),
-            incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
-          };
-          await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
-
-          await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
-
-          // Start TWAP rebalance
-          await leverageStrategyExtension.rebalance();
-          await increaseTimeAsync(BigNumber.from(100));
-
-          // Set to above incentivized ratio
-          await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
-        });
-
-        it("should set the global last trade timestamp", async () => {
-          await subject();
-
-          const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-
-          expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
-        });
-
-        it("should set the TWAP leverage ratio to 0", async () => {
-          await subject();
-
-          const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-
-          expect(twapLeverageRatio).to.eq(ZERO);
+            expect(twapLeverageRatio).to.eq(ZERO);
+          });
         });
       });
 
       describe("when not engaged", async () => {
-        before(async () => {
-          ifEngaged = false;
-        });
-
-        after(async () => {
-          ifEngaged = true;
-        });
-      
         it("should revert", async () => {
           await expect(subject()).to.be.revertedWith("Base asset balance must be > 0");
         });
@@ -2935,18 +3153,18 @@ describe("PerpV2LeverageStrategyExtension", () => {
           });
         });
 
-        describe("when not engaged", async () => {          
+        describe("when not engaged", async () => {
           before(async () => {
             ifEngaged = false;
           });
 
           cacheBeforeEach(intializeContracts);
           beforeEach(initializeSubjectVariables);
-  
+
           after(async () => {
             ifEngaged = true;
           });
-        
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Base asset balance must be > 0");
           });
@@ -2955,7 +3173,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
       context("when notional is greater than max trade size", async () => {
         let newExchangeSettings: PerpV2ExchangeSettings;
-        
+
         before(async () => {
           ifEngaged = true;
         });
@@ -3026,18 +3244,18 @@ describe("PerpV2LeverageStrategyExtension", () => {
           });
         });
 
-        describe("when not engaged", async () => {          
+        describe("when not engaged", async () => {
           before(async () => {
             ifEngaged = false;
           });
 
           cacheBeforeEach(intializeContracts);
           beforeEach(initializeSubjectVariables);
-  
+
           after(async () => {
             ifEngaged = true;
           });
-        
+
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Base asset balance must be > 0");
           });
@@ -4138,7 +4356,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
                 : exchangeSettings.twapMaxTradeSize
               )
               : totalRebalanceNotional;
-            
+
             expect(sellAsset).to.eq(strategy.virtualBaseAddress);
             expect(buyAsset).to.eq(strategy.virtualQuoteAddress);
             expect(chunkRebalance).to.eq(expectedTotalRebalance);
