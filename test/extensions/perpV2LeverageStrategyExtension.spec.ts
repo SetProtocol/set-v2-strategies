@@ -46,13 +46,12 @@ import { calculateNewLeverageRatioPerpV2 } from "@utils/flexibleLeverageUtils/fl
 const expect = getWaffleExpect();
 const provider = ethers.provider;
 
-// todo: fix the terminology of base asset, quote asset and collateral asset throughout.
-// todo: iterate rebalance tets, twap is set to zero even when clr is 1.686?
-// todo: it moves from 1.666 to 1.686 and then sets twap to zero, is it cause 1.706 > 1.7
-// todo: Fix "when SetToken has 0 supply" test cases
-// todo: Fix "when caller is a contract" test cases
-// todo: Update chainlink oracles + perp oracles.
-// todo: Fix skipped test cases in iterateRebalance short positions
+// todo: Fix terminology used to refer to base asset, quote asset and collateral asset throughout.
+// todo: Add code to update perp oracles where needed.
+// todo: Fix "when SetToken has 0 supply" test cases.
+// todo: Fix "when caller is a contract" test cases.
+// todo: Fix 2 skipped test cases in iterateRebalance short positions.
+// todo: Add short position tests cases for shouldRebalance, shouldRebalanceWithBounds and getChunkRebalanceNotional
 describe("PerpV2LeverageStrategyExtension", () => {
   let owner: Account;
   let methodologist: Account;

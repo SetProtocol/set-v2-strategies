@@ -30,9 +30,9 @@ import { IPerpV2LeverageModule } from "@setprotocol/set-protocol-v2/contracts/in
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 import { BaseExtension } from "../lib/BaseExtension.sol";
+import { IAccountBalance } from "../interfaces/IAccountBalance.sol";
 import { IBaseManager } from "../interfaces/IBaseManager.sol";
 import { IChainlinkAggregatorV3 } from "../interfaces/IChainlinkAggregatorV3.sol";
-import { IAccountBalance } from "../interfaces/IAccountBalance.sol";
 import { IVault } from "../interfaces/IVault.sol";
 
 import { PreciseUnitMath } from "../lib/PreciseUnitMath.sol";
@@ -40,6 +40,9 @@ import { StringArrayUtils } from "../lib/StringArrayUtils.sol";
 
 import "hardhat/console.sol";
 
+// Todo
+// 1. Fix terminology used to refer to base asset, quote asset and collateral throughout the contract.
+// 2. Improve javadocs.
 /**
  * @title PerpV2LeverageStrategyExtension
  * @author Set Protocol
@@ -643,7 +646,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         returns(ShouldRebalance)
     {
         require (
-            _customMinLeverageRatio <= methodology.minLeverageRatio && _customMaxLeverageRatio >= methodology.maxLeverageRatio,
+            _absUint256(_customMinLeverageRatio) <= _absUint256(methodology.minLeverageRatio)
+            && _absUint256(_customMaxLeverageRatio) >= _absUint256(methodology.maxLeverageRatio),
             "Custom bounds must be valid"
         );
 
@@ -887,12 +891,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
             .add(_actionInfo.accountInfo.pendingFundingPayments)
             .add(_actionInfo.basePositionValue)
             .add(_actionInfo.quoteValue);
-        console.logInt(_actionInfo.accountInfo.collateralBalance);
-        console.logInt(_actionInfo.accountInfo.owedRealizedPnl);
-        console.logInt(_actionInfo.accountInfo.pendingFundingPayments);
-        console.logInt(_actionInfo.basePositionValue);
-        console.logInt(_actionInfo.quoteValue);
-        console.logInt(accountValue);
+
         // accountMarginRatio = accountValue / sum(abs(positionValue[ith_market]))
         // CLR = 1 / accountMarginRatio = sum(abs(positionValue[ith_market])) / accountValue
 
