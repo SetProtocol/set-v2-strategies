@@ -52,7 +52,6 @@ export interface PerpV2MethodologySettings {
 }
 
 export interface PerpV2ExecutionSettings {
-  unutilizedLeveragePercentage: BigNumber;
   twapCooldownPeriod: BigNumber;
   slippageTolerance: BigNumber;
 }
