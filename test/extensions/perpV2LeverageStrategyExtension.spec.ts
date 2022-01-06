@@ -3092,172 +3092,278 @@ describe("PerpV2LeverageStrategyExtension", () => {
       let subjectCaller: Account;
       let ifEngaged: boolean;
 
+      beforeEach(async () => {
+        subjectCaller = owner;
+      });
+
       async function subject(): Promise<any> {
         return leverageStrategyExtension.connect(subjectCaller.wallet).disengage();
       }
 
-      context("when notional is less than max trade size", async () => {
-        before(async () => {
-          ifEngaged = true;
+      context("when disengage long position", async () => {
+        context("when notional is less than max trade size", async () => {
+          before(async () => {
+            ifEngaged = true;
+          });
+
+          const intializeContracts = async() => {
+            if (ifEngaged) {
+              // Add allowed trader
+              await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
+              // Engage to initial leverage
+              await leverageStrategyExtension.deposit();
+              await leverageStrategyExtension.engage();
+            }
+          };
+
+          describe("when engaged", () => {
+            cacheBeforeEach(intializeContracts);
+
+            it("should remove the base position from the SetToken", async () => {
+              const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
+
+              await subject();
+
+              const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
+
+              expect(initialPositions.length).to.eq(1);
+              expect(newPositions.length).to.eq(0);
+            });
+
+            describe.skip("when SetToken has 0 supply", async () => {
+              beforeEach(async () => {
+                await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
+                await issuanceModule.redeem(setToken.address, ether(1), owner.address);
+              });
+
+              it("should revert", async () => {
+                await expect(subject()).to.be.revertedWith("SetToken must have > 0 supply");
+              });
+            });
+
+            describe("when the caller is not the operator", async () => {
+              beforeEach(async () => {
+                subjectCaller = await getRandomAccount();
+              });
+
+              it("should revert", async () => {
+                await expect(subject()).to.be.revertedWith("Must be operator");
+              });
+            });
+          });
+
+          describe("when not engaged", async () => {
+            before(async () => {
+              ifEngaged = false;
+            });
+
+            cacheBeforeEach(intializeContracts);
+
+            after(async () => {
+              ifEngaged = true;
+            });
+
+            it("should revert", async () => {
+              await expect(subject()).to.be.revertedWith("Base asset balance must be > 0");
+            });
+          });
         });
 
-        const intializeContracts = async() => {
-          await initializeRootScopeContracts();
-          if (ifEngaged) {
+        context("when notional is greater than max trade size", async () => {
+          let newExchangeSettings: PerpV2ExchangeSettings;
+
+          before(async () => {
+            ifEngaged = true;
+          });
+
+          const intializeContracts = async() => {
             // Add allowed trader
             await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
             // Engage to initial leverage
             await leverageStrategyExtension.deposit();
-            await leverageStrategyExtension.engage();
-          }
-        };
 
-        const initializeSubjectVariables = () => {
-          subjectCaller = owner;
-        };
+            if (ifEngaged) {
+              await leverageStrategyExtension.engage();
 
-        describe("when engaged", () => {
-          cacheBeforeEach(intializeContracts);
-          beforeEach(initializeSubjectVariables);
+              newExchangeSettings = {
+                twapMaxTradeSize: ether(1.9),
+                incentivizedTwapMaxTradeSize: exchange.incentivizedTwapMaxTradeSize
+              };
+              await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
+            }
+          };
 
-          it("should remove the base position from the SetToken", async () => {
-            const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
+          describe("when engaged", () => {
+            cacheBeforeEach(intializeContracts);
 
-            await subject();
+            it("should update the base position on the SetToken correctly", async () => {
+              const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
 
-            const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
+              await subject();
 
-            expect(initialPositions.length).to.eq(1);
-            expect(newPositions.length).to.eq(0);
+              const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
+              const newPosition = newPositions[0];
+
+              const totalSupply = await setToken.totalSupply();
+              const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.sub(newExchangeSettings.twapMaxTradeSize), totalSupply);
+
+              expect(initialPositions.length).to.eq(1);
+              expect(newPositions.length).to.eq(1);
+              expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
+              expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
+            });
+
+            describe.skip("when SetToken has 0 supply", async () => {
+              beforeEach(async () => {
+                await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
+                await issuanceModule.redeem(setToken.address, ether(1), owner.address);
+              });
+
+              it("should revert", async () => {
+                await expect(subject()).to.be.revertedWith("SetToken must have > 0 supply");
+              });
+            });
+
+            describe("when the caller is not the operator", async () => {
+              beforeEach(async () => {
+                subjectCaller = await getRandomAccount();
+              });
+
+              it("should revert", async () => {
+                await expect(subject()).to.be.revertedWith("Must be operator");
+              });
+            });
           });
 
-          describe.skip("when SetToken has 0 supply", async () => {
-            beforeEach(async () => {
-              await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
-              await issuanceModule.redeem(setToken.address, ether(1), owner.address);
+          describe("when not engaged", async () => {
+            before(async () => {
+              ifEngaged = false;
+            });
+
+            cacheBeforeEach(intializeContracts);
+
+            after(async () => {
+              ifEngaged = true;
             });
 
             it("should revert", async () => {
-              await expect(subject()).to.be.revertedWith("SetToken must have > 0 supply");
+              await expect(subject()).to.be.revertedWith("Base asset balance must be > 0");
             });
-          });
-
-          describe("when the caller is not the operator", async () => {
-            beforeEach(async () => {
-              subjectCaller = await getRandomAccount();
-            });
-
-            it("should revert", async () => {
-              await expect(subject()).to.be.revertedWith("Must be operator");
-            });
-          });
-        });
-
-        describe("when not engaged", async () => {
-          before(async () => {
-            ifEngaged = false;
-          });
-
-          cacheBeforeEach(intializeContracts);
-          beforeEach(initializeSubjectVariables);
-
-          after(async () => {
-            ifEngaged = true;
-          });
-
-          it("should revert", async () => {
-            await expect(subject()).to.be.revertedWith("Base asset balance must be > 0");
           });
         });
       });
 
-      context("when notional is greater than max trade size", async () => {
-        let newExchangeSettings: PerpV2ExchangeSettings;
+      context("when disengage short position", async () => {
+        let newMethodologySettings: PerpV2MethodologySettings;
 
-        before(async () => {
-          ifEngaged = true;
+        cacheBeforeEach(async () => {
+          newMethodologySettings = {
+            targetLeverageRatio: methodology.targetLeverageRatio.mul(-1),
+            minLeverageRatio: methodology.minLeverageRatio.mul(-1),
+            maxLeverageRatio: methodology.maxLeverageRatio.mul(-1),
+            recenteringSpeed: methodology.recenteringSpeed,
+            rebalanceInterval: methodology.rebalanceInterval,
+          };
+          await leverageStrategyExtension.setMethodologySettings(newMethodologySettings);
         });
 
-        const intializeContracts = async() => {
-          await initializeRootScopeContracts();
-
-          // Add allowed trader
-          await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
-          // Engage to initial leverage
-          await leverageStrategyExtension.deposit();
-
-          if (ifEngaged) {
-            await leverageStrategyExtension.engage();
-
-            newExchangeSettings = {
-              twapMaxTradeSize: ether(1.9),
-              incentivizedTwapMaxTradeSize: exchange.incentivizedTwapMaxTradeSize
-            };
-            await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
-          }
-        };
-
-        const initializeSubjectVariables = () => {
-          subjectCaller = owner;
-        };
-
-        describe("when engaged", () => {
-          cacheBeforeEach(intializeContracts);
-          beforeEach(initializeSubjectVariables);
-
-          it("should update the base position on the SetToken correctly", async () => {
-            const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
-
-            await subject();
-
-            const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
-            const newPosition = newPositions[0];
-
-            const totalSupply = await setToken.totalSupply();
-            const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.sub(newExchangeSettings.twapMaxTradeSize), totalSupply);
-
-            expect(initialPositions.length).to.eq(1);
-            expect(newPositions.length).to.eq(1);
-            expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
-            expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
-          });
-
-          describe.skip("when SetToken has 0 supply", async () => {
-            beforeEach(async () => {
-              await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
-              await issuanceModule.redeem(setToken.address, ether(1), owner.address);
-            });
-
-            it("should revert", async () => {
-              await expect(subject()).to.be.revertedWith("SetToken must have > 0 supply");
-            });
-          });
-
-          describe("when the caller is not the operator", async () => {
-            beforeEach(async () => {
-              subjectCaller = await getRandomAccount();
-            });
-
-            it("should revert", async () => {
-              await expect(subject()).to.be.revertedWith("Must be operator");
-            });
-          });
-        });
-
-        describe("when not engaged", async () => {
+        context("when notional is less than max trade size", async () => {
           before(async () => {
-            ifEngaged = false;
-          });
-
-          cacheBeforeEach(intializeContracts);
-          beforeEach(initializeSubjectVariables);
-
-          after(async () => {
             ifEngaged = true;
           });
 
-          it("should revert", async () => {
-            await expect(subject()).to.be.revertedWith("Base asset balance must be > 0");
+          const intializeContracts = async() => {
+            if (ifEngaged) {
+              // Add allowed trader
+              await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
+              // Engage to initial leverage
+              await leverageStrategyExtension.deposit();
+              await leverageStrategyExtension.engage();
+            }
+          };
+
+          describe("when engaged", () => {
+            cacheBeforeEach(intializeContracts);
+
+            it("should remove the base position from the SetToken", async () => {
+              const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
+
+              await subject();
+
+              const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
+
+              expect(initialPositions.length).to.eq(1);
+              expect(newPositions.length).to.eq(0);
+            });
+
+            describe.skip("when SetToken has 0 supply", async () => {
+              beforeEach(async () => {
+                await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
+                await issuanceModule.redeem(setToken.address, ether(1), owner.address);
+              });
+
+              it("should revert", async () => {
+                await expect(subject()).to.be.revertedWith("SetToken must have > 0 supply");
+              });
+            });
+          });
+        });
+
+        context("when notional is greater than max trade size", async () => {
+          let newExchangeSettings: PerpV2ExchangeSettings;
+
+          before(async () => {
+            ifEngaged = true;
+          });
+
+          const intializeContracts = async() => {
+            // Add allowed trader
+            await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
+
+            // Engage to initial leverage
+            await leverageStrategyExtension.deposit();
+
+            if (ifEngaged) {
+              await leverageStrategyExtension.engage();
+
+              newExchangeSettings = {
+                twapMaxTradeSize: ether(1.9),
+                incentivizedTwapMaxTradeSize: exchange.incentivizedTwapMaxTradeSize
+              };
+              await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
+            }
+          };
+
+          describe("when engaged", () => {
+            cacheBeforeEach(intializeContracts);
+
+            it("should update the base position on the SetToken correctly", async () => {
+              const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
+
+              await subject();
+
+              const newPositions = await perpV2LeverageModule.getPositionUnitInfo(setToken.address);
+              const newPosition = newPositions[0];
+
+              const totalSupply = await setToken.totalSupply();
+              const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(newExchangeSettings.twapMaxTradeSize), totalSupply);
+
+              expect(initialPositions.length).to.eq(1);
+              expect(newPositions.length).to.eq(1);
+              expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
+              expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
+            });
+
+            describe.skip("when SetToken has 0 supply", async () => {
+              beforeEach(async () => {
+                await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
+                await issuanceModule.redeem(setToken.address, ether(1), owner.address);
+              });
+
+              it("should revert", async () => {
+                await expect(subject()).to.be.revertedWith("SetToken must have > 0 supply");
+              });
+            });
           });
         });
       });
