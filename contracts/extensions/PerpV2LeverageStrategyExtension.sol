@@ -41,8 +41,6 @@ import { StringArrayUtils } from "../lib/StringArrayUtils.sol";
 import "hardhat/console.sol";
 
 // Todo
-// 1. Fix terminology used to refer to base asset, quote asset and collateral throughout the contract.
-// 2. Improve javadocs.
 // 3. Make sure fethcing single position values from PerpV2.
 // 4. Optimize for L2.
 // 5. Verify oracles.
@@ -79,11 +77,11 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     struct ActionInfo {
         int256 baseBalance;                                 // Balance of virtual base asset from Perp in precise units (10e18). E.g. vWBTC = 10e18
         int256 quoteBalance;                                // Balance of virtual quote asset from Perp in precise units (10e18). E.g. vUSDC = 10e18
-        IPerpV2LeverageModule.AccountInfo accountInfo;      // Info on perpetual account including, collateral amount, owedRealizedPnl and pendingFunding
+        IPerpV2LeverageModule.AccountInfo accountInfo;      // Info on perpetual account including, collateral balance, owedRealizedPnl and pendingFunding
         int256 basePositionValue;                           // Valuation in USD adjusted for decimals in precise units (10e18)
         int256 quoteValue;                                  // Valuation in USD adjusted for decimals in precise units (10e18)
-        int256 basePrice;                                   // Price of collateral in precise units (10e18) from Chainlink
-        int256 quotePrice;                                  // Price of collateral in precise units (10e18) from Chainlink
+        int256 basePrice;                                   // Price of base asset in precise units (10e18) from Chainlink
+        int256 quotePrice;                                  // Price of quote asset in precise units (10e18) from Chainlink
         uint256 setTotalSupply;                             // Total supply of SetToken
     }
 
@@ -91,15 +89,15 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         ActionInfo action;
         int256 currentLeverageRatio;                    // Current leverage ratio of Set. For short tokens, this will be negative
         uint256 slippageTolerance;                      // Allowable percent trade slippage in preciseUnits (1% = 10^16)
-        uint256 twapMaxTradeSize;                       // Max trade size in collateral units allowed for rebalance action
+        uint256 twapMaxTradeSize;                       // Max trade size in base asset units allowed for rebalance action
     }
 
     struct ContractSettings {
         ISetToken setToken;                             // Instance of leverage token
         IPerpV2LeverageModule perpV2LeverageModule;     // Instance of Perp V2 leverage module
         IAccountBalance perpV2AccountBalance;           // Instance of Perp V2 AccountBalance contract used to fetch position balances
-        IChainlinkAggregatorV3 basePriceOracle;         // Chainlink oracle feed that returns prices in 8 decimals for collateral asset
-        IChainlinkAggregatorV3 quotePriceOracle;        // Chainlink oracle feed that returns prices in 8 decimals for collateral asset
+        IChainlinkAggregatorV3 basePriceOracle;         // Chainlink oracle feed that returns prices in 8 decimals for base asset
+        IChainlinkAggregatorV3 quotePriceOracle;        // Chainlink oracle feed that returns prices in 8 decimals for quote asset
         address virtualBaseAddress;                     // Address of virtual base asset (e.g. vETH, vWBTC etc)
         address virtualQuoteAddress;                    // Address of virtual USDC quote asset. The Perp V2 system uses USDC for all markets
     }
@@ -121,8 +119,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     struct ExchangeSettings {
-        uint256 twapMaxTradeSize;                        // Max trade size in collateral base units. Always a positive number
-        uint256 incentivizedTwapMaxTradeSize;            // Max trade size for incentivized rebalances in collateral base units. Always a positive number
+        uint256 twapMaxTradeSize;                        // Max trade size in base assset base units. Always a positive number
+        uint256 incentivizedTwapMaxTradeSize;            // Max trade size for incentivized rebalances in base asset units. Always a positive number
     }
 
     struct IncentiveSettings {
@@ -532,7 +530,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
     /**
      * Get current leverage ratio. Current leverage ratio is defined as the sum of USD values of all SetToken open positions on Perp V2 divided by its account value on 
-     * PerpV2. Prices for collateral and quote asset are retrieved from the Chainlink Price Oracle.
+     * PerpV2. Prices for base and quote asset are retrieved from the Chainlink Price Oracle.
      *
      * return currentLeverageRatio         Current leverage ratio in precise units (10e18)
      */
@@ -669,15 +667,15 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     )
         internal
     {
-        int256 collateralRebalanceUnits = _chunkRebalanceNotional.preciseDiv(_leverageInfo.action.setTotalSupply.toInt256());
+        int256 baseRebalanceUnits = _chunkRebalanceNotional.preciseDiv(_leverageInfo.action.setTotalSupply.toInt256());
 
-        uint256 oppositeBoundUnits = _calculateOppositeBoundUnits(collateralRebalanceUnits, _leverageInfo.action, _leverageInfo.slippageTolerance);
+        uint256 oppositeBoundUnits = _calculateOppositeBoundUnits(baseRebalanceUnits, _leverageInfo.action, _leverageInfo.slippageTolerance);
 
         bytes memory tradeCallData = abi.encodeWithSelector(
             IPerpV2LeverageModule.trade.selector,
             address(strategy.setToken),
             strategy.virtualBaseAddress,
-            collateralRebalanceUnits,
+            baseRebalanceUnits,
             oppositeBoundUnits
         );
 
@@ -738,10 +736,10 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         // Calculate prices from chainlink. Chainlink returns prices with 8 decimal places, so we need to adjust by 10 ** 10.
         // In Perp v2, virtual tokens all have 18 decimals, therefore we do not need to make further adjustments to determine
         // base and quote valuation
-        int256 rawCollateralPrice = strategy.basePriceOracle.latestAnswer();
-        int256 rawBorrowPrice = strategy.quotePriceOracle.latestAnswer();
-        rebalanceInfo.basePrice = rawCollateralPrice.mul(10 ** 10);
-        rebalanceInfo.quotePrice = rawBorrowPrice.mul(10 ** 10);
+        int256 rawBasePrice = strategy.basePriceOracle.latestAnswer();
+        int256 rawQuotePrice = strategy.quotePriceOracle.latestAnswer();
+        rebalanceInfo.basePrice = rawBasePrice.mul(10 ** 10);
+        rebalanceInfo.quotePrice = rawQuotePrice.mul(10 ** 10);
 
         rebalanceInfo.baseBalance = strategy.perpV2AccountBalance.getBase(address(strategy.setToken), strategy.virtualBaseAddress);
         
@@ -927,10 +925,10 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Calculate total notional rebalance quantity and chunked rebalance quantity in collateral units.
+     * Calculate total notional rebalance quantity and chunked rebalance quantity in base asset units.
      *
-     * return int256          Chunked rebalance notional in collateral units
-     * return int256          Total rebalance notional in collateral units
+     * return int256          Chunked rebalance notional in base asset units
+     * return int256          Total rebalance notional in base asset units
      */
     function _calculateChunkRebalanceNotional(
         LeverageInfo memory _leverageInfo,
@@ -954,10 +952,10 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Calculate total notional rebalance quantity and chunked rebalance quantity in collateral units for engaging the SetToken. Used in engage()
+     * Calculate total notional rebalance quantity and chunked rebalance quantity in base asset units for engaging the SetToken. Used in engage()
      *
-     * return int256          Chunked rebalance notional in collateral units
-     * return int256          Total rebalance notional in collateral units
+     * return int256          Chunked rebalance notional in base asset units
+     * return int256          Total rebalance notional in base asset units
      */
     function _calculateEngageRebalanceSize(
         LeverageInfo memory _leverageInfo,
@@ -980,20 +978,20 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Derive the quote token units for slippage tolerance. The units are calculated by the base token units multiplied by collateral asset price divided by quote asset price.
+     * Derive the quote token units for slippage tolerance. The units are calculated by the base token units multiplied by base asset price divided by quote asset price.
      * Output is measured to quote unit decimals.
      *
      * return int256           Position units to quote
      */
-    function _calculateOppositeBoundUnits(int256 _collateralRebalanceUnits, ActionInfo memory _actionInfo, uint256 _slippageTolerance) internal pure returns (uint256) {
+    function _calculateOppositeBoundUnits(int256 _baseRebalanceUnits, ActionInfo memory _actionInfo, uint256 _slippageTolerance) internal pure returns (uint256) {
         uint256 oppositeBoundUnits;
-        if (_collateralRebalanceUnits > 0) {
-            oppositeBoundUnits = _collateralRebalanceUnits
+        if (_baseRebalanceUnits > 0) {
+            oppositeBoundUnits = _baseRebalanceUnits
                 .preciseMul(_actionInfo.basePrice)
                 .preciseDiv(_actionInfo.quotePrice)
                 .preciseMul(PreciseUnitMath.preciseUnit().add(_slippageTolerance).toInt256()).toUint256();
         } else {
-            oppositeBoundUnits = _collateralRebalanceUnits
+            oppositeBoundUnits = _baseRebalanceUnits
                 .mul(-1)
                 .preciseMul(_actionInfo.basePrice)
                 .preciseDiv(_actionInfo.quotePrice)
