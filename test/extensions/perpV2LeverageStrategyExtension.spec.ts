@@ -34,6 +34,7 @@ import {
   preciseMul,
   usdc,
   increaseTimeAsync,
+  calculateNewLeverageRatioPerpV2,
   calculateTotalRebalanceNotionalPerpV2
 } from "../../utils/index";
 
@@ -41,7 +42,6 @@ import { PerpV2Fixture, SystemFixture } from "@setprotocol/set-protocol-v2/utils
 import { getPerpV2Fixture, getSystemFixture } from "@setprotocol/set-protocol-v2/utils/test";
 
 import { BaseManagerV2, PerpV2LeverageStrategyExtension } from "@utils/contracts/index";
-import { calculateNewLeverageRatioPerpV2 } from "@utils/flexibleLeverageUtils/flexibleLeverage";
 
 const expect = getWaffleExpect();
 const provider = ethers.provider;
