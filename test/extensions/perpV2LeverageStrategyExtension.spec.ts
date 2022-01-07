@@ -4341,7 +4341,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
         await initializeRootScopeContracts();
         await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
         await leverageStrategyExtension.deposit();
-        await leverageStrategyExtension.engage();
       });
 
       beforeEach(() => {
@@ -4356,237 +4355,519 @@ describe("PerpV2LeverageStrategyExtension", () => {
         );
       }
 
-      context("when in the midst of a TWAP rebalance", async () => {
-        let newExchangeSettings: PerpV2ExchangeSettings;
-
+      context("when long position", async () => {
         cacheBeforeEach(async () => {
-          // Set up new rebalance TWAP
-          await increaseTimeAsync(ONE_DAY_IN_SECONDS);
-          await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
-
-          newExchangeSettings = {
-            twapMaxTradeSize: ether(.1),
-            incentivizedTwapMaxTradeSize: ether(1)
-          };
-          await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
-
-          await leverageStrategyExtension.connect(owner.wallet).rebalance();
+          await leverageStrategyExtension.engage();
         });
 
-        describe("when above incentivized leverage ratio and incentivized TWAP cooldown has elapsed", async () => {
-          beforeEach(async () => {
-            // Set to above incentivized ratio
-            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
-            await increaseTimeAsync(BigNumber.from(100));    // >60 (incentivized cooldown period)
-          });
+        context("when in the midst of a TWAP rebalance", async () => {
+          let newExchangeSettings: PerpV2ExchangeSettings;
 
-          it("should verify initial leverage conditions", async () => {
-            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-
-            expect(currentLeverageRatio).to.be.gt(incentive.incentivizedLeverageRatio);
-          });
-
-          it("should return ripcord", async () => {
-            const shouldRebalance = await subject();
-
-            expect(shouldRebalance).to.eq(BigNumber.from(3));
-          });
-        });
-
-        describe("when below incentivized leverage ratio and regular TWAP cooldown has elapsed", async () => {
-          beforeEach(async () => {
-            // Set to below incentivized ratio
+          cacheBeforeEach(async () => {
+            // Set up new rebalance TWAP
+            await increaseTimeAsync(ONE_DAY_IN_SECONDS);
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
-            await increaseTimeAsync(BigNumber.from(4000));    // >3000 (regular cooldown period)
+
+            newExchangeSettings = {
+              twapMaxTradeSize: ether(.1),
+              incentivizedTwapMaxTradeSize: ether(1)
+            };
+            await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
+
+            await leverageStrategyExtension.connect(owner.wallet).rebalance();
           });
 
-          it("should verify initial leverage conditions", async () => {
-            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+          describe("when above incentivized leverage ratio and incentivized TWAP cooldown has elapsed", async () => {
+            beforeEach(async () => {
+              // Set to above incentivized ratio
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
+              await increaseTimeAsync(BigNumber.from(100));    // >60 (incentivized cooldown period)
+            });
 
-            expect(currentLeverageRatio).to.be.lt(incentive.incentivizedLeverageRatio);
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio).to.be.gt(incentive.incentivizedLeverageRatio);
+            });
+
+            it("should return ripcord", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(BigNumber.from(3));
+            });
           });
 
-          it("should return iterate rebalance", async () => {
-            const shouldRebalance = await subject();
+          describe("when below incentivized leverage ratio and regular TWAP cooldown has elapsed", async () => {
+            beforeEach(async () => {
+              // Set to below incentivized ratio
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
+              await increaseTimeAsync(BigNumber.from(4000));    // >3000 (regular cooldown period)
+            });
 
-            expect(shouldRebalance).to.eq(TWO);
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio).to.be.lt(incentive.incentivizedLeverageRatio);
+            });
+
+            it("should return iterate rebalance", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(TWO);
+            });
+          });
+
+          describe("when above incentivized leverage ratio and incentivized TWAP cooldown has NOT elapsed", async () => {
+            beforeEach(async () => {
+              // Set to above incentivized ratio
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
+              await increaseTimeAsync(BigNumber.from(50));    // <60 (incentivized cooldown period)
+            });
+
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio).to.be.gt(incentive.incentivizedLeverageRatio);
+            });
+
+            it("should not rebalance", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(ZERO);
+            });
+          });
+
+          describe("when below incentivized leverage ratio and regular TWAP cooldown has NOT elapsed", async () => {
+            beforeEach(async () => {
+              // Set to below incentivized ratio
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
+              await increaseTimeAsync(BigNumber.from(2000));    // <3000 (regular cooldown period)
+            });
+
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio).to.be.lt(incentive.incentivizedLeverageRatio);
+            });
+
+            it("should not rebalance", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(ZERO);
+            });
           });
         });
 
-        describe("when above incentivized leverage ratio and incentivized TWAP cooldown has NOT elapsed", async () => {
-          beforeEach(async () => {
-            // Set to above incentivized ratio
-            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
-            await increaseTimeAsync(BigNumber.from(50));    // <60 (incentivized cooldown period)
+        context("when not in a TWAP rebalance", async () => {
+          describe("when above incentivized leverage ratio and cooldown period has elapsed", async () => {
+            beforeEach(async () => {
+              // Set to above incentivized ratio
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
+              await increaseTimeAsync(BigNumber.from(100));
+            });
+
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio).to.be.gt(incentive.incentivizedLeverageRatio);
+            });
+
+            it("should return ripcord", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(BigNumber.from(3));
+            });
           });
 
-          it("should verify initial leverage conditions", async () => {
-            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+          describe("when between max and min leverage ratio and rebalance interval has elapsed", async () => {
+            beforeEach(async () => {
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
+              await increaseTimeAsync(BigNumber.from(ONE_DAY_IN_SECONDS));
+            });
 
-            expect(currentLeverageRatio).to.be.gt(incentive.incentivizedLeverageRatio);
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio).to.be.gt(methodology.minLeverageRatio);
+              expect(currentLeverageRatio).to.be.lt(methodology.maxLeverageRatio);
+            });
+
+            it("should return rebalance", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(BigNumber.from(1));
+            });
           });
 
-          it("should not rebalance", async () => {
-            const shouldRebalance = await subject();
+          describe("when above max leverage ratio but below incentivized leverage ratio", async () => {
+            beforeEach(async () => {
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
+              await increaseTimeAsync(BigNumber.from(ONE_DAY_IN_SECONDS));
+            });
 
-            expect(shouldRebalance).to.eq(ZERO);
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio).to.be.gt(methodology.maxLeverageRatio);
+              expect(currentLeverageRatio).to.be.lt(incentive.incentivizedLeverageRatio);
+            });
+
+            it("should return rebalance", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(BigNumber.from(1));
+            });
           });
-        });
 
-        describe("when below incentivized leverage ratio and regular TWAP cooldown has NOT elapsed", async () => {
-          beforeEach(async () => {
-            // Set to below incentivized ratio
-            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
-            await increaseTimeAsync(BigNumber.from(2000));    // <3000 (regular cooldown period)
+          describe("when below min leverage ratio", async () => {
+            beforeEach(async () => {
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1400).mul(10 ** 8));
+            });
+
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio).to.be.lt(methodology.minLeverageRatio);
+            });
+
+            it("should return rebalance", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(BigNumber.from(1));
+            });
           });
 
-          it("should verify initial leverage conditions", async () => {
-            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+          describe("when above incentivized leverage ratio and incentivized TWAP cooldown has NOT elapsed", async () => {
+            beforeEach(async () => {
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
+            });
 
-            expect(currentLeverageRatio).to.be.lt(incentive.incentivizedLeverageRatio);
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio).to.be.gt(incentive.incentivizedLeverageRatio);
+            });
+
+            it("should not rebalance", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(ZERO);
+            });
           });
 
-          it("should not rebalance", async () => {
-            const shouldRebalance = await subject();
+          describe("when between max and min leverage ratio and rebalance interval has NOT elapsed", async () => {
+            beforeEach(async () => {
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
+            });
 
-            expect(shouldRebalance).to.eq(ZERO);
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio).to.be.gt(methodology.minLeverageRatio);
+              expect(currentLeverageRatio).to.be.lt(methodology.maxLeverageRatio);
+            });
+
+            it("should not rebalance", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(ZERO);
+            });
+          });
+
+          describe("when custom min leverage ratio is above methodology min leverage ratio", async () => {
+            beforeEach(async () => {
+              subjectMinLeverageRatio = ether(1.9);
+            });
+
+            it("should revert", async () => {
+              await expect(subject()).to.be.revertedWith("Custom bounds must be valid");
+            });
+          });
+
+          describe("when custom max leverage ratio is below methodology max leverage ratio", async () => {
+            beforeEach(async () => {
+              subjectMinLeverageRatio = ether(2.2);
+            });
+
+            it("should revert", async () => {
+              await expect(subject()).to.be.revertedWith("Custom bounds must be valid");
+            });
           });
         });
       });
 
-      context("when not in a TWAP rebalance", async () => {
-        describe("when above incentivized leverage ratio and cooldown period has elapsed", async () => {
-          beforeEach(async () => {
-            // Set to above incentivized ratio
-            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
-            await increaseTimeAsync(BigNumber.from(100));
+      context("when short position", async () => {
+        let newMethodologySettings: PerpV2MethodologySettings;
+        let newIncentiveSettings: PerpV2IncentiveSettings;
+
+        cacheBeforeEach(async () => {
+          newMethodologySettings = {
+            targetLeverageRatio: methodology.targetLeverageRatio.mul(-1),
+            minLeverageRatio: methodology.minLeverageRatio.mul(-1),
+            maxLeverageRatio: methodology.maxLeverageRatio.mul(-1),
+            recenteringSpeed: methodology.recenteringSpeed,
+            rebalanceInterval: methodology.rebalanceInterval,
+          };
+          await leverageStrategyExtension.setMethodologySettings(newMethodologySettings);
+          newIncentiveSettings = {
+            incentivizedLeverageRatio: incentive.incentivizedLeverageRatio.mul(-1),
+            incentivizedSlippageTolerance: incentive.incentivizedSlippageTolerance,
+            incentivizedTwapCooldownPeriod: incentive.incentivizedTwapCooldownPeriod,
+            etherReward: incentive.etherReward
+          };
+          await leverageStrategyExtension.setIncentiveSettings(newIncentiveSettings);
+
+          // Engage the Set
+          await leverageStrategyExtension.engage();
+        });
+
+        beforeEach(() => {
+          subjectMinLeverageRatio = ether(1.6).mul(-1);
+          subjectMaxLeverageRatio = ether(2.4).mul(-1);
+        });
+
+        context("when in the midst of a TWAP rebalance", async () => {
+          let newExchangeSettings: PerpV2ExchangeSettings;
+
+          cacheBeforeEach(async () => {
+            // Set up new rebalance TWAP
+            await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1040).mul(10 ** 8));
+
+            newExchangeSettings = {
+              twapMaxTradeSize: ether(.1),
+              incentivizedTwapMaxTradeSize: ether(1)
+            };
+            await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
+
+            await leverageStrategyExtension.connect(owner.wallet).rebalance();
           });
 
-          it("should verify initial leverage conditions", async () => {
-            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-
-            expect(currentLeverageRatio).to.be.gt(incentive.incentivizedLeverageRatio);
+          it("should verify in TWAP rebalance", async () => {
+            const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
+            expect(twapLeverageRatio.abs()).to.be.gt(ZERO);
           });
 
-          it("should return ripcord", async () => {
-            const shouldRebalance = await subject();
+          describe("when above incentivized leverage ratio and incentivized TWAP cooldown has elapsed", async () => {
+            beforeEach(async () => {
+              // Set to above incentivized ratio
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1100).mul(10 ** 8));
+              await increaseTimeAsync(BigNumber.from(100));    // >60 (incentivized cooldown period)
+            });
 
-            expect(shouldRebalance).to.eq(BigNumber.from(3));
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio.abs()).to.be.gt(incentive.incentivizedLeverageRatio.abs());
+            });
+
+            it("should return ripcord", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(BigNumber.from(3));
+            });
+          });
+
+          describe("when below incentivized leverage ratio and regular TWAP cooldown has elapsed", async () => {
+            beforeEach(async () => {
+              // Set to below incentivized ratio
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
+              await increaseTimeAsync(BigNumber.from(4000));    // >3000 (regular cooldown period)
+            });
+
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio.abs()).to.be.lt(incentive.incentivizedLeverageRatio.abs());
+            });
+
+            it("should return iterate rebalance", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(TWO);
+            });
+          });
+
+          describe("when above incentivized leverage ratio and incentivized TWAP cooldown has NOT elapsed", async () => {
+            beforeEach(async () => {
+              // Set to above incentivized ratio
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1100).mul(10 ** 8));
+              await increaseTimeAsync(BigNumber.from(50));    // <60 (incentivized cooldown period)
+            });
+
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio.abs()).to.be.gt(incentive.incentivizedLeverageRatio.abs());
+            });
+
+            it("should not rebalance", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(ZERO);
+            });
+          });
+
+          describe("when below incentivized leverage ratio and regular TWAP cooldown has NOT elapsed", async () => {
+            beforeEach(async () => {
+              // Set to below incentivized ratio
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1050).mul(10 ** 8));
+              await increaseTimeAsync(BigNumber.from(2000));    // <3000 (regular cooldown period)
+            });
+
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio.abs()).to.be.lt(incentive.incentivizedLeverageRatio.abs());
+            });
+
+            it("should not rebalance", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(ZERO);
+            });
           });
         });
 
-        describe("when between max and min leverage ratio and rebalance interval has elapsed", async () => {
-          beforeEach(async () => {
-            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
-            await increaseTimeAsync(BigNumber.from(ONE_DAY_IN_SECONDS));
+        context("when not in a TWAP rebalance", async () => {
+          it("should verify NOT in TWAP rebalance", async () => {
+            const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
+            expect(twapLeverageRatio).to.be.eq(ZERO);
           });
 
-          it("should verify initial leverage conditions", async () => {
-            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+          describe("when above incentivized leverage ratio and cooldown period has elapsed", async () => {
+            beforeEach(async () => {
+              // Set to above incentivized ratio
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1100).mul(10 ** 8));
+              await increaseTimeAsync(BigNumber.from(100));
+            });
 
-            expect(currentLeverageRatio).to.be.gt(methodology.minLeverageRatio);
-            expect(currentLeverageRatio).to.be.lt(methodology.maxLeverageRatio);
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio.abs()).to.be.gt(incentive.incentivizedLeverageRatio.abs());
+            });
+
+            it("should return ripcord", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(BigNumber.from(3));
+            });
           });
 
-          it("should return rebalance", async () => {
-            const shouldRebalance = await subject();
+          describe("when between max and min leverage ratio and rebalance interval has elapsed", async () => {
+            beforeEach(async () => {
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1010).mul(10 ** 8));
+              await increaseTimeAsync(BigNumber.from(ONE_DAY_IN_SECONDS));
+            });
 
-            expect(shouldRebalance).to.eq(BigNumber.from(1));
-          });
-        });
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
 
-        describe("when above max leverage ratio but below incentivized leverage ratio", async () => {
-          beforeEach(async () => {
-            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
-            await increaseTimeAsync(BigNumber.from(ONE_DAY_IN_SECONDS));
-          });
+              expect(currentLeverageRatio.abs()).to.be.gt(methodology.minLeverageRatio.abs());
+              expect(currentLeverageRatio.abs()).to.be.lt(methodology.maxLeverageRatio.abs());
+            });
 
-          it("should verify initial leverage conditions", async () => {
-            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+            it("should return rebalance", async () => {
+              const shouldRebalance = await subject();
 
-            expect(currentLeverageRatio).to.be.gt(methodology.maxLeverageRatio);
-            expect(currentLeverageRatio).to.be.lt(incentive.incentivizedLeverageRatio);
-          });
-
-          it("should return rebalance", async () => {
-            const shouldRebalance = await subject();
-
-            expect(shouldRebalance).to.eq(BigNumber.from(1));
-          });
-        });
-
-        describe("when below min leverage ratio", async () => {
-          beforeEach(async () => {
-            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1400).mul(10 ** 8));
+              expect(shouldRebalance).to.eq(BigNumber.from(1));
+            });
           });
 
-          it("should verify initial leverage conditions", async () => {
-            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+          describe("when above max leverage ratio but below incentivized leverage ratio", async () => {
+            beforeEach(async () => {
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1050).mul(10 ** 8));
+              await increaseTimeAsync(BigNumber.from(ONE_DAY_IN_SECONDS));
+            });
 
-            expect(currentLeverageRatio).to.be.lt(methodology.minLeverageRatio);
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio.abs()).to.be.gt(methodology.maxLeverageRatio.abs());
+              expect(currentLeverageRatio.abs()).to.be.lt(incentive.incentivizedLeverageRatio.abs());
+            });
+
+            it("should return rebalance", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(BigNumber.from(1));
+            });
           });
 
-          it("should return rebalance", async () => {
-            const shouldRebalance = await subject();
+          describe("when below min leverage ratio", async () => {
+            beforeEach(async () => {
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
+            });
 
-            expect(shouldRebalance).to.eq(BigNumber.from(1));
-          });
-        });
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
 
-        describe("when above incentivized leverage ratio and incentivized TWAP cooldown has NOT elapsed", async () => {
-          beforeEach(async () => {
-            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
-          });
+              expect(currentLeverageRatio.abs()).to.be.lt(methodology.minLeverageRatio.abs());
+            });
 
-          it("should verify initial leverage conditions", async () => {
-            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+            it("should return rebalance", async () => {
+              const shouldRebalance = await subject();
 
-            expect(currentLeverageRatio).to.be.gt(incentive.incentivizedLeverageRatio);
-          });
-
-          it("should not rebalance", async () => {
-            const shouldRebalance = await subject();
-
-            expect(shouldRebalance).to.eq(ZERO);
-          });
-        });
-
-        describe("when between max and min leverage ratio and rebalance interval has NOT elapsed", async () => {
-          beforeEach(async () => {
-            await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
+              expect(shouldRebalance).to.eq(BigNumber.from(1));
+            });
           });
 
-          it("should verify initial leverage conditions", async () => {
-            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+          describe("when above incentivized leverage ratio and incentivized TWAP cooldown has NOT elapsed", async () => {
+            beforeEach(async () => {
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1100).mul(10 ** 8));
+            });
 
-            expect(currentLeverageRatio).to.be.gt(methodology.minLeverageRatio);
-            expect(currentLeverageRatio).to.be.lt(methodology.maxLeverageRatio);
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+
+              expect(currentLeverageRatio.abs()).to.be.gt(incentive.incentivizedLeverageRatio.abs());
+            });
+
+            it("should not rebalance", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(ZERO);
+            });
           });
 
-          it("should not rebalance", async () => {
-            const shouldRebalance = await subject();
+          describe("when between max and min leverage ratio and rebalance interval has NOT elapsed", async () => {
+            beforeEach(async () => {
+              await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1010).mul(10 ** 8));
+            });
 
-            expect(shouldRebalance).to.eq(ZERO);
-          });
-        });
+            it("should verify initial leverage conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
 
-        describe("when custom min leverage ratio is above methodology min leverage ratio", async () => {
-          beforeEach(async () => {
-            subjectMinLeverageRatio = ether(1.9);
-          });
+              expect(currentLeverageRatio.abs()).to.be.gt(methodology.minLeverageRatio.abs());
+              expect(currentLeverageRatio.abs()).to.be.lt(methodology.maxLeverageRatio.abs());
+            });
 
-          it("should revert", async () => {
-            await expect(subject()).to.be.revertedWith("Custom bounds must be valid");
-          });
-        });
+            it("should not rebalance", async () => {
+              const shouldRebalance = await subject();
 
-        describe("when custom max leverage ratio is below methodology max leverage ratio", async () => {
-          beforeEach(async () => {
-            subjectMinLeverageRatio = ether(2.2);
+              expect(shouldRebalance).to.eq(ZERO);
+            });
           });
 
-          it("should revert", async () => {
-            await expect(subject()).to.be.revertedWith("Custom bounds must be valid");
+          describe("when custom min leverage ratio is above methodology min leverage ratio", async () => {
+            beforeEach(async () => {
+              subjectMinLeverageRatio = ether(1.9).mul(-1);
+            });
+
+            it("should revert", async () => {
+              await expect(subject()).to.be.revertedWith("Custom bounds must be valid");
+            });
+          });
+
+          describe("when custom max leverage ratio is below methodology max leverage ratio", async () => {
+            beforeEach(async () => {
+              subjectMinLeverageRatio = ether(2.2).mul(-1);
+            });
+
+            it("should revert", async () => {
+              await expect(subject()).to.be.revertedWith("Custom bounds must be valid");
+            });
           });
         });
       });
