@@ -43,15 +43,17 @@ import "hardhat/console.sol";
 // Todo
 // 1. Fix terminology used to refer to base asset, quote asset and collateral throughout the contract.
 // 2. Improve javadocs.
+// 3. Make sure fethcing single position values from PerpV2.
+// 4. Optimize for L2.
+// 5. Verify oracles.
 /**
  * @title PerpV2LeverageStrategyExtension
  * @author Set Protocol
  *
- * Smart contract that enables trustless leverage tokens with USDC as the base asset. This extension is paired with the PerpV2LeverageModule from Set protocol where module
- * interactions are invoked via the IBaseManager contract. Any leveraged token can be constructed as long as the market is listed in Perp V2.
- * This extension contract also allows the operator to set an ETH reward to incentivize keepers calling the rebalance function at different
- * leverage thresholds.
- *
+ * Smart contract that enables trustless leverage tokens with USDC as collateral. This extension is paired with the PerpV2LeverageModule from
+ * Set protocol where module interactions are invoked via the IBaseManager contract. Any leveraged token can be constructed as long as the
+ * market  is listed on Perp V2. This extension contract also allows the operator to set an ETH reward to incentivize keepers calling the 
+ * rebalance function at different leverage thresholds.
  */
 contract PerpV2LeverageStrategyExtension is BaseExtension {
     using Address for address;
@@ -76,7 +78,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
     struct ActionInfo {
         int256 baseBalance;                                 // Balance of virtual base asset from Perp in precise units (10e18). E.g. vWBTC = 10e18
-        int256 quoteBalance;                                // Balance of virtual quote asset from Perp in precise units (10e18)
+        int256 quoteBalance;                                // Balance of virtual quote asset from Perp in precise units (10e18). E.g. vUSDC = 10e18
         IPerpV2LeverageModule.AccountInfo accountInfo;      // Info on perpetual account including, collateral amount, owedRealizedPnl and pendingFunding
         int256 basePositionValue;                           // Valuation in USD adjusted for decimals in precise units (10e18)
         int256 quoteValue;                                  // Valuation in USD adjusted for decimals in precise units (10e18)
@@ -103,11 +105,12 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     struct MethodologySettings {
-        int256 targetLeverageRatio;                     // Long term target ratio in precise units (10e18). Short tokens are negative
-        int256 minLeverageRatio;                        // For long tokens, if current leverage is lower, rebalance target is this ratio. For short
-                                                        // tokens, if current leverage is higher, rebalance target is this ratio. In precise units (10e18)
-        int256 maxLeverageRatio;                        // For long tokens, if current leverage is higher, rebalance target is this ratio. For short
-                                                        // tokens, if current leverage is lower, rebalance target is this ratio. In precise units (10e18)
+        int256 targetLeverageRatio;                     // Long term target ratio in precise units (10e18). For short tokens target ratio is negative.
+                                                        // E.g. 2e18 for ETH 2x and -2e18 for ETH -2x.
+        int256 minLeverageRatio;                        // For both long and short tokens, if magnitude of current leverage is lower, rebalance target is 
+                                                        // this ratio. In precise units (10e18). E.g. 1.7e17 for ETH 2x and -1.7e17 for ETH -1x.
+        int256 maxLeverageRatio;                        // For both long and short tokens, if magniutde of current leverage is higher, rebalance target is 
+                                                        // this ratio. In precise units (10e18). E.g. 1.7e17 for ETH 2x and -1.7e17 for ETH -1x.
         uint256 recenteringSpeed;                       // % at which to rebalance back to target leverage in precise units (10e18). Always a positive number
         uint256 rebalanceInterval;                      // Period of time required since last rebalance timestamp in seconds
     }
@@ -204,7 +207,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * @param _methodology              Struct containing methodology parameters
      * @param _execution                Struct containing execution parameters
      * @param _incentive                Struct containing incentive parameters for ripcord
-     * @param _exchange                 List of structs containing exchange parameters for the initial exchanges
+     * @param _exchange                 Struct containing exchange parameters
      */
     constructor(
         IBaseManager _manager,
@@ -230,9 +233,9 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     /* ============ External Functions ============ */
 
     /**
-     * OPERATOR ONLY: Engage to target leverage ratio for the first time. SetToken will swap virtual quote asset (USDC) for base token. If target
-     * leverage ratio is above max trade size, then TWAP is kicked off. To complete engage if TWAP, any valid caller must call iterateRebalance until target
-     * is met.
+     * OPERATOR ONLY: Engage to target leverage ratio for the first time. SetToken will open a new base token position on PerpV2. Under the hood, perp would
+     * mint virutal quote assets (vUSDC) for SetToken and swap them for base token. If target leverage ratio is above max trade size, then TWAP is kicked off. 
+     * To complete engage if TWAP, any valid caller must call iterateRebalance until target is met.
      */
     function engage() external onlyOperator {
         ActionInfo memory engageInfo = _createActionInfo();
@@ -270,7 +273,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * ONLY EOA AND ALLOWED CALLER: Rebalance product. If current leverage ratio is between the max and min bounds, then rebalance
+     * ONLY EOA AND ALLOWED CALLER: Rebalance product. If |min leverage ratio| < |current leverage ratio| < |max leverage ratio|, then rebalance
      * can only be called once the rebalance interval has elapsed since last timestamp. If outside the max and min, rebalance can be called anytime to bring leverage
      * ratio back to the max or min bounds. The methodology will determine whether to delever or lever.
      *
@@ -304,8 +307,9 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * ONLY EOA AND ALLOWED CALLER: Iterate a rebalance when in TWAP. TWAP cooldown period must have elapsed. If price moves advantageously, then exit without rebalancing
-     * and clear TWAP state. This function can only be called when below incentivized leverage ratio and in TWAP state.
+     * ONLY EOA AND ALLOWED CALLER: Iterate a rebalance when in TWAP. TWAP cooldown period must have elapsed. If price moves advantageously, then 
+     * exit without rebalancing and clear TWAP state. This function can only be called when |current leverage ratio| < |incentivized leverage ratio| 
+     * and in TWAP state.
      */
     function iterateRebalance() external onlyEOA onlyAllowedCaller(msg.sender) {
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
@@ -313,9 +317,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
             exchange.twapMaxTradeSize
         );
 
-        // todo: remove this
-        // Use the lastTradeTimestamp since cooldown periods are measured on a per-exchange basis, allowing it to rebalance multiple time in quick
-        // succession with different exchanges
         _validateNormalRebalance(leverageInfo, execution.twapCooldownPeriod, lastTradeTimestamp);
         _validateTWAP();
 
@@ -325,8 +326,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
             (chunkRebalanceNotional, totalRebalanceNotional) = _handleRebalance(leverageInfo, twapLeverageRatio);
         }
 
-        // If not advantageous, then rebalance is skipped and chunk and total rebalance notional are both 0, which means TWAP state is
-        // cleared
+        // If not advantageous, then rebalance is skipped and chunk and total rebalance notional are both 0, which means TWAP state is cleared
         _updateIterateState(chunkRebalanceNotional, totalRebalanceNotional);
 
         emit RebalanceIterated(
@@ -338,18 +338,17 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * ONLY EOA: In case the current leverage ratio exceeds the incentivized leverage threshold, the ripcord function can be called by anyone to return leverage ratio
-     * back to the max leverage ratio. This function typically would only be called during times of high downside volatility and / or normal keeper malfunctions. The caller
-     * of ripcord() will receive a reward in Ether. The ripcord function uses it's own TWAP cooldown period, slippage tolerance and TWAP max trade size which are typically
-     * looser than in regular rebalances.
+     * ONLY EOA: In case |current leverage ratio| > |incentivized leverage ratio|, the ripcord function can be called by anyone to return leverage ratio
+     * back to the max leverage ratio. This function typically would only be called during times of high downside/upside volatility and / or normal keeper malfunctions. The 
+     * caller of ripcord() will receive a reward in Ether. The ripcord function uses it's own TWAP cooldown period, slippage tolerance and TWAP max trade size which are
+     * typically looser than in regular rebalances.
      */
     function ripcord() external onlyEOA {
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
             incentive.incentivizedSlippageTolerance,
             exchange.incentivizedTwapMaxTradeSize
         );
-
-        // Use the lastTradeTimestamp so it can ripcord quickly with multiple exchanges
+        
         _validateRipcord(leverageInfo, lastTradeTimestamp);
 
         ( int256 chunkRebalanceNotional, ) = _calculateChunkRebalanceNotional(leverageInfo, methodology.maxLeverageRatio);
@@ -373,8 +372,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * virtual base token positions into virtual USDC. If the chunk rebalance size is less than the total notional size, then this function will trade out of base
      * token position in one go. If chunk rebalance size is above max quote or max trade size, then operator must continue to call this function to completely
      * unwind position. The function iterateRebalance will not work.
-     *
-     * Note: Delever to 0 will likely result in additional units of the collateral (USDC) asset added as equity on the SetToken due to oracle price / market price mismatch
      */
     function disengage() external onlyOperator {
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
@@ -421,7 +418,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Withdraws all USDC tokens from Perpetual Protocol.
+     * Withdraws all USDC tokens from Perpetual Protocol and adds it as default position on the SetToken.
      */
     function withdraw() external onlyOperator {
         // todo: Add a check to make sure we dont' get liquidated?
@@ -500,9 +497,9 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * OPERATOR ONLY: Updates the settings of an exchange. Reverts if exchange is not already added. When updating an exchange, lastTradeTimestamp
-     * is preserved. Updating exchanges during rebalances is allowed, as it is not possible to enter an unexpected state while doing so. Note: Need to
-     * pass in all existing parameters even if only changing a few settings.
+     * OPERATOR ONLY: Set exchange settings and check new settings are valid.Updating exchange settings during rebalances is allowed, as it is not possible 
+     * to enter an unexpected state while doing so. Note: Need to pass in existing parameters if only changing a few settings.
+     * todo: Reviewer please verify these.
      *
      * @param _newExchangeSettings     Struct containing exchange parameters
      */
@@ -534,8 +531,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     /* ============ External Getter Functions ============ */
 
     /**
-     * Get current leverage ratio. Current leverage ratio is defined as the USD value of the collateral divided by the USD value of the SetToken. Prices for collateral
-     * and quote asset are retrieved from the Chainlink Price Oracle.
+     * Get current leverage ratio. Current leverage ratio is defined as the sum of USD values of all SetToken open positions on Perp V2 divided by its account value on 
+     * PerpV2. Prices for collateral and quote asset are retrieved from the Chainlink Price Oracle.
      *
      * return currentLeverageRatio         Current leverage ratio in precise units (10e18)
      */
@@ -547,10 +544,10 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
     /**
      * Calculates the chunk rebalance size. This can be used by external contracts and keeper bots to calculate the optimal exchange to rebalance with.
-     * Note: this function does not take into account timestamps, so it may return a nonzero value even when shouldRebalance would return ShouldRebalance.NONE for
-     * all exchanges (since minimum delays have not elapsed)
+     * Note: this function does not take into account timestamps, so it may return a nonzero value even when shouldRebalance would return ShouldRebalance.NONE
+     * (since minimum delays have not elapsed).
      *
-     * @return size             Array of total notional chunk size. Measured in the asset that would be sold
+     * @return size             Total notional chunk size. Measured in the asset that would be sold.
      * @return sellAsset        Asset that would be sold during a rebalance
      * @return buyAsset         Asset that would be purchased during a rebalance
      */
@@ -631,7 +628,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * @param _customMinLeverageRatio          Min leverage ratio passed in by caller
      * @param _customMaxLeverageRatio          Max leverage ratio passed in by caller
      *
-     * @return (string[] memory, ShouldRebalance[] memory)      List of exchange names and a list of enums representing whether that exchange should rebalance
+     * @return ShouldRebalance      Enum representing whether should rebalance
      */
     function shouldRebalanceWithBounds(
         int256 _customMinLeverageRatio,
@@ -664,8 +661,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     /* ============ Internal Functions ============ */
 
     /**
-     * Calculate notional rebalance quantity, whether to chunk rebalance based on max trade size and max quote and invoke lever on PerpV2LeverageModule
-     *
+     * Calculate notional rebalance quantity, whether to chunk rebalance based on max trade size and and invoke trade on PerpV2LeverageModule
      */
     function _trade(
         LeverageInfo memory _leverageInfo,
@@ -715,11 +711,11 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
         require(actionInfo.setTotalSupply > 0, "SetToken must have > 0 supply");
 
-        require(_absUint256(actionInfo.baseBalance) > 0, "Base asset balance must be > 0");
         // This function is called during rebalance, iterateRebalance, ripcord and disengage.
         // |baseBalance| > 0, shows the position exists, and the Set has been engaged. We should not
         // check for |quoteBalance| > 0, as it is redundant.
-
+        require(_absUint256(actionInfo.baseBalance) > 0, "Base asset balance must be > 0");
+        
         // Get current leverage ratio
         int256 currentLeverageRatio = _calculateCurrentLeverageRatio(actionInfo);
 
@@ -748,6 +744,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         rebalanceInfo.quotePrice = rawBorrowPrice.mul(10 ** 10);
 
         rebalanceInfo.baseBalance = strategy.perpV2AccountBalance.getBase(address(strategy.setToken), strategy.virtualBaseAddress);
+        
         // Note: Fetching quote balance associated with a single position and not the net quote balance
         rebalanceInfo.quoteBalance = strategy.perpV2AccountBalance.getQuote(address(strategy.setToken), strategy.virtualBaseAddress);
         rebalanceInfo.accountInfo = strategy.perpV2LeverageModule.getAccountInfo(strategy.setToken);
@@ -811,12 +808,12 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Validate an ExchangeSettings struct when adding or updating an exchange. Does not validate that twapMaxTradeSize < incentivizedMaxTradeSize since
-     * it may be useful to disable exchanges for ripcord by setting incentivizedMaxTradeSize to 0.
+     * Validate an ExchangeSettings struct settings. Does not validate that twapMaxTradeSize < incentivizedMaxTradeSize.
+     * todo: reviewer.
      */
-     function _validateExchangeSettings(ExchangeSettings memory _settings) internal pure {
-         require(_settings.twapMaxTradeSize != 0, "Max TWAP trade size must not be 0");
-     }
+    function _validateExchangeSettings(ExchangeSettings memory _settings) internal pure {
+        require(_settings.twapMaxTradeSize != 0, "Max TWAP trade size must not be 0");
+    }
 
     /**
      * Validate that current leverage is below incentivized leverage ratio and cooldown / rebalance period has elapsed or outsize max/min bounds. Used
@@ -873,7 +870,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Calculate the current leverage ratio given a valuation of the collateral and quote asset, which is calculated as collateral USD valuation / SetToken USD valuation
+     * Calculate the current leverage ratio.
      *
      * return int256            Current leverage ratio
      */
@@ -956,6 +953,12 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         );
     }
 
+    /**
+     * Calculate total notional rebalance quantity and chunked rebalance quantity in collateral units for engaging the SetToken. Used in engage()
+     *
+     * return int256          Chunked rebalance notional in collateral units
+     * return int256          Total rebalance notional in collateral units
+     */
     function _calculateEngageRebalanceSize(
         LeverageInfo memory _leverageInfo,
         int256 _newLeverageRatio
@@ -964,7 +967,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         pure
         returns (int256, int256)
     {
-        // TBD: This doesn't work if other factors which contribute to the leverage ratio are part of the set's position.
+        // todo: This doesn't work if other factors which contribute to the leverage ratio are part of the set's position.
         int256 totalRebalanceNotional = _leverageInfo.action.accountInfo.collateralBalance.preciseMul(_newLeverageRatio).preciseDiv(_leverageInfo.action.basePrice);
 
         uint256 chunkRebalanceNotionalAbs = Math.min(_absUint256(totalRebalanceNotional), _leverageInfo.twapMaxTradeSize);
@@ -1046,9 +1049,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Update lastTradeTimestamp and lastTradeTimestamp values. This function updates both the exchange-specific and global timestamp so that the
-     * epoch rebalance can use the global timestamp (since the global timestamp is always  equal to the most recently used exchange timestamp). This allows for
-     * multiple rebalances to occur simultaneously since only the exchange-specific timestamp is checked for non-epoch rebalances.
+     * Update lastTradeTimestamp and lastTradeTimestamp values. This function updates the global timestamp so that the
+     * epoch rebalance can use the global timestamp.
      */
      function _updateLastTradeTimestamp() internal {
         lastTradeTimestamp = block.timestamp;
