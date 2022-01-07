@@ -585,8 +585,26 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         (size, ) = _calculateChunkRebalanceNotional(leverageInfo, newLeverageRatio);
 
         bool increaseLeverage = _absUint256(newLeverageRatio) > _absUint256(currentLeverageRatio);
-        sellAsset = increaseLeverage ? strategy.virtualQuoteAddress : strategy.virtualBaseAddress;
-        buyAsset = increaseLeverage ? strategy.virtualBaseAddress : strategy.virtualQuoteAddress;
+        
+        /*
+        ----------------------------------------------------------------------
+        |   CLR          |  increaseLeverage |    sellAsset   |    buyAsset    |
+        ----------------------------------------------------------------------
+        |   > 0  (long)  |       true        |      quote     |    base        |
+        |   > 0  (long)  |       false       |      base      |    quote       |
+        |   < 0  (short) |       true        |      base      |    quote       |
+        |   < 0  (short) |       false       |      quote     |    base        |
+        ----------------------------------------------------------------------
+        
+        // todo: handle when currentLeverage = 0 or newLeverageRatio == currentLeverageRatio
+        */
+        if (currentLeverageRatio > 0) {
+            sellAsset = increaseLeverage ? strategy.virtualQuoteAddress : strategy.virtualBaseAddress;
+            buyAsset = increaseLeverage ? strategy.virtualBaseAddress : strategy.virtualQuoteAddress;
+        } else {
+            sellAsset = increaseLeverage ? strategy.virtualBaseAddress : strategy.virtualQuoteAddress;
+            buyAsset = increaseLeverage ? strategy.virtualQuoteAddress : strategy.virtualBaseAddress;
+        }
     }
 
     /**
@@ -873,6 +891,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * return int256            Current leverage ratio
      */
     function _calculateCurrentLeverageRatio(ActionInfo memory _actionInfo) internal pure returns(int256) {
+        //todo: handle account Value = 0
         int256 accountValue = _actionInfo.accountInfo.collateralBalance
             .add(_actionInfo.accountInfo.owedRealizedPnl)
             .add(_actionInfo.accountInfo.pendingFundingPayments)
