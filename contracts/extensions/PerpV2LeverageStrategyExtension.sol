@@ -962,7 +962,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Calculate total notional rebalance quantity and chunked rebalance quantity in base asset units for engaging the SetToken. Used in engage()
+     * Calculate total notional rebalance quantity and chunked rebalance quantity in base asset units for engaging the SetToken. Used in engage().
+     * Note: The formula to calculate engage rebalance size is different than the one to calculate chunk rebalance notional.
      *
      * return int256          Chunked rebalance notional in base asset units
      * return int256          Total rebalance notional in base asset units
