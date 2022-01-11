@@ -46,9 +46,7 @@ import { BaseManagerV2, PerpV2LeverageStrategyExtension } from "@utils/contracts
 const expect = getWaffleExpect();
 const provider = ethers.provider;
 
-// todo: Add code to update perp oracles where needed.
 // todo: Fix "when SetToken has 0 supply" test cases.
-// todo: Fix 2 skipped test cases in iterateRebalance short positions.
 describe("PerpV2LeverageStrategyExtension", () => {
   let owner: Account;
   let methodologist: Account;
@@ -245,10 +243,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
     await perpV2Setup.usdc.approve(issuanceModule.address, usdc(10000));
     await issuanceModule.connect(owner.wallet).issue(setToken.address, ether(100), owner.address);
-  };
-
-  const printLeverageRatio = async () => {
-    console.log("clr", (await leverageStrategyExtension.getCurrentLeverageRatio()).toString());
   };
 
   describe("#constructor", async () => {
@@ -1233,6 +1227,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
           beforeEach(async () => {
             // Setup a TWAP rebalance
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1500));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1500).mul(10 ** 8));
             newSettings = {
               twapMaxTradeSize: ether(0.01),
@@ -1733,6 +1728,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
           beforeEach(async () => {
             // Setup a TWAP rebalance
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(800));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
             newSettings = {
               twapMaxTradeSize: ether(0.01),
@@ -1783,6 +1779,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1340));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1340).mul(10 ** 8));
 
             newExchangeSettings = {
@@ -1858,6 +1855,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1250));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1250).mul(10 ** 8));
 
             newExchangeSettings = {
@@ -1950,6 +1948,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(850));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
 
             newExchangeSettings = {
@@ -2039,6 +2038,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1500));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1500).mul(10 ** 8));
 
             newExchangeSettings = {
@@ -2052,6 +2052,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
 
             // Move price advantageously towards TLR; decrease price, so leverage increases towards TLR
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1000));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1000).mul(10 ** 8));
           });
 
@@ -2089,6 +2090,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         describe("when above incentivized leverage ratio threshold", async () => {
           beforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(650));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(650).mul(10 ** 8));
           });
 
@@ -2097,15 +2099,16 @@ describe("PerpV2LeverageStrategyExtension", () => {
           });
         });
 
-        describe.skip("when cooldown has not elapsed", async () => {
+        describe("when cooldown has not elapsed", async () => {
           let newExchangeSettings: PerpV2ExchangeSettings;
 
           beforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(900));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
 
             newExchangeSettings = {
-              twapMaxTradeSize: ether(1),
+              twapMaxTradeSize: ether(.1),
               incentivizedTwapMaxTradeSize: ether(1)
             };
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
@@ -2117,8 +2120,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
 
             expect(twapLeverageRatio).to.be.gt(ZERO);
-            console.log("cooldown period", (await (await leverageStrategyExtension.getExecution()).twapCooldownPeriod).toString());
-
           });
 
           it("should revert", async () => {
@@ -2145,6 +2146,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             subjectCaller = await getRandomAccount();
 
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(850));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
 
             newExchangeSettings = {
@@ -2194,6 +2196,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         context("when not in TWAP state", async () => {
           beforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(850));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(850).mul(10 ** 8));
           });
 
@@ -2222,6 +2225,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
         context("when currently in the last chunk of a TWAP rebalance", async () => {
           let newExchangeSettings: PerpV2ExchangeSettings;
+          let preTwapLeverageRatio: BigNumber;
 
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
@@ -2232,17 +2236,15 @@ describe("PerpV2LeverageStrategyExtension", () => {
               twapMaxTradeSize: ether(1),
               incentivizedTwapMaxTradeSize: ether(1)
             };
+            preTwapLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
-            await printLeverageRatio();
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
-            await printLeverageRatio();
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
           });
 
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-            await printLeverageRatio();
             expect(currentLeverageRatio.abs()).to.be.lt(newMethodologySettings.minLeverageRatio.abs());
             expect(twapLeverageRatio.abs()).to.be.eq(newMethodologySettings.minLeverageRatio.abs());
           });
@@ -2263,13 +2265,13 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(twapLeverageRatio).to.eq(ZERO);
           });
 
-          it.skip("should update the baseToken position on the SetToken correctly", async () => {
+          it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
 
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
 
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
-              currentLeverageRatio,
+              preTwapLeverageRatio,
               newMethodologySettings.targetLeverageRatio,
               newMethodologySettings.minLeverageRatio,
               newMethodologySettings.maxLeverageRatio,
@@ -2305,7 +2307,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
-            // await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(900));
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(900));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
 
             newExchangeSettings = {
@@ -2315,16 +2317,13 @@ describe("PerpV2LeverageStrategyExtension", () => {
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
 
             preTwapLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-            await printLeverageRatio();
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
-
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
           });
 
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-            await printLeverageRatio();
             expect(currentLeverageRatio.abs()).to.be.lt(newMethodologySettings.targetLeverageRatio.abs());
             expect(twapLeverageRatio.abs()).to.be.gt(ZERO);
           });
@@ -2355,13 +2354,13 @@ describe("PerpV2LeverageStrategyExtension", () => {
             expect(currentTwapLeverageRatio).to.eq(expectedNewLeverageRatio);
           });
 
-          it.skip("should update the baseToken position on the SetToken correctly", async () => {
+          it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
 
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
 
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2(
-              currentLeverageRatio,
+              preTwapLeverageRatio,
               newMethodologySettings.targetLeverageRatio,
               newMethodologySettings.minLeverageRatio,
               newMethodologySettings.maxLeverageRatio,
@@ -2377,8 +2376,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               preciseDiv(expectedNewLeverageRatio.sub(currentLeverageRatio), currentLeverageRatio),
               initialPositions[0].baseBalance
             );
-
-            const chunkRebalanceNotional = newExchangeSettings.twapMaxTradeSize.gt(totalRebalanceNotional)
+            const chunkRebalanceNotional = newExchangeSettings.twapMaxTradeSize.gt(totalRebalanceNotional.abs())
               ? totalRebalanceNotional
               : (totalRebalanceNotional.gt(ZERO) ? newExchangeSettings.twapMaxTradeSize : newExchangeSettings.twapMaxTradeSize.mul(-1));
 
@@ -2398,6 +2396,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1050));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1050).mul(10 ** 8));
 
             newExchangeSettings = {
@@ -2407,7 +2406,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
 
             preTwapLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-            await printLeverageRatio();
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
 
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
@@ -2416,7 +2414,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-            await printLeverageRatio();
             expect(currentLeverageRatio.abs()).to.be.gt(newMethodologySettings.targetLeverageRatio.abs());
             expect(twapLeverageRatio.abs()).to.be.gt(ZERO);
           });
@@ -2487,6 +2484,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(900));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(900).mul(10 ** 8));
 
             newExchangeSettings = {
@@ -2494,19 +2492,17 @@ describe("PerpV2LeverageStrategyExtension", () => {
               incentivizedTwapMaxTradeSize: ether(1)
             };
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
-            await printLeverageRatio();
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
 
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
 
             // Move price advantageously towards TLR; increase price, so leverage increases towards TLR
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(950));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(950).mul(10 ** 8));
-            await printLeverageRatio();
           });
 
           it("should verify initial leverage conditions", async () => {
             const twapLeverageRatio = await leverageStrategyExtension.twapLeverageRatio();
-            await printLeverageRatio();
             expect(twapLeverageRatio.abs()).to.be.gt(ZERO);
           });
 
@@ -2539,6 +2535,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         describe("when above incentivized leverage ratio threshold", async () => {
           beforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1200));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1200).mul(10 ** 8));
           });
 
@@ -2550,6 +2547,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         context("when not in TWAP state", async () => {
           beforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(950));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(950).mul(10 ** 8));
           });
 
@@ -2592,6 +2590,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         context("when not in a TWAP rebalance", async () => {
           cacheBeforeEach(async () => {
             // Set to above incentivized ratio
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(800));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
             transferredEth = ether(1);
             await owner.wallet.sendTransaction({to: leverageStrategyExtension.address, value: transferredEth});
@@ -2726,6 +2725,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             describe("when incentivized cooldown period has not elapsed", async () => {
               beforeEach(async () => {
                 await subject();
+                await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(400));
                 await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(400).mul(10 ** 8));
               });
 
@@ -2737,6 +2737,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
           describe("when below incentivized leverage ratio threshold", async () => {
             beforeEach(async () => {
+              await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(2000));
               await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(2000).mul(10 ** 8));
             });
 
@@ -2799,6 +2800,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             };
             await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
 
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(990));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(990).mul(10 ** 8));
 
             // Start TWAP rebalance
@@ -2806,6 +2808,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             await increaseTimeAsync(BigNumber.from(100));
 
             // Set to above incentivized ratio
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(800));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(800).mul(10 ** 8));
           });
 
@@ -2857,6 +2860,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         context("when not in a TWAP rebalance", async () => {
           cacheBeforeEach(async () => {
             // Set to above incentivized ratio
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1100));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1100).mul(10 ** 8));
 
             // Deposit ETH to incentivize calling ripcord
@@ -2996,6 +3000,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             describe("when incentivized cooldown period has not elapsed", async () => {
               beforeEach(async () => {
                 await subject();
+                await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1100));
                 await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1100).mul(10 ** 8));
               });
 
@@ -3007,6 +3012,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
           describe("when below incentivized leverage ratio threshold", async () => {
             beforeEach(async () => {
+              await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1010));
               await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1010).mul(10 ** 8));
             });
 
@@ -3030,6 +3036,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             };
             await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
 
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(950));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(950).mul(10 ** 8));
 
             // Start TWAP rebalance
@@ -3037,6 +3044,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             await increaseTimeAsync(BigNumber.from(100));
 
             // Set to above incentivized ratio
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1100));
             await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1100).mul(10 ** 8));
           });
 
@@ -3865,6 +3873,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       describe("when above incentivized leverage ratio", async () => {
         beforeEach(async () => {
           await owner.wallet.sendTransaction({to: leverageStrategyExtension.address, value: ether(1)});
+          await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(650));
           await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(650).mul(10 ** 8));
         });
 
@@ -3891,6 +3900,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
       describe("when below incentivized leverage ratio", async () => {
         beforeEach(async () => {
+          await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(2000));
           await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(2000).mul(10 ** 8));
         });
 
