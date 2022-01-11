@@ -1,5 +1,5 @@
 /*
-    Copyright 2021 Set Labs Inc.
+    Copyright 2022 Set Labs Inc.
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -38,11 +38,9 @@ import { IVault } from "../interfaces/IVault.sol";
 import { PreciseUnitMath } from "../lib/PreciseUnitMath.sol";
 import { StringArrayUtils } from "../lib/StringArrayUtils.sol";
 
-import "hardhat/console.sol";
-
 // Todo
 // 3. Make sure fethcing single position values from PerpV2.
-// 4. Optimize for L2.
+// 4. Optimize for L2.  
 // 5. Verify oracles.
 /**
  * @title PerpV2LeverageStrategyExtension
@@ -178,7 +176,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     /* ============ Modifiers ============ */
 
     /**
-     * Throws if rebalance is currently in TWAP`
+     * Throws if rebalance is currently in TWAP
      */
     modifier noRebalanceInProgress() {
         require(twapLeverageRatio == 0, "Rebalance is currently in progress");
@@ -232,8 +230,9 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
     /**
      * OPERATOR ONLY: Engage to target leverage ratio for the first time. SetToken will open a new base token position on PerpV2. Under the hood, perp would
-     * mint virutal quote assets (vUSDC) for SetToken and swap them for base token. If target leverage ratio is above max trade size, then TWAP is kicked off. 
+     * mint virtual quote assets (vUSDC) for SetToken and swap them for base token. If target leverage ratio is above max trade size, then TWAP is kicked off. 
      * To complete engage if TWAP, any valid caller must call iterateRebalance until target is met.
+     * Note: Engage should be called after collateral has been deposited to PerpV2 using `deposit()`. 
      */
     function engage() external onlyOperator {
         ActionInfo memory engageInfo = _createActionInfo();
@@ -396,43 +395,30 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Deposits any current USDC tokens not already being used as collateral into Perpetual Protocol.
+     * OEPRATOR ONLY: Deposits specified units of current USDC tokens not already being used as collateral into Perpetual Protocol.
+     *
+     * @param  _collateralUnits     Collateral to deposit in position units
      */
-    function deposit() external onlyOperator {
-        ISetToken setToken = strategy.setToken;
-        uint256 depositPositionUnit = setToken.getDefaultPositionRealUnit(
-            address(strategy.perpV2LeverageModule.collateralToken())
-        ).toUint256();
-
-        require(depositPositionUnit > 0, "No USDC to deposit");
-
-        bytes memory depositCalldata = abi.encodeWithSignature(
-            "deposit(address,uint256)",
-            address(setToken),
-            depositPositionUnit
+    function deposit(uint256 _collateralUnits) external onlyOperator {
+        bytes memory depositCalldata = abi.encodeWithSelector(
+            IPerpV2LeverageModule.deposit.selector,
+            address(strategy.setToken),
+            _collateralUnits
         );
 
         invokeManager(address(strategy.perpV2LeverageModule), depositCalldata);
     }
 
     /**
-     * Withdraws all USDC tokens from Perpetual Protocol and adds it as default position on the SetToken.
+     * OPERATOR ONLY: Withdraws specified units of USDC tokens from Perpetual Protocol and adds it as default position on the SetToken.
+     *
+     * @param  _collateralUnits     Collateral to withdraw in position units
      */
-    function withdraw() external onlyOperator {
-        // todo: Add a check to make sure we dont' get liquidated?
-
-        ISetToken setToken = strategy.setToken;
-        IVault vault = IVault(address(strategy.perpV2LeverageModule.perpVault()));
-
-        uint256 withdrawNotional = vault.getBalance(address(setToken)).toUint256();
-        uint256 withdrawUnits = withdrawNotional.preciseDiv(setToken.totalSupply());
-
-        require(withdrawUnits > 0, "No USDC to withdraw");
-
-        bytes memory withdrawCalldata = abi.encodeWithSignature(
-            "withdraw(address,uint256)",
-            address(setToken),
-            withdrawUnits
+    function withdraw(uint256 _collateralUnits) external onlyOperator {        
+        bytes memory withdrawCalldata = abi.encodeWithSelector(
+            IPerpV2LeverageModule.withdraw.selector,
+            address(strategy.setToken),
+            _collateralUnits
         );
 
         invokeManager(address(strategy.perpV2LeverageModule), withdrawCalldata);
@@ -497,7 +483,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     /**
      * OPERATOR ONLY: Set exchange settings and check new settings are valid.Updating exchange settings during rebalances is allowed, as it is not possible 
      * to enter an unexpected state while doing so. Note: Need to pass in existing parameters if only changing a few settings.
-     * todo: Reviewer please verify these.
      *
      * @param _newExchangeSettings     Struct containing exchange parameters
      */
@@ -701,7 +686,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Check whether to delever or lever based on the current vs new leverage ratios. Used in the rebalance() and iterateRebalance() functions
+     * Calculates chunk rebalance notional and calls trade to open a position. Used in the rebalance() and iterateRebalance() functions
      *
      * return uint256           Calculated notional to trade
      * return uint256           Total notional to rebalance over TWAP
@@ -824,11 +809,14 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Validate an ExchangeSettings struct settings. Does not validate that twapMaxTradeSize < incentivizedMaxTradeSize.
-     * todo: reviewer.
+     * Validate an ExchangeSettings struct settings.
      */
     function _validateExchangeSettings(ExchangeSettings memory _settings) internal pure {
         require(_settings.twapMaxTradeSize != 0, "Max TWAP trade size must not be 0");
+        require(
+            _settings.twapMaxTradeSize <= _settings.incentivizedTwapMaxTradeSize, 
+            "Max TWAP trade size must not be greater than incentivized max TWAP trade size"
+        );
     }
 
     /**
@@ -873,6 +861,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     /**
      * Check if price has moved advantageously while in the midst of the TWAP rebalance. This means the current leverage ratio has moved over/under
      * the stored TWAP leverage ratio on lever/delever so there is no need to execute a rebalance. Used in iterateRebalance()
+     *
+     * return bool          True if price has moved advantageously, false otherwise
      */
     function _isAdvantageousTWAP(int256 _currentLeverageRatio) internal view returns (bool) {
         uint256 twapLeverageRatioAbs = _absUint256(twapLeverageRatio);
@@ -891,6 +881,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * return int256            Current leverage ratio
      */
     function _calculateCurrentLeverageRatio(ActionInfo memory _actionInfo) internal pure returns(int256) {
+        /// todo: Add a note here highlighting the difference between leverage and account margin.
         //todo: handle account Value = 0
         int256 accountValue = _actionInfo.accountInfo.collateralBalance
             .add(_actionInfo.accountInfo.owedRealizedPnl)

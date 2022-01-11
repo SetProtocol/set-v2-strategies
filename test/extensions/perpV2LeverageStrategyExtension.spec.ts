@@ -46,7 +46,6 @@ import { BaseManagerV2, PerpV2LeverageStrategyExtension } from "@utils/contracts
 const expect = getWaffleExpect();
 const provider = ethers.provider;
 
-// todo: Fix terminology used to refer to base asset, quote asset and collateral asset throughout.
 // todo: Add code to update perp oracles where needed.
 // todo: Fix "when SetToken has 0 supply" test cases.
 // todo: Fix "when caller is a contract" test cases.
@@ -252,6 +251,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
   const printLeverageRatio = async () => {
     console.log("clr", (await leverageStrategyExtension.getCurrentLeverageRatio()).toString());
   };
+
   describe("#constructor", async () => {
     let subjectManagerAddress: Address;
     let subjectContractSettings: PerpV2ContractSettings;
@@ -482,12 +482,17 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
     describe("#deposit", async () => {
       let subjectCaller: Account;
+      let subjectCollateralUnits: BigNumber;
+
       beforeEach(async () => {
+        const collateralUnits = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+
         subjectCaller = owner;
+        subjectCollateralUnits = collateralUnits;
       });
 
       async function subject(): Promise<ContractTransaction> {
-        return await leverageStrategyExtension.connect(subjectCaller.wallet).deposit();
+        return await leverageStrategyExtension.connect(subjectCaller.wallet).deposit(subjectCollateralUnits);
       }
 
       it("should deposit assets USDC into Perpetual Protocol", async () => {
@@ -501,27 +506,26 @@ describe("PerpV2LeverageStrategyExtension", () => {
         expect(postUsdcExternalUnit).to.eq(preUsdcDefaultUnit);
         expect(postUsdcDefaultUnit).to.eq(ZERO);
       });
-
-      describe("when no USDC to be deposited", async () => {
-        beforeEach(async () => {
-          await subject();
-        });
-
-        it("should revert", async () => {
-          await expect(subject()).to.be.revertedWith("No USDC to deposit");
-        });
-      });
     });
 
     describe("#withdraw", async () => {
       let subjectCaller: Account;
+      let subjectCollateralUnits: BigNumber;
+
       beforeEach(async () => {
-        await leverageStrategyExtension.deposit();
+        const depositUnits = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+        await leverageStrategyExtension.deposit(depositUnits);
+
+        const totalSupply = await setToken.totalSupply();
+        const collateralAmount = await perpV2Setup.vault.getBalance(setToken.address);
+        const collateralUnits = preciseDiv(collateralAmount, totalSupply);
+
         subjectCaller = owner;
+        subjectCollateralUnits = collateralUnits;
       });
 
       async function subject(): Promise<ContractTransaction> {
-        return await leverageStrategyExtension.connect(subjectCaller.wallet).withdraw();
+        return await leverageStrategyExtension.connect(subjectCaller.wallet).withdraw(subjectCollateralUnits);
       }
 
       it("should withdraw USDC from Perpetual Protocol", async () => {
@@ -538,16 +542,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
         expect(postUsdcDefaultUnit).to.eq(expectedPostUsdcDefaultUnit);
         expect(postUsdcExternalUnit).to.eq(ZERO);
       });
-
-      describe("when no USDC to withdraw", async () => {
-        beforeEach(async () => {
-          await subject();
-        });
-
-        it("should revert", async () => {
-          await expect(subject()).to.be.revertedWith("No USDC to withdraw");
-        });
-      });
     });
 
     describe("#engage", async () => {
@@ -556,7 +550,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
       beforeEach(async () => {
         if (shouldDeposit) {
-          await leverageStrategyExtension.deposit();
+          await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
         }
 
         subjectCaller = owner;
@@ -816,7 +810,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       let subjectCaller: Account;
 
       cacheBeforeEach(async () => {
-        await leverageStrategyExtension.deposit();
+        await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
         await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
       });
 
@@ -1768,7 +1762,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       let subjectCaller: Account;
 
       cacheBeforeEach(async () => {
-        await leverageStrategyExtension.deposit();
+        await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
         await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
       });
 
@@ -2579,7 +2573,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
       cacheBeforeEach(async () => {
         await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
-        await leverageStrategyExtension.deposit();
+        await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
       });
 
       beforeEach(async () => {
@@ -3103,7 +3097,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               // Add allowed trader
               await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
               // Engage to initial leverage
-              await leverageStrategyExtension.deposit();
+              await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
               await leverageStrategyExtension.engage();
             }
           };
@@ -3172,7 +3166,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             // Add allowed trader
             await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
             // Engage to initial leverage
-            await leverageStrategyExtension.deposit();
+            await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
 
             if (ifEngaged) {
               await leverageStrategyExtension.engage();
@@ -3269,7 +3263,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               // Add allowed trader
               await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
               // Engage to initial leverage
-              await leverageStrategyExtension.deposit();
+              await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
               await leverageStrategyExtension.engage();
             }
           };
@@ -3313,7 +3307,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
 
             // Engage to initial leverage
-            await leverageStrategyExtension.deposit();
+            await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
 
             if (ifEngaged) {
               await leverageStrategyExtension.engage();
@@ -3500,7 +3494,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
           };
           await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
 
-          await leverageStrategyExtension.deposit();
+          await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
           // Engage to initial leverage
           await leverageStrategyExtension.engage();
         });
@@ -3600,7 +3594,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
           };
           await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
 
-          await leverageStrategyExtension.deposit();
+          await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
           // Engage to initial leverage
           await leverageStrategyExtension.engage();
         });
@@ -3707,13 +3701,81 @@ describe("PerpV2LeverageStrategyExtension", () => {
           };
           await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
 
-          await leverageStrategyExtension.deposit();
+          await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
           // Engage to initial leverage
           await leverageStrategyExtension.engage();
         });
 
         it("should revert", async () => {
           await expect(subject()).to.be.revertedWith("Rebalance is currently in progress");
+        });
+      });
+    });
+
+    describe("#setExchangeSettings", async () => {
+      let subjectExchangeSettings: PerpV2ExchangeSettings;
+      let subjectCaller: Account;
+
+      const initializeSubjectVariables = () => {
+        subjectExchangeSettings = {
+          twapMaxTradeSize: ether(10),
+          incentivizedTwapMaxTradeSize: ether(20)
+        };
+        subjectCaller = owner;
+      };
+
+      async function subject(): Promise<any> {
+        leverageStrategyExtension = leverageStrategyExtension.connect(subjectCaller.wallet);
+        return leverageStrategyExtension.setExchangeSettings(subjectExchangeSettings);
+      }
+
+      beforeEach(initializeSubjectVariables);
+
+      it("should set the correct exchange parameters", async () => {
+        await subject();
+        const exchange = await leverageStrategyExtension.getExchangeSettings();
+
+        expect(exchange.twapMaxTradeSize).to.eq(subjectExchangeSettings.twapMaxTradeSize);
+        expect(exchange.incentivizedTwapMaxTradeSize).to.eq(subjectExchangeSettings.incentivizedTwapMaxTradeSize);
+      });
+
+      it("should emit ExchangeSettingsUpdated event", async () => {
+        await expect(subject()).to.emit(leverageStrategyExtension, "ExchangeSettingsUpdated").withArgs(
+          subjectExchangeSettings.twapMaxTradeSize,
+          subjectExchangeSettings.incentivizedTwapMaxTradeSize
+        );
+      });
+
+      describe("when the caller is not the operator", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be operator");
+        });
+      });
+
+      describe("when max TWAP trade size is 0", async () => {
+        beforeEach(async () => {
+          subjectExchangeSettings.twapMaxTradeSize = ZERO;
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Max TWAP trade size must not be 0");
+        });
+      });
+
+      describe("when max TWAP trade size is greater than incentivized max TWAP trade size", async () => {
+        beforeEach(async () => {
+          subjectExchangeSettings = {
+            twapMaxTradeSize: ether(20),
+            incentivizedTwapMaxTradeSize: ether(10)
+          };
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Max TWAP trade size must not be greater than incentivized max TWAP trade size");
         });
       });
     });
@@ -3777,7 +3839,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
           };
           await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
 
-          await leverageStrategyExtension.deposit();
+          await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
           // Engage to initial leverage
           await leverageStrategyExtension.engage();
         });
@@ -3792,7 +3854,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       cacheBeforeEach(async () => {
         await initializeRootScopeContracts();
 
-        await leverageStrategyExtension.deposit();
+        await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
         // Engage to initial leverage
         await leverageStrategyExtension.engage();
         await increaseTimeAsync(BigNumber.from(100000));
@@ -3852,7 +3914,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       cacheBeforeEach(async () => {
         await initializeRootScopeContracts();
         await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
-        await leverageStrategyExtension.deposit();
+        await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
       });
 
       async function subject(): Promise<number> {
@@ -4339,7 +4401,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       cacheBeforeEach(async () => {
         await initializeRootScopeContracts();
         await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
-        await leverageStrategyExtension.deposit();
+        await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
       });
 
       beforeEach(() => {
@@ -4876,7 +4938,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       cacheBeforeEach(async () => {
         await initializeRootScopeContracts();
         await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
-        await leverageStrategyExtension.deposit();
+        await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
       });
 
       async function subject(): Promise<[BigNumber, Address, Address]> {
@@ -4920,7 +4982,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(currentLeverageRatio).to.be.gt(incentive.incentivizedLeverageRatio);
             });
 
-            it("should return correct total rebalance size and isLever boolean", async () => {
+            it("should return correct total rebalance size, sell asset and buy asset", async () => {
 
               const newLeverageRatio = methodology.maxLeverageRatio;
               const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
@@ -4960,7 +5022,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(currentLeverageRatio).to.be.lt(incentive.incentivizedLeverageRatio);
             });
 
-            it("should return correct total rebalance size and isLever boolean", async () => {
+            it("should return correct total rebalance size, sell asset and buy asset", async () => {
               const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
               const newLeverageRatio = calculateNewLeverageRatioPerpV2(
                 preTwapLeverageRatio,
@@ -5006,7 +5068,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(currentLeverageRatio).to.be.gt(incentive.incentivizedLeverageRatio);
             });
 
-            it("should return correct total rebalance size and isLever boolean", async () => {
+            it("should return correct total rebalance size, sell asset and buy asset", async () => {
 
               const newLeverageRatio = methodology.maxLeverageRatio;
               const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
@@ -5039,7 +5101,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(currentLeverageRatio).to.be.lt(methodology.maxLeverageRatio);
             });
 
-            it("should return correct total rebalance size and isLever boolean", async () => {
+            it("should return correct total rebalance size, sell asset and buy asset", async () => {
               const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
               const newLeverageRatio = calculateNewLeverageRatioPerpV2(
                 currentLeverageRatio,
@@ -5077,7 +5139,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(currentLeverageRatio).to.be.lt(incentive.incentivizedLeverageRatio);
             });
 
-            it("should return correct total rebalance size and isLever boolean", async () => {
+            it("should return correct total rebalance size, sell asset and buy asset", async () => {
               const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
               const newLeverageRatio = calculateNewLeverageRatioPerpV2(
                 currentLeverageRatio,
@@ -5114,7 +5176,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(currentLeverageRatio).to.be.lt(methodology.minLeverageRatio);
             });
 
-            it("should return correct total rebalance size and isLever boolean", async () => {
+            it("should return correct total rebalance size, sell asset and buy asset", async () => {
               const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
               const newLeverageRatio = calculateNewLeverageRatioPerpV2(
                 currentLeverageRatio,
@@ -5204,7 +5266,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(currentLeverageRatio.abs()).to.be.gt(newIncentiveSettings.incentivizedLeverageRatio.abs());
             });
 
-            it("should return correct total rebalance size and isLever boolean", async () => {
+            it("should return correct total rebalance size, sell asset and buy asset", async () => {
               const newLeverageRatio = newMethodologySettings.maxLeverageRatio;
               const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
 
@@ -5243,7 +5305,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(currentLeverageRatio.abs()).to.be.lt(newIncentiveSettings.incentivizedLeverageRatio.abs());
             });
 
-            it("should return correct total rebalance size and isLever boolean", async () => {
+            it("should return correct total rebalance size, sell asset and buy asset", async () => {
               const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
               const newLeverageRatio = calculateNewLeverageRatioPerpV2(
                 preTwapLeverageRatio,
@@ -5289,7 +5351,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(currentLeverageRatio.abs()).to.be.gt(newIncentiveSettings.incentivizedLeverageRatio.abs());
             });
 
-            it("should return correct total rebalance size and isLever boolean", async () => {
+            it("should return correct total rebalance size, sell asset and buy asset", async () => {
               const newLeverageRatio = newMethodologySettings.maxLeverageRatio;
               const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
 
@@ -5321,7 +5383,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(currentLeverageRatio.abs()).to.be.lt(newMethodologySettings.maxLeverageRatio.abs());
             });
 
-            it("should return correct total rebalance size and isLever boolean", async () => {
+            it("should return correct total rebalance size, sell asset and buy asset", async () => {
               const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
               const newLeverageRatio = calculateNewLeverageRatioPerpV2(
                 currentLeverageRatio,
@@ -5359,7 +5421,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(currentLeverageRatio.abs()).to.be.lt(newIncentiveSettings.incentivizedLeverageRatio.abs());
             });
 
-            it("should return correct total rebalance size and isLever boolean", async () => {
+            it("should return correct total rebalance size, sell asset and buy asset", async () => {
               const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
               const newLeverageRatio = calculateNewLeverageRatioPerpV2(
                 currentLeverageRatio,
@@ -5396,7 +5458,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(currentLeverageRatio.abs()).to.be.lt(newMethodologySettings.minLeverageRatio.abs());
             });
 
-            it("should return correct total rebalance size and isLever boolean", async () => {
+            it("should return correct total rebalance size, sell asset and buy asset", async () => {
               const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
               const newLeverageRatio = calculateNewLeverageRatioPerpV2(
                 currentLeverageRatio,
