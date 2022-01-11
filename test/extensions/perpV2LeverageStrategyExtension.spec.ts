@@ -3716,20 +3716,19 @@ describe("PerpV2LeverageStrategyExtension", () => {
       let subjectExchangeSettings: PerpV2ExchangeSettings;
       let subjectCaller: Account;
 
-      const initializeSubjectVariables = () => {
+      cacheBeforeEach(initializeRootScopeContracts);
+      beforeEach(async () => {
         subjectExchangeSettings = {
           twapMaxTradeSize: ether(10),
           incentivizedTwapMaxTradeSize: ether(20)
         };
         subjectCaller = owner;
-      };
+      });
 
       async function subject(): Promise<any> {
         leverageStrategyExtension = leverageStrategyExtension.connect(subjectCaller.wallet);
         return leverageStrategyExtension.setExchangeSettings(subjectExchangeSettings);
       }
-
-      beforeEach(initializeSubjectVariables);
 
       it("should set the correct exchange parameters", async () => {
         await subject();
