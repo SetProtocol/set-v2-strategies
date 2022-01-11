@@ -19,7 +19,7 @@ import {
   ChainlinkAggregatorMock,
   PerpV2,
   SlippageIssuanceModule,
-  // ContractCallerMock
+  ContractCallerMock
 } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "../../utils/deploys";
 import {
@@ -48,7 +48,6 @@ const provider = ethers.provider;
 
 // todo: Add code to update perp oracles where needed.
 // todo: Fix "when SetToken has 0 supply" test cases.
-// todo: Fix "when caller is a contract" test cases.
 // todo: Fix 2 skipped test cases in iterateRebalance short positions.
 describe("PerpV2LeverageStrategyExtension", () => {
   let owner: Account;
@@ -1260,37 +1259,37 @@ describe("PerpV2LeverageStrategyExtension", () => {
           });
         });
 
-        // describe.skip("when caller is a contract", async () => {
-        //   let subjectTarget: Address;
-        //   let subjectCallData: string;
-        //   let subjectValue: BigNumber;
+        describe.only("when caller is a contract", async () => {
+          let subjectTarget: Address;
+          let subjectCallData: string;
+          let subjectValue: BigNumber;
 
-        //   let contractCaller: ContractCallerMock;
+          let contractCaller: ContractCallerMock;
 
-        //   beforeEach(async () => {
-        //     contractCaller = await deployer.mocks.deployContractCallerMock();
+          beforeEach(async () => {
+            contractCaller = await deployer.mocks.deployContractCallerMock();
 
-        //     subjectTarget = leverageStrategyExtension.address;
-        //     subjectCallData = leverageStrategyExtension.interface.encodeFunctionData("rebalance", []);
-        //     subjectValue = ZERO;
-        //   });
+            subjectTarget = leverageStrategyExtension.address;
+            subjectCallData = leverageStrategyExtension.interface.encodeFunctionData("rebalance");
+            subjectValue = ZERO;
+          });
 
-        //   async function subjectContractCaller(): Promise<any> {
-        //     return await contractCaller.invoke(
-        //       subjectTarget,
-        //       subjectValue,
-        //       subjectCallData
-        //     );
-        //   }
+          async function subjectContractCaller(): Promise<any> {
+            return await contractCaller.invoke(
+              subjectTarget,
+              subjectValue,
+              subjectCallData
+            );
+          }
 
-        //   it("the trade reverts", async () => {
-        //     await expect(subjectContractCaller()).to.be.revertedWith("Caller must be EOA Address");
-        //   });
-        // });
+          it("the trade reverts", async () => {
+            await expect(subjectContractCaller()).to.be.revertedWith("Caller must be EOA Address");
+          });
+        });
 
         describe.skip("when SetToken has 0 supply", async () => {
           beforeEach(async () => {
-            await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
+            await setToken.approve(issuanceModule.address, MAX_UINT_256);
             await issuanceModule.redeem(setToken.address, ether(1), owner.address);
           });
 
@@ -2164,33 +2163,33 @@ describe("PerpV2LeverageStrategyExtension", () => {
           });
         });
 
-        // describe.skip("when caller is a contract", async () => {
-        //   let subjectTarget: Address;
-        //   let subjectCallData: string;
-        //   let subjectValue: BigNumber;
+        describe.only("when caller is a contract", async () => {
+          let subjectTarget: Address;
+          let subjectCallData: string;
+          let subjectValue: BigNumber;
 
-        //   let contractCaller: ContractCallerMock;
+          let contractCaller: ContractCallerMock;
 
-        //   beforeEach(async () => {
-        //     contractCaller = await deployer.setV2.deployContractCallerMock();
+          beforeEach(async () => {
+            contractCaller = await deployer.mocks.deployContractCallerMock();
 
-        //     subjectTarget = leverageStrategyExtension.address;
-        //     subjectCallData = leverageStrategyExtension.interface.encodeFunctionData("iterateRebalance", [ subjectExchangeName ]);
-        //     subjectValue = ZERO;
-        //   });
+            subjectTarget = leverageStrategyExtension.address;
+            subjectCallData = leverageStrategyExtension.interface.encodeFunctionData("iterateRebalance");
+            subjectValue = ZERO;
+          });
 
-        //   async function subjectContractCaller(): Promise<any> {
-        //     return await contractCaller.invoke(
-        //       subjectTarget,
-        //       subjectValue,
-        //       subjectCallData
-        //     );
-        //   }
+          async function subjectContractCaller(): Promise<any> {
+            return await contractCaller.invoke(
+              subjectTarget,
+              subjectValue,
+              subjectCallData
+            );
+          }
 
-        //   it("the trade reverts", async () => {
-        //     await expect(subjectContractCaller()).to.be.revertedWith("Caller must be EOA Address");
-        //   });
-        // });
+          it("the trade reverts", async () => {
+            await expect(subjectContractCaller()).to.be.revertedWith("Caller must be EOA Address");
+          });
+        });
 
         context("when not in TWAP state", async () => {
           beforeEach(async () => {
@@ -2746,32 +2745,32 @@ describe("PerpV2LeverageStrategyExtension", () => {
             });
           });
 
-          describe.skip("when caller is a contract", async () => {
-          //   let subjectTarget: Address;
-          //   let subjectCallData: string;
-          //   let subjectValue: BigNumber;
+          describe.only("when caller is a contract", async () => {
+            let subjectTarget: Address;
+            let subjectCallData: string;
+            let subjectValue: BigNumber;
 
-            //   let contractCaller: ContractCallerMock;
+            let contractCaller: ContractCallerMock;
 
-            //   beforeEach(async () => {
-            //     contractCaller = await deployer.setV2.deployContractCallerMock();
+            beforeEach(async () => {
+              contractCaller = await deployer.mocks.deployContractCallerMock();
 
-            //     subjectTarget = leverageStrategyExtension.address;
-            //     subjectCallData = leverageStrategyExtension.interface.encodeFunctionData("ripcord", [ subjectExchangeName ]);
-            //     subjectValue = ZERO;
-            //   });
+              subjectTarget = leverageStrategyExtension.address;
+              subjectCallData = leverageStrategyExtension.interface.encodeFunctionData("ripcord");
+              subjectValue = ZERO;
+            });
 
-            //   async function subjectContractCaller(): Promise<any> {
-            //     return await contractCaller.invoke(
-            //       subjectTarget,
-            //       subjectValue,
-            //       subjectCallData
-            //     );
-            //   }
+            async function subjectContractCaller(): Promise<any> {
+              return await contractCaller.invoke(
+                subjectTarget,
+                subjectValue,
+                subjectCallData
+              );
+            }
 
-          //   it("the trade reverts", async () => {
-          //     await expect(subjectContractCaller()).to.be.revertedWith("Caller must be EOA Address");
-          //   });
+            it("the trade reverts", async () => {
+              await expect(subjectContractCaller()).to.be.revertedWith("Caller must be EOA Address");
+            });
           });
 
           describe.skip("when SetToken has 0 supply", async () => {
