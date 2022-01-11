@@ -39,9 +39,7 @@ import { PreciseUnitMath } from "../lib/PreciseUnitMath.sol";
 import { StringArrayUtils } from "../lib/StringArrayUtils.sol";
 
 // Todo
-// 3. Make sure fethcing single position values from PerpV2.
 // 4. Optimize for L2.  
-// 5. Verify oracles.
 /**
  * @title PerpV2LeverageStrategyExtension
  * @author Set Protocol
@@ -881,16 +879,21 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * return int256            Current leverage ratio
      */
     function _calculateCurrentLeverageRatio(ActionInfo memory _actionInfo) internal pure returns(int256) {
-        /// todo: Add a note here highlighting the difference between leverage and account margin.
-        //todo: handle account Value = 0
-        int256 accountValue = _actionInfo.accountInfo.collateralBalance
+        // Note: Collateral balance, owedRealizedPnl and pendingFundingPayments represent the entire account and NOT the single market managed by this contract.
+        // So, while managing multiple positions acrros multiple markets via multiple separate extension contracts, `totalCollateralValue` should be counted only once.
+        int256 totalCollateralValue = _actionInfo.accountInfo.collateralBalance
             .add(_actionInfo.accountInfo.owedRealizedPnl)
-            .add(_actionInfo.accountInfo.pendingFundingPayments)
-            .add(_actionInfo.basePositionValue)
+            .add(_actionInfo.accountInfo.pendingFundingPayments);
+        
+        // Note: Both basePositionValue and quoteValue are values that represent a single market managed by this contract.
+        int256 unrealizedPnl = _actionInfo.basePositionValue
             .add(_actionInfo.quoteValue);
 
-        // accountMarginRatio = accountValue / sum(abs(positionValue[ith_market]))
-        // CLR = 1 / accountMarginRatio = sum(abs(positionValue[ith_market])) / accountValue
+        int256 accountValue = totalCollateralValue.add(unrealizedPnl);
+
+        if (accountValue == 0) {
+            return 0;
+        }
 
         // Assuming accountValue is always positive, we do not use absolute value of basePositionValue in the
         // below equation, to keep the sign of CLR same as basePositionValue.
