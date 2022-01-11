@@ -1259,7 +1259,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
           });
         });
 
-        describe.only("when caller is a contract", async () => {
+        describe("when caller is a contract", async () => {
           let subjectTarget: Address;
           let subjectCallData: string;
           let subjectValue: BigNumber;
@@ -2163,7 +2163,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
           });
         });
 
-        describe.only("when caller is a contract", async () => {
+        describe("when caller is a contract", async () => {
           let subjectTarget: Address;
           let subjectCallData: string;
           let subjectValue: BigNumber;
@@ -2745,7 +2745,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             });
           });
 
-          describe.only("when caller is a contract", async () => {
+          describe("when caller is a contract", async () => {
             let subjectTarget: Address;
             let subjectCallData: string;
             let subjectValue: BigNumber;
@@ -5481,6 +5481,23 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(chunkRebalance).to.eq(expectedTotalRebalance);
             });
           });
+        });
+      });
+    });
+
+    describe("#getCurrentLeverageRatio", async () => {
+
+      cacheBeforeEach(initializeRootScopeContracts);
+
+      async function subject(): Promise<BigNumber> {
+        return await leverageStrategyExtension.getCurrentLeverageRatio();
+      }
+
+      describe("when account value is zero", async () => {
+        it("should return zero", async () => {
+          const leverageRatio = await subject();
+
+          expect(leverageRatio).to.equal(ZERO);
         });
       });
     });
