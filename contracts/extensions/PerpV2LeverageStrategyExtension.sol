@@ -38,8 +38,6 @@ import { IVault } from "../interfaces/IVault.sol";
 import { PreciseUnitMath } from "../lib/PreciseUnitMath.sol";
 import { StringArrayUtils } from "../lib/StringArrayUtils.sol";
 
-// Todo
-// 4. Optimize for L2.  
 /**
  * @title PerpV2LeverageStrategyExtension
  * @author Set Protocol
@@ -824,7 +822,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     function _validateNormalRebalance(LeverageInfo memory _leverageInfo, uint256 _coolDown, uint256 _lastTradeTimestamp) internal view {
         uint256 currentLeverageRatioAbs = _absUint256(_leverageInfo.currentLeverageRatio);
         require(currentLeverageRatioAbs < _absUint256(incentive.incentivizedLeverageRatio), "Must be below incentivized leverage ratio");
-        // todo: this needs a fix
+        
         require(
             block.timestamp.sub(_lastTradeTimestamp) > _coolDown
             || currentLeverageRatioAbs > _absUint256(methodology.maxLeverageRatio)
@@ -889,13 +887,14 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         settling collateral (on withdraw)
             collateral <- collateral + owedRealizedPnL
             owedRealizedPnL <- 0
-            
+
         settling funding (on every trade)
             owedRealizedPnL <- owedrRealizedPnL + pendingFundingPayment
             pendingFundingPayment <- 0
         */
-        // Note: Collateral balance, owedRealizedPnl and pendingFundingPayments belong to the entire account and NOT just the single market managed by this contract.
-        // So, while managing multiple positions acrros multiple markets via multiple separate extension contracts, `totalCollateralValue` should be counted only once.
+        // Note: Collateral balance, owedRealizedPnl and pendingFundingPayments belong to the entire account and 
+        // NOT just the single market managed by this contract. So, while managing multiple positions acrros multiple
+        // markets via multiple separate extension contracts, `totalCollateralValue` should be counted only once.
         int256 totalCollateralValue = _actionInfo.accountInfo.collateralBalance
             .add(_actionInfo.accountInfo.owedRealizedPnl)
             .add(_actionInfo.accountInfo.pendingFundingPayments);
@@ -971,7 +970,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
         int256 totalRebalanceNotional = leverageRatioDifference.preciseDiv(_leverageInfo.currentLeverageRatio).preciseMul(_leverageInfo.action.baseBalance);
 
-        uint256 chunkRebalanceNotionalAbs = Math.min(_absUint256(totalRebalanceNotional), _leverageInfo.twapMaxTradeSize);
+        uint256 chunkRebalanceNotionalAbs = Math.min(_absUint256(totalRebalanceNotional), _leverageInfo.twapMaxTradeSize);        
         return (
             // Return int256 chunkRebalanceNotional
             totalRebalanceNotional >= 0 ? chunkRebalanceNotionalAbs.toInt256() : chunkRebalanceNotionalAbs.toInt256().mul(-1),
@@ -981,7 +980,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
     /**
      * Calculate total notional rebalance quantity and chunked rebalance quantity in base asset units for engaging the SetToken. Used in engage().
-     * Note: The formula to calculate engage rebalance size is different than the one to calculate chunk rebalance notional.
+     * Note: The formula used to calculate engage rebalance size is different than the one used to calculate chunk rebalance notional.
      *
      * return int256          Chunked rebalance notional in base asset units
      * return int256          Total rebalance notional in base asset units
@@ -994,7 +993,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         pure
         returns (int256, int256)
     {
-        // todo: This doesn't work if other factors which contribute to the leverage ratio are part of the set's position.
         int256 totalRebalanceNotional = _leverageInfo.action.accountInfo.collateralBalance.preciseMul(_newLeverageRatio).preciseDiv(_leverageInfo.action.basePrice);
 
         uint256 chunkRebalanceNotionalAbs = Math.min(_absUint256(totalRebalanceNotional), _leverageInfo.twapMaxTradeSize);
