@@ -570,18 +570,18 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         bool increaseLeverage = _absUint256(newLeverageRatio) > _absUint256(currentLeverageRatio);
         
         /*
-        ----------------------------------------------------------------------
-        |   CLR          |  increaseLeverage |    sellAsset   |    buyAsset    |
-        ----------------------------------------------------------------------
-        |   > 0  (long)  |       true        |      quote     |    base        |
-        |   > 0  (long)  |       false       |      base      |    quote       |
-        |   < 0  (short) |       true        |      base      |    quote       |
-        |   < 0  (short) |       false       |      quote     |    base        |
-        ----------------------------------------------------------------------
-        
-        // todo: handle when currentLeverage = 0 or newLeverageRatio == currentLeverageRatio
+        ------------------------------------------------------------------------------
+        |   New LR             |  increaseLeverage |    sellAsset   |    buyAsset    |
+        ------------------------------------------------------------------------------
+        |   = 0 (not possible) |        x          |        x       |      x         |
+        |   > 0  (long)        |       true        |      quote     |    base        |
+        |   > 0  (long)        |       false       |      base      |    quote       |
+        |   < 0  (short)       |       true        |      base      |    quote       |
+        |   < 0  (short)       |       false       |      quote     |    base        |
+        ------------------------------------------------------------------------------
         */
-        if (currentLeverageRatio > 0) {
+
+        if (newLeverageRatio > 0) {
             sellAsset = increaseLeverage ? strategy.virtualQuoteAddress : strategy.virtualBaseAddress;
             buyAsset = increaseLeverage ? strategy.virtualBaseAddress : strategy.virtualQuoteAddress;
         } else {
@@ -879,13 +879,28 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * return int256            Current leverage ratio
      */
     function _calculateCurrentLeverageRatio(ActionInfo memory _actionInfo) internal pure returns(int256) {
-        // Note: Collateral balance, owedRealizedPnl and pendingFundingPayments represent the entire account and NOT the single market managed by this contract.
+        /*
+        Account Specs:
+        -------------
+        collatearal:= balance of USDC in vault
+        owedRealizedPnl:= realized PnL (in USD) that hasn't been settled
+        pendingFundingPayment := funding payment (in USD) that hasn't been settled
+
+        settling collateral (on withdraw)
+            collateral <- collateral + owedRealizedPnL
+            owedRealizedPnL <- 0
+            
+        settling funding (on every trade)
+            owedRealizedPnL <- owedrRealizedPnL + pendingFundingPayment
+            pendingFundingPayment <- 0
+        */
+        // Note: Collateral balance, owedRealizedPnl and pendingFundingPayments belong to the entire account and NOT just the single market managed by this contract.
         // So, while managing multiple positions acrros multiple markets via multiple separate extension contracts, `totalCollateralValue` should be counted only once.
         int256 totalCollateralValue = _actionInfo.accountInfo.collateralBalance
             .add(_actionInfo.accountInfo.owedRealizedPnl)
             .add(_actionInfo.accountInfo.pendingFundingPayments);
         
-        // Note: Both basePositionValue and quoteValue are values that represent a single market managed by this contract.
+        // Note: Both basePositionValue and quoteValue are values that belong to the single market managed by this contract.
         int256 unrealizedPnl = _actionInfo.basePositionValue
             .add(_actionInfo.quoteValue);
 
