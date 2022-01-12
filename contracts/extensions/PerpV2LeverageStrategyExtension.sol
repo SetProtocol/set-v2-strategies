@@ -522,8 +522,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Calculates the chunk rebalance size. This can be used by external contracts and keeper bots to calculate the optimal exchange to rebalance with.
-     * Note: this function does not take into account timestamps, so it may return a nonzero value even when shouldRebalance would return ShouldRebalance.NONE
+     * Calculates the chunk rebalance size. This can be used by external contracts and keeper bots to track rebalances and fetch assets to be bought and sold.
+     * Note: This function does not take into account timestamps, so it may return a nonzero value even when shouldRebalance would return ShouldRebalance.NONE
      * (since minimum delays have not elapsed).
      *
      * @return size             Total notional chunk size. Measured in the asset that would be sold.
@@ -822,7 +822,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     function _validateNormalRebalance(LeverageInfo memory _leverageInfo, uint256 _coolDown, uint256 _lastTradeTimestamp) internal view {
         uint256 currentLeverageRatioAbs = _absUint256(_leverageInfo.currentLeverageRatio);
         require(currentLeverageRatioAbs < _absUint256(incentive.incentivizedLeverageRatio), "Must be below incentivized leverage ratio");
-        
         require(
             block.timestamp.sub(_lastTradeTimestamp) > _coolDown
             || currentLeverageRatioAbs > _absUint256(methodology.maxLeverageRatio)
@@ -880,7 +879,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         /*
         Account Specs:
         -------------
-        collatearal:= balance of USDC in vault
+        collateral:= balance of USDC in vault
         owedRealizedPnl:= realized PnL (in USD) that hasn't been settled
         pendingFundingPayment := funding payment (in USD) that hasn't been settled
 
@@ -891,10 +890,11 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         settling funding (on every trade)
             owedRealizedPnL <- owedrRealizedPnL + pendingFundingPayment
             pendingFundingPayment <- 0
+        
+        Note: Collateral balance, owedRealizedPnl and pendingFundingPayments belong to the entire account and 
+        NOT just the single market managed by this contract. So, while managing multiple positions across multiple
+        markets via multiple separate extension contracts, `totalCollateralValue` should be counted only once.
         */
-        // Note: Collateral balance, owedRealizedPnl and pendingFundingPayments belong to the entire account and 
-        // NOT just the single market managed by this contract. So, while managing multiple positions acrros multiple
-        // markets via multiple separate extension contracts, `totalCollateralValue` should be counted only once.
         int256 totalCollateralValue = _actionInfo.accountInfo.collateralBalance
             .add(_actionInfo.accountInfo.owedRealizedPnl)
             .add(_actionInfo.accountInfo.pendingFundingPayments);
@@ -980,20 +980,21 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
     /**
      * Calculate total notional rebalance quantity and chunked rebalance quantity in base asset units for engaging the SetToken. Used in engage().
-     * Note: The formula used to calculate engage rebalance size is different than the one used to calculate chunk rebalance notional.
+     * Leverage ratio (for the base asset) is zero before engage. We open a new base asset position with size equals to (collateralBalance * targetLeverageRatio / baseAssetPrice)
+     * to gain (targetLeverageRatio * collateralBalance) worth of exposure to the base asset. Leverage ratio (for the base asset) becomes equals to `targetLeverageRatio` after engage.
      *
      * return int256          Chunked rebalance notional in base asset units
      * return int256          Total rebalance notional in base asset units
      */
     function _calculateEngageRebalanceSize(
         LeverageInfo memory _leverageInfo,
-        int256 _newLeverageRatio
+        int256 _targetLeverageRatio
     )
         internal
         pure
         returns (int256, int256)
     {
-        int256 totalRebalanceNotional = _leverageInfo.action.accountInfo.collateralBalance.preciseMul(_newLeverageRatio).preciseDiv(_leverageInfo.action.basePrice);
+        int256 totalRebalanceNotional = _leverageInfo.action.accountInfo.collateralBalance.preciseMul(_targetLeverageRatio).preciseDiv(_leverageInfo.action.basePrice);
 
         uint256 chunkRebalanceNotionalAbs = Math.min(_absUint256(totalRebalanceNotional), _leverageInfo.twapMaxTradeSize);
 
@@ -1006,7 +1007,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
     /**
      * Derive the quote token units for slippage tolerance. The units are calculated by the base token units multiplied by base asset price divided by quote asset price.
-     * Output is measured to quote unit decimals.
+     * Output is measured to precise units (1e18).
      *
      * return int256           Position units to quote
      */
@@ -1074,8 +1075,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Update lastTradeTimestamp and lastTradeTimestamp values. This function updates the global timestamp so that the
-     * epoch rebalance can use the global timestamp.
+     * Update lastTradeTimestamp value. This function updates the global timestamp so that the epoch rebalance can use the global timestamp.
      */
      function _updateLastTradeTimestamp() internal {
         lastTradeTimestamp = block.timestamp;
