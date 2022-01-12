@@ -46,7 +46,6 @@ import { BaseManager, PerpV2LeverageStrategyExtension } from "@utils/contracts/i
 const expect = getWaffleExpect();
 const provider = ethers.provider;
 
-// todo: Fix "when SetToken has 0 supply" test cases.
 describe("PerpV2LeverageStrategyExtension", () => {
   let owner: Account;
   let methodologist: Account;
