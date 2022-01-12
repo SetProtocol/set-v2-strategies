@@ -12,7 +12,7 @@ import {
   PerpV2ExchangeSettings
 } from "@utils/types";
 
-import { ADDRESS_ZERO, ZERO, ONE_DAY_IN_SECONDS, MAX_UINT_256, TWO } from "../../utils/constants";
+import { ADDRESS_ZERO, ZERO, ONE_DAY_IN_SECONDS, TWO } from "../../utils/constants";
 import {
   PerpV2LeverageModule,
   SetToken,
@@ -1282,10 +1282,10 @@ describe("PerpV2LeverageStrategyExtension", () => {
           });
         });
 
-        describe.skip("when SetToken has 0 supply", async () => {
+        describe("when SetToken has 0 supply", async () => {
           beforeEach(async () => {
-            await setToken.approve(issuanceModule.address, MAX_UINT_256);
-            await issuanceModule.redeem(setToken.address, ether(1), owner.address);
+            const totalSupply = await setToken.totalSupply();
+            await issuanceModule.redeem(setToken.address, totalSupply, owner.address);
           });
 
           it("should revert", async () => {
@@ -2127,9 +2127,8 @@ describe("PerpV2LeverageStrategyExtension", () => {
           });
         });
 
-        describe.skip("when SetToken has 0 supply", async () => {
+        describe("when SetToken has 0 supply", async () => {
           beforeEach(async () => {
-            await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
             const totalSupply = await setToken.totalSupply();
             await issuanceModule.redeem(setToken.address, totalSupply, owner.address);
           });
@@ -2774,10 +2773,10 @@ describe("PerpV2LeverageStrategyExtension", () => {
             });
           });
 
-          describe.skip("when SetToken has 0 supply", async () => {
+          describe("when SetToken has 0 supply", async () => {
             beforeEach(async () => {
-              await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
-              await issuanceModule.redeem(setToken.address, ether(1), owner.address);
+              const totalSupply = await setToken.totalSupply();
+              await issuanceModule.redeem(setToken.address, totalSupply, owner.address);
             });
 
             it("should revert", async () => {
@@ -3123,10 +3122,10 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(newPositions.length).to.eq(0);
             });
 
-            describe.skip("when SetToken has 0 supply", async () => {
+            describe("when SetToken has 0 supply", async () => {
               beforeEach(async () => {
-                await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
-                await issuanceModule.redeem(setToken.address, ether(1), owner.address);
+                const totalSupply = await setToken.totalSupply();
+                await issuanceModule.redeem(setToken.address, totalSupply, owner.address);
               });
 
               it("should revert", async () => {
@@ -3206,10 +3205,10 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
             });
 
-            describe.skip("when SetToken has 0 supply", async () => {
+            describe("when SetToken has 0 supply", async () => {
               beforeEach(async () => {
-                await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
-                await issuanceModule.redeem(setToken.address, ether(1), owner.address);
+                const totalSupply = await setToken.totalSupply();
+                await issuanceModule.redeem(setToken.address, totalSupply, owner.address);
               });
 
               it("should revert", async () => {
@@ -3289,10 +3288,10 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(newPositions.length).to.eq(0);
             });
 
-            describe.skip("when SetToken has 0 supply", async () => {
+            describe("when SetToken has 0 supply", async () => {
               beforeEach(async () => {
-                await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
-                await issuanceModule.redeem(setToken.address, ether(1), owner.address);
+                const totalSupply = await setToken.totalSupply();
+                await issuanceModule.redeem(setToken.address, totalSupply, owner.address);
               });
 
               it("should revert", async () => {
@@ -3347,10 +3346,10 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
             });
 
-            describe.skip("when SetToken has 0 supply", async () => {
+            describe("when SetToken has 0 supply", async () => {
               beforeEach(async () => {
-                await systemSetup.usdc.approve(issuanceModule.address, MAX_UINT_256);
-                await issuanceModule.redeem(setToken.address, ether(1), owner.address);
+                const totalSupply = await setToken.totalSupply();
+                await issuanceModule.redeem(setToken.address, totalSupply, owner.address);
               });
 
               it("should revert", async () => {

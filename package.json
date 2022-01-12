@@ -92,7 +92,7 @@
     "web3": "^1.2.9"
   },
   "dependencies": {
-    "@setprotocol/set-protocol-v2": "^0.1.9",
+    "@setprotocol/set-protocol-v2": "^0.1.10-fast.0",
     "@uniswap/v3-sdk": "^3.5.1",
     "ethers": "5.5.2",
     "fs-extra": "^5.0.0",
