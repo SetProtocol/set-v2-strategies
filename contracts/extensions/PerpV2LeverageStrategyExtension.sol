@@ -541,7 +541,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         bool isRipcord = false;
 
         // if over incentivized leverage ratio, always ripcord
-        if (_absUint256(currentLeverageRatio) > _absUint256(incentive.incentivizedLeverageRatio)) {
+        if (currentLeverageRatio.absUint256() > incentive.incentivizedLeverageRatio.absUint256()) {
             newLeverageRatio = methodology.maxLeverageRatio;
             isRipcord = true;
         // if we are in an ongoing twap, use the cached twapLeverageRatio as our target leverage
@@ -565,7 +565,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
         (size, ) = _calculateChunkRebalanceNotional(leverageInfo, newLeverageRatio);
 
-        bool increaseLeverage = _absUint256(newLeverageRatio) > _absUint256(currentLeverageRatio);
+        bool increaseLeverage = newLeverageRatio.absUint256() > currentLeverageRatio.absUint256();
         
         /*
         ------------------------------------------------------------------------------
@@ -636,8 +636,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         returns(ShouldRebalance)
     {
         require (
-            _absUint256(_customMinLeverageRatio) <= _absUint256(methodology.minLeverageRatio)
-            && _absUint256(_customMaxLeverageRatio) >= _absUint256(methodology.maxLeverageRatio),
+            _customMinLeverageRatio.absUint256() <= methodology.minLeverageRatio.absUint256()
+            && _customMaxLeverageRatio.absUint256() >= methodology.maxLeverageRatio.absUint256(),
             "Custom bounds must be valid"
         );
 
@@ -711,7 +711,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         // This function is called during rebalance, iterateRebalance, ripcord and disengage.
         // |baseBalance| > 0, shows the position exists, and the Set has been engaged. We should not
         // check for |quoteBalance| > 0, as it is redundant.
-        require(_absUint256(actionInfo.baseBalance) > 0, "Base asset balance must be > 0");
+        require(actionInfo.baseBalance.absUint256() > 0, "Base asset balance must be > 0");
         
         // Get current leverage ratio
         int256 currentLeverageRatio = _calculateCurrentLeverageRatio(actionInfo);
@@ -765,10 +765,10 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         internal
         pure
     {
-        uint256 minLeverageRatioAbs = _absUint256(_methodology.minLeverageRatio);
-        uint256 targetLeverageRatioAbs = _absUint256(_methodology.targetLeverageRatio);
-        uint256 maxLeverageRatioAbs = _absUint256(_methodology.maxLeverageRatio);
-        uint256 incentivizedLeverageRatioAbs = _absUint256(_incentive.incentivizedLeverageRatio);
+        uint256 minLeverageRatioAbs = _methodology.minLeverageRatio.absUint256();
+        uint256 targetLeverageRatioAbs = _methodology.targetLeverageRatio.absUint256();
+        uint256 maxLeverageRatioAbs = _methodology.maxLeverageRatio.absUint256();
+        uint256 incentivizedLeverageRatioAbs = _incentive.incentivizedLeverageRatio.absUint256();
 
         require (
             minLeverageRatioAbs <= targetLeverageRatioAbs && minLeverageRatioAbs > 0,
@@ -820,12 +820,12 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * in rebalance() and iterateRebalance() functions
      */
     function _validateNormalRebalance(LeverageInfo memory _leverageInfo, uint256 _coolDown, uint256 _lastTradeTimestamp) internal view {
-        uint256 currentLeverageRatioAbs = _absUint256(_leverageInfo.currentLeverageRatio);
-        require(currentLeverageRatioAbs < _absUint256(incentive.incentivizedLeverageRatio), "Must be below incentivized leverage ratio");
+        uint256 currentLeverageRatioAbs = _leverageInfo.currentLeverageRatio.absUint256();
+        require(currentLeverageRatioAbs < incentive.incentivizedLeverageRatio.absUint256(), "Must be below incentivized leverage ratio");
         require(
             block.timestamp.sub(_lastTradeTimestamp) > _coolDown
-            || currentLeverageRatioAbs > _absUint256(methodology.maxLeverageRatio)
-            || currentLeverageRatioAbs < _absUint256(methodology.minLeverageRatio),
+            || currentLeverageRatioAbs > methodology.maxLeverageRatio.absUint256()
+            || currentLeverageRatioAbs < methodology.minLeverageRatio.absUint256(),
             "Cooldown not elapsed or not valid leverage ratio"
         );
     }
@@ -834,7 +834,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * Validate that current leverage is above incentivized leverage ratio and incentivized cooldown period has elapsed in ripcord()
      */
     function _validateRipcord(LeverageInfo memory _leverageInfo, uint256 _lastTradeTimestamp) internal view {
-        require(_absUint256(_leverageInfo.currentLeverageRatio) >= _absUint256(incentive.incentivizedLeverageRatio), "Must be above incentivized leverage ratio");
+        require(_leverageInfo.currentLeverageRatio.absUint256() >= incentive.incentivizedLeverageRatio.absUint256(), "Must be above incentivized leverage ratio");
         // If currently in the midst of a TWAP rebalance, ensure that the cooldown period has elapsed
         require(_lastTradeTimestamp.add(incentive.incentivizedTwapCooldownPeriod) < block.timestamp, "TWAP cooldown must have elapsed");
     }
@@ -860,9 +860,9 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * return bool          True if price has moved advantageously, false otherwise
      */
     function _isAdvantageousTWAP(int256 _currentLeverageRatio) internal view returns (bool) {
-        uint256 twapLeverageRatioAbs = _absUint256(twapLeverageRatio);
-        uint256 targetLeverageRatioAbs = _absUint256(methodology.targetLeverageRatio);
-        uint256 currentLeverageRatioAbs = _absUint256(_currentLeverageRatio);
+        uint256 twapLeverageRatioAbs = twapLeverageRatio.absUint256();
+        uint256 targetLeverageRatioAbs = methodology.targetLeverageRatio.absUint256();
+        uint256 currentLeverageRatioAbs = _currentLeverageRatio.absUint256();
 
         return (
             (twapLeverageRatioAbs < targetLeverageRatioAbs && currentLeverageRatioAbs >= twapLeverageRatioAbs)
@@ -915,15 +915,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Convert int256 variables to absolute uint256 values
-     *
-     * return uint256          Absolute value in uint256
-     */
-    function _absUint256(int256 _int256Value) internal pure returns(uint256) {
-        return _int256Value > 0 ? _int256Value.toUint256() : _int256Value.mul(-1).toUint256();
-    }
-
-    /**
      * Calculate the new leverage ratio. The methodology reduces the size of each rebalance by weighting
      * the current leverage ratio against the target leverage ratio by the recentering speed percentage. The lower the recentering speed, the slower
      * the leverage token will move towards the target leverage each rebalance.
@@ -932,10 +923,10 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      */
     function _calculateNewLeverageRatio(int256 _currentLeverageRatio) internal view returns(int256) {
         // Convert int256 variables to uint256 prior to passing through methodology
-        uint256 currentLeverageRatioAbs = _absUint256(_currentLeverageRatio);
-        uint256 targetLeverageRatioAbs = _absUint256(methodology.targetLeverageRatio);
-        uint256 maxLeverageRatioAbs = _absUint256(methodology.maxLeverageRatio);
-        uint256 minLeverageRatioAbs = _absUint256(methodology.minLeverageRatio);
+        uint256 currentLeverageRatioAbs = _currentLeverageRatio.absUint256();
+        uint256 targetLeverageRatioAbs = methodology.targetLeverageRatio.absUint256();
+        uint256 maxLeverageRatioAbs = methodology.maxLeverageRatio.absUint256();
+        uint256 minLeverageRatioAbs = methodology.minLeverageRatio.absUint256();
 
         // CLRt+1 = max(MINLR, min(MAXLR, CLRt * (1 - RS) + TLR * RS))
         // a: TLR * RS
@@ -970,7 +961,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
         int256 totalRebalanceNotional = leverageRatioDifference.preciseDiv(_leverageInfo.currentLeverageRatio).preciseMul(_leverageInfo.action.baseBalance);
 
-        uint256 chunkRebalanceNotionalAbs = Math.min(_absUint256(totalRebalanceNotional), _leverageInfo.twapMaxTradeSize);        
+        uint256 chunkRebalanceNotionalAbs = Math.min(totalRebalanceNotional.absUint256(), _leverageInfo.twapMaxTradeSize);        
         return (
             // Return int256 chunkRebalanceNotional
             totalRebalanceNotional >= 0 ? chunkRebalanceNotionalAbs.toInt256() : chunkRebalanceNotionalAbs.toInt256().mul(-1),
@@ -996,7 +987,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     {
         int256 totalRebalanceNotional = _leverageInfo.action.accountInfo.collateralBalance.preciseMul(_targetLeverageRatio).preciseDiv(_leverageInfo.action.basePrice);
 
-        uint256 chunkRebalanceNotionalAbs = Math.min(_absUint256(totalRebalanceNotional), _leverageInfo.twapMaxTradeSize);
+        uint256 chunkRebalanceNotionalAbs = Math.min(totalRebalanceNotional.absUint256(), _leverageInfo.twapMaxTradeSize);
 
         return (
             // Return int256 chunkRebalanceNotional
@@ -1041,7 +1032,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     {
         _updateLastTradeTimestamp();
 
-        if (_absUint256(_chunkRebalanceNotional) < _absUint256(_totalRebalanceNotional)) {
+        if (_chunkRebalanceNotional.absUint256() < _totalRebalanceNotional.absUint256()) {
             twapLeverageRatio = _newLeverageRatio;
         }
     }
@@ -1113,10 +1104,10 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         ShouldRebalance shouldRebalanceEnum = ShouldRebalance.NONE;
 
         // Get absolute value of current leverage ratio
-        uint256 currentLeverageRatioAbs = _absUint256(_currentLeverageRatio);
+        uint256 currentLeverageRatioAbs = _currentLeverageRatio.absUint256();
 
         // If above ripcord threshold, then check if incentivized cooldown period has elapsed
-        if (currentLeverageRatioAbs >= _absUint256(incentive.incentivizedLeverageRatio)) {
+        if (currentLeverageRatioAbs >= incentive.incentivizedLeverageRatio.absUint256()) {
             if (lastTradeTimestamp.add(incentive.incentivizedTwapCooldownPeriod) < block.timestamp) {
                 shouldRebalanceEnum = ShouldRebalance.RIPCORD;
             }
@@ -1131,8 +1122,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
                 // min leverage
                 if (
                     block.timestamp.sub(lastTradeTimestamp) > methodology.rebalanceInterval
-                    || currentLeverageRatioAbs > _absUint256(_maxLeverageRatio)
-                    || currentLeverageRatioAbs < _absUint256(_minLeverageRatio)
+                    || currentLeverageRatioAbs > _maxLeverageRatio.absUint256()
+                    || currentLeverageRatioAbs < _minLeverageRatio.absUint256()
                 ) {
                     shouldRebalanceEnum = ShouldRebalance.REBALANCE;
                 }
