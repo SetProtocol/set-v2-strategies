@@ -83,7 +83,7 @@ describe("BaseExtension", () => {
 
     // Transfer ownership to BaseManager
     await setToken.setManager(baseManager.address);
-    await baseManager.addExtension(baseExtensionMock.address);
+    await baseManager.addAdapter(baseExtensionMock.address);
 
     await baseExtensionMock.updateCallerStatus([owner.address], [true]);
   });
