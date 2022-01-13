@@ -9,12 +9,10 @@ import {
 } from "../types";
 import {
   PerpV2LeverageStrategyExtension,
-  StreamingFeeSplitExtension
+  FeeSplitExtension
 } from "../contracts/index";
 
 import { PerpV2LeverageStrategyExtension__factory } from "../../typechain/factories/PerpV2LeverageStrategyExtension__factory";
-import { StreamingFeeSplitExtension__factory } from "../../typechain/factories/StreamingFeeSplitExtension__factory";
-import { FeeSplitExtension } from "../../typechain/FeeSplitExtension";
 import { FeeSplitExtension__factory } from "../../typechain/factories/FeeSplitExtension__factory";
 
 export default class DeployExtensions {
