@@ -1,5 +1,6 @@
 export { BaseExtensionMock } from "../../typechain/BaseExtensionMock";
 export { AddressArrayUtilsMock } from "../../typechain/AddressArrayUtilsMock";
+export { BaseManager } from "../..//typechain/BaseManager";
 export { BaseManagerV2 } from "../..//typechain/BaseManagerV2";
 export { ChainlinkAggregatorMock } from "../../typechain/ChainlinkAggregatorMock";
 export { MutualUpgradeMock } from "../..//typechain/MutualUpgradeMock";
