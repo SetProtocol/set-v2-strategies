@@ -14,6 +14,8 @@ import {
 
 import { PerpV2LeverageStrategyExtension__factory } from "../../typechain/factories/PerpV2LeverageStrategyExtension__factory";
 import { StreamingFeeSplitExtension__factory } from "../../typechain/factories/StreamingFeeSplitExtension__factory";
+import { FeeSplitExtension } from "../../typechain/FeeSplitExtension";
+import { FeeSplitExtension__factory } from "../../typechain/factories/FeeSplitExtension__factory";
 
 export default class DeployExtensions {
   private _deployerSigner: Signer;
@@ -40,15 +42,17 @@ export default class DeployExtensions {
     );
   }
 
-  public async deployStreamingFeeSplitExtension(
+  public async deployFeeSplitExtension(
     manager: Address,
     streamingFeeModule: Address,
+    debtIssuanceModule: Address,
     operatorFeeSplit: BigNumber,
-    operatorFeeRecipient: Address,
-  ): Promise<StreamingFeeSplitExtension> {
-    return await new StreamingFeeSplitExtension__factory(this._deployerSigner).deploy(
+    operatorFeeRecipient: Address
+  ): Promise<FeeSplitExtension> {
+    return await new FeeSplitExtension__factory(this._deployerSigner).deploy(
       manager,
       streamingFeeModule,
+      debtIssuanceModule,
       operatorFeeSplit,
       operatorFeeRecipient
     );
