@@ -3,7 +3,7 @@ import "module-alias/register";
 import { BigNumber } from "ethers";
 import { Account, Address, Bytes } from "@utils/types";
 import { ZERO, ADDRESS_ZERO } from "@utils/constants";
-import { BaseExtensionMock, BaseManagerV2 } from "@utils/contracts/index";
+import { BaseExtensionMock, BaseManager } from "@utils/contracts/index";
 
 import DeployHelper from "@utils/deploys";
 
@@ -12,6 +12,7 @@ import {
   getAccounts,
   getWaffleExpect,
   getRandomAccount,
+  getRandomAddress,
   ether,
 } from "@utils/index";
 
@@ -38,7 +39,7 @@ describe("BaseExtension", () => {
   let setToken: SetToken;
   let systemSetup: SystemFixture;
 
-  let baseManagerV2: BaseManagerV2;
+  let baseManager: BaseManager;
   let baseExtensionMock: BaseExtensionMock;
 
   before(async () => {
@@ -73,18 +74,17 @@ describe("BaseExtension", () => {
     await systemSetup.streamingFeeModule.initialize(setToken.address, streamingFeeSettings);
 
     // Deploy BaseManager
-    baseManagerV2 = await deployer.manager.deployBaseManagerV2(
+    baseManager = await deployer.manager.deployBaseManager(
       setToken.address,
       owner.address,
       methodologist.address
     );
-    await baseManagerV2.connect(methodologist.wallet).authorizeInitialization();
 
-    baseExtensionMock = await deployer.mocks.deployBaseExtensionMock(baseManagerV2.address);
+    baseExtensionMock = await deployer.mocks.deployBaseExtensionMock(baseManager.address);
 
     // Transfer ownership to BaseManager
-    await setToken.setManager(baseManagerV2.address);
-    await baseManagerV2.addExtension(baseExtensionMock.address);
+    await setToken.setManager(baseManager.address);
+    await baseManager.addAdapter(baseExtensionMock.address);
 
     await baseExtensionMock.updateCallerStatus([owner.address], [true]);
   });
@@ -248,41 +248,6 @@ describe("BaseExtension", () => {
     });
   });
 
-  describe("#testInvokeManagerTransfer", async () => {
-    let subjectToken: Address;
-    let subjectDestination: Address;
-    let subjectAmount: BigNumber;
-
-    beforeEach(async () => {
-      subjectToken = systemSetup.weth.address;
-      subjectDestination = otherAccount.address;
-      subjectAmount = ether(1);
-
-      await systemSetup.weth.transfer(baseManagerV2.address, subjectAmount);
-    });
-
-    async function subject(): Promise<ContractTransaction> {
-      return baseExtensionMock.testInvokeManagerTransfer(
-        subjectToken,
-        subjectDestination,
-        subjectAmount
-      );
-    }
-
-    it("should send the given amount from the manager to the address", async () => {
-      const preManagerAmount = await systemSetup.weth.balanceOf(baseManagerV2.address);
-      const preDestinationAmount = await systemSetup.weth.balanceOf(subjectDestination);
-
-      await subject();
-
-      const postManagerAmount = await systemSetup.weth.balanceOf(baseManagerV2.address);
-      const postDestinationAmount = await systemSetup.weth.balanceOf(subjectDestination);
-
-      expect(preManagerAmount.sub(postManagerAmount)).to.eq(subjectAmount);
-      expect(postDestinationAmount.sub(preDestinationAmount)).to.eq(subjectAmount);
-    });
-  });
-
   describe("#updateCallerStatus", async () => {
     let subjectFunctionCallers: Address[];
     let subjectStatuses: boolean[];
@@ -318,6 +283,38 @@ describe("BaseExtension", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Must be operator");
+      });
+    });
+
+    describe("when the callers and statuses array lengths don't match", async () => {
+      beforeEach(async () => {
+        subjectFunctionCallers = [otherAccount.address, await getRandomAddress()];
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Array length mismatch");
+      });
+    });
+
+    describe("when the arrays are empty", async () => {
+      beforeEach(async () => {
+        subjectFunctionCallers = [];
+        subjectStatuses = [];
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Array length must be > 0");
+      });
+    });
+
+    describe("when there are duplicate callers listed", async () => {
+      beforeEach(async () => {
+        subjectFunctionCallers = [otherAccount.address, otherAccount.address];
+        subjectStatuses = [true, true];
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Cannot duplicate callers");
       });
     });
   });

@@ -23,22 +23,21 @@ import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 
 import { BaseExtension } from "../lib/BaseExtension.sol";
+import { IIssuanceModule } from "../interfaces/IIssuanceModule.sol";
 import { IBaseManager } from "../interfaces/IBaseManager.sol";
 import { ISetToken } from "../interfaces/ISetToken.sol";
 import { IStreamingFeeModule } from "../interfaces/IStreamingFeeModule.sol";
 import { PreciseUnitMath } from "../lib/PreciseUnitMath.sol";
 import { TimeLockUpgrade } from "../lib/TimeLockUpgrade.sol";
-import { MutualUpgrade } from "../lib/MutualUpgrade.sol";
 
 
 /**
- * @title StreamingFeeSplitExtension
+ * @title FeeSplitExtension
  * @author Set Protocol
  *
- * Smart contract manager extension that allows for splitting and setting streaming fees. Fee splits are updated by operator.
- * Any fee updates are timelocked.
+ * Smart contract extension that allows for splitting and setting streaming and mint/redeem fees.
  */
-contract StreamingFeeSplitExtension is BaseExtension, TimeLockUpgrade, MutualUpgrade {
+contract FeeSplitExtension is BaseExtension, TimeLockUpgrade {
     using Address for address;
     using PreciseUnitMath for uint256;
     using SafeMath for uint256;
@@ -56,6 +55,7 @@ contract StreamingFeeSplitExtension is BaseExtension, TimeLockUpgrade, MutualUpg
 
     ISetToken public setToken;
     IStreamingFeeModule public streamingFeeModule;
+    IIssuanceModule public issuanceModule;
 
     // Percent of fees in precise units (10^16 = 1%) sent to operator, rest to methodologist
     uint256 public operatorFeeSplit;
@@ -68,6 +68,7 @@ contract StreamingFeeSplitExtension is BaseExtension, TimeLockUpgrade, MutualUpg
     constructor(
         IBaseManager _manager,
         IStreamingFeeModule _streamingFeeModule,
+        IIssuanceModule _issuanceModule,
         uint256 _operatorFeeSplit,
         address _operatorFeeRecipient
     )
@@ -75,6 +76,7 @@ contract StreamingFeeSplitExtension is BaseExtension, TimeLockUpgrade, MutualUpg
         BaseExtension(_manager)
     {
         streamingFeeModule = _streamingFeeModule;
+        issuanceModule = _issuanceModule;
         operatorFeeSplit = _operatorFeeSplit;
         operatorFeeRecipient = _operatorFeeRecipient;
         setToken = manager.setToken();
@@ -83,9 +85,10 @@ contract StreamingFeeSplitExtension is BaseExtension, TimeLockUpgrade, MutualUpg
     /* ============ External Functions ============ */
 
     /**
-     * ANYONE CALLABLE: Accrues fees from streaming fee module. Gets resulting balance after fee accrual,
-     * calculates fees for operator and methodologist, and sends to operatorFeeRecipient and methodologist
-     * respectively.
+     * ANYONE CALLABLE: Accrues fees from streaming fee module. Gets resulting balance after fee accrual, calculates fees for
+     * operator and methodologist, and sends to operator fee recipient and methodologist respectively. NOTE: mint/redeem fees
+     * will automatically be sent to this address so reading the balance of the SetToken in the contract after accrual is
+     * sufficient for accounting for all collected fees.
      */
     function accrueFeesAndDistribute() public {
         // Emits a FeeActualized event
@@ -110,40 +113,8 @@ contract StreamingFeeSplitExtension is BaseExtension, TimeLockUpgrade, MutualUpg
     }
 
     /**
-     * MUTUAL UPGRADE: Initializes the streaming fee module. Operator and Methodologist must each call
-     * this function to execute the update.
-     *
-     * This method is called after invoking `replaceProtectedModule` or `emergencyReplaceProtectedModule`
-     * to configure the replacement streaming fee module's fee settings.
-     *
-     * @dev FeeState settings encode the following struct
-     * ```
-     * struct FeeState {
-     *   address feeRecipient;                // Address to accrue fees to
-     *   uint256 maxStreamingFeePercentage;   // Max streaming fee maanager commits to using (1% = 1e16, 100% = 1e18)
-     *   uint256 streamingFeePercentage;      // Percent of Set accruing to manager annually (1% = 1e16, 100% = 1e18)
-     *   uint256 lastStreamingFeeTimestamp;   // Timestamp last streaming fee was accrued
-     *}
-     *```
-     * @param _settings     FeeModule.FeeState settings
-     */
-    function initializeModule(IStreamingFeeModule.FeeState memory _settings)
-        external
-        mutualUpgrade(manager.operator(), manager.methodologist())
-    {
-        bytes memory callData = abi.encodeWithSelector(
-            IStreamingFeeModule.initialize.selector,
-            manager.setToken(),
-            _settings
-        );
-
-        invokeManager(address(streamingFeeModule), callData);
-    }
-
-    /**
-     * MUTUAL UPGRADE: Updates streaming fee on StreamingFeeModule. Operator and Methodologist must
-     * each call this function to execute the update. Because the method is timelocked, each party
-     * must call it twice: once to set the lock and once to execute.
+     * ONLY OPERATOR: Updates streaming fee on StreamingFeeModule.
+     * Because the method is timelocked, each party must call it twice: once to set the lock and once to execute.
      *
      * Method is timelocked to protect token owners from sudden changes in fee structure which
      * they would rather not bear. The delay gives them a chance to exit their positions without penalty.
@@ -154,45 +125,71 @@ contract StreamingFeeSplitExtension is BaseExtension, TimeLockUpgrade, MutualUpg
      */
     function updateStreamingFee(uint256 _newFee)
         external
-        mutualUpgrade(manager.operator(), manager.methodologist())
+        onlyOperator
         timeLockUpgrade
     {
-        bytes memory callData = abi.encodeWithSelector(
-            IStreamingFeeModule.updateStreamingFee.selector,
-            manager.setToken(),
-            _newFee
-        );
-
+        bytes memory callData = abi.encodeWithSignature("updateStreamingFee(address,uint256)", manager.setToken(), _newFee);
         invokeManager(address(streamingFeeModule), callData);
     }
 
     /**
-     * MUTUAL UPGRADE: Updates fee recipient on streaming fee module.
+     * ONLY OPERATOR: Updates issue fee on IssuanceModule. Only is executed once time lock has passed.
+     * Because the method is timelocked, each party must call it twice: once to set the lock and once to execute.
+     *
+     * Method is timelocked to protect token owners from sudden changes in fee structure which
+     * they would rather not bear. The delay gives them a chance to exit their positions without penalty.
+     *
+     * @param _newFee           New issue fee percentage in precise units (1% = 1e16, 100% = 1e18)
+     */
+    function updateIssueFee(uint256 _newFee)
+        external
+        onlyOperator
+        timeLockUpgrade
+    {
+        bytes memory callData = abi.encodeWithSignature("updateIssueFee(address,uint256)", manager.setToken(), _newFee);
+        invokeManager(address(issuanceModule), callData);
+    }
+
+    /**
+     * ONLY OPERATOR: Updates redeem fee on IssuanceModule. Only is executed once time lock has passed.
+     * Because the method is timelocked, each party must call it twice: once to set the lock and once to execute.
+     *
+     * Method is timelocked to protect token owners from sudden changes in fee structure which
+     * they would rather not bear. The delay gives them a chance to exit their positions without penalty.
+     *
+     * @param _newFee           New redeem fee percentage in precise units (1% = 1e16, 100% = 1e18)
+     */
+    function updateRedeemFee(uint256 _newFee)
+        external
+        onlyOperator
+        timeLockUpgrade
+    {
+        bytes memory callData = abi.encodeWithSignature("updateRedeemFee(address,uint256)", manager.setToken(), _newFee);
+        invokeManager(address(issuanceModule), callData);
+    }
+
+    /**
+     * ONLY OPERATOR: Updates fee recipient on both streaming fee and issuance modules.
      *
      * @param _newFeeRecipient  Address of new fee recipient. This should be the address of the fee extension itself.
      */
     function updateFeeRecipient(address _newFeeRecipient)
         external
-        mutualUpgrade(manager.operator(), manager.methodologist())
+        onlyOperator
     {
-        bytes memory callData = abi.encodeWithSelector(
-            IStreamingFeeModule.updateFeeRecipient.selector,
-            manager.setToken(),
-            _newFeeRecipient
-        );
-
+        bytes memory callData = abi.encodeWithSignature("updateFeeRecipient(address,address)", manager.setToken(), _newFeeRecipient);
         invokeManager(address(streamingFeeModule), callData);
+        invokeManager(address(issuanceModule), callData);
     }
 
     /**
-     * MUTUAL UPGRADE: Updates fee split between operator and methodologist. Split defined in precise units (1% = 10^16).
-     * Fees will be accrued and distributed before the new split goes into effect.
+     * ONLY OPERATOR: Updates fee split between operator and methodologist. Split defined in precise units (1% = 10^16).
      *
      * @param _newFeeSplit      Percent of fees in precise units (10^16 = 1%) sent to operator, (rest go to the methodologist).
      */
     function updateFeeSplit(uint256 _newFeeSplit)
         external
-        mutualUpgrade(manager.operator(), manager.methodologist())
+        onlyOperator
     {
         require(_newFeeSplit <= PreciseUnitMath.preciseUnit(), "Fee must be less than 100%");
         accrueFeesAndDistribute();
@@ -200,7 +197,7 @@ contract StreamingFeeSplitExtension is BaseExtension, TimeLockUpgrade, MutualUpg
     }
 
     /**
-     * OPERATOR ONLY: Updates the address that receives the operator's share of the fees (see IIP-72)
+     * ONLY OPERATOR: Updates the address that receives the operator's fees (see IIP-72)
      *
      * @param _newOperatorFeeRecipient  Address to send operator's fees to.
      */

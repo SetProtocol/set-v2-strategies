@@ -18,3 +18,8 @@ export {
 export {
   bigNumberToData
 } from "./conversionUtils";
+export {
+  getStreamingFee,
+  getStreamingFeeInflationAmount,
+  getPostFeePositionUnits
+} from "./feeModuleUtils";
