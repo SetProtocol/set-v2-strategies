@@ -17,6 +17,22 @@ export function calculateNewLeverageRatio(
   return minLeverageRatio.gte(d) ? minLeverageRatio : d;
 }
 
+
+export function calculateNewLeverageRatioPerpV2(
+  currentLeverageRatio: BigNumber,
+  targetLeverageRatio: BigNumber,
+  minLeverageRatio: BigNumber,
+  maxLeverageRatio: BigNumber,
+  recenteringSpeed: BigNumber
+): BigNumber {
+  const a = preciseMul(targetLeverageRatio.abs(), recenteringSpeed);
+  const b = preciseMul(ether(1).sub(recenteringSpeed), currentLeverageRatio.abs());
+  const c = a.add(b);
+  const d = c.lt(maxLeverageRatio.abs()) ? c : maxLeverageRatio.abs();
+  const nlr = minLeverageRatio.abs().gte(d) ? minLeverageRatio.abs() : d;
+  return currentLeverageRatio.gt(0) ? nlr : nlr.mul(-1);
+}
+
 export function calculateCollateralRebalanceUnits(
   currentLeverageRatio: BigNumber,
   newLeverageRatio: BigNumber,
