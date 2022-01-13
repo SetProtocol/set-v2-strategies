@@ -247,41 +247,6 @@ describe("BaseExtension", () => {
     });
   });
 
-  describe("#testInvokeManagerTransfer", async () => {
-    let subjectToken: Address;
-    let subjectDestination: Address;
-    let subjectAmount: BigNumber;
-
-    beforeEach(async () => {
-      subjectToken = systemSetup.weth.address;
-      subjectDestination = otherAccount.address;
-      subjectAmount = ether(1);
-
-      await systemSetup.weth.transfer(baseManager.address, subjectAmount);
-    });
-
-    async function subject(): Promise<ContractTransaction> {
-      return baseExtensionMock.testInvokeManagerTransfer(
-        subjectToken,
-        subjectDestination,
-        subjectAmount
-      );
-    }
-
-    it("should send the given amount from the manager to the address", async () => {
-      const preManagerAmount = await systemSetup.weth.balanceOf(baseManager.address);
-      const preDestinationAmount = await systemSetup.weth.balanceOf(subjectDestination);
-
-      await subject();
-
-      const postManagerAmount = await systemSetup.weth.balanceOf(baseManager.address);
-      const postDestinationAmount = await systemSetup.weth.balanceOf(subjectDestination);
-
-      expect(preManagerAmount.sub(postManagerAmount)).to.eq(subjectAmount);
-      expect(postDestinationAmount.sub(preDestinationAmount)).to.eq(subjectAmount);
-    });
-  });
-
   describe("#updateCallerStatus", async () => {
     let subjectFunctionCallers: Address[];
     let subjectStatuses: boolean[];
