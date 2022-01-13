@@ -8,3 +8,4 @@ export { FeeSplitExtension } from "../../typechain/FeeSplitExtension";
 export { PreciseUnitMathMock } from "../../typechain/PreciseUnitMathMock";
 export { StandardTokenMock } from "../../typechain/StandardTokenMock";
 export { StringArrayUtilsMock } from "../../typechain/StringArrayUtilsMock";
+export { SupplyCapIssuanceHook } from "../../typechain/SupplyCapIssuanceHook";
