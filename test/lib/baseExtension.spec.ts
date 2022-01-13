@@ -3,7 +3,7 @@ import "module-alias/register";
 import { BigNumber } from "ethers";
 import { Account, Address, Bytes } from "@utils/types";
 import { ZERO, ADDRESS_ZERO } from "@utils/constants";
-import { BaseExtensionMock, BaseManagerV2 } from "@utils/contracts/index";
+import { BaseExtensionMock, BaseManager } from "@utils/contracts/index";
 
 import DeployHelper from "@utils/deploys";
 
@@ -38,7 +38,7 @@ describe("BaseExtension", () => {
   let setToken: SetToken;
   let systemSetup: SystemFixture;
 
-  let baseManagerV2: BaseManagerV2;
+  let baseManager: BaseManager;
   let baseExtensionMock: BaseExtensionMock;
 
   before(async () => {
@@ -73,18 +73,17 @@ describe("BaseExtension", () => {
     await systemSetup.streamingFeeModule.initialize(setToken.address, streamingFeeSettings);
 
     // Deploy BaseManager
-    baseManagerV2 = await deployer.manager.deployBaseManagerV2(
+    baseManager = await deployer.manager.deployBaseManager(
       setToken.address,
       owner.address,
       methodologist.address
     );
-    await baseManagerV2.connect(methodologist.wallet).authorizeInitialization();
 
-    baseExtensionMock = await deployer.mocks.deployBaseExtensionMock(baseManagerV2.address);
+    baseExtensionMock = await deployer.mocks.deployBaseExtensionMock(baseManager.address);
 
     // Transfer ownership to BaseManager
-    await setToken.setManager(baseManagerV2.address);
-    await baseManagerV2.addExtension(baseExtensionMock.address);
+    await setToken.setManager(baseManager.address);
+    await baseManager.addExtension(baseExtensionMock.address);
 
     await baseExtensionMock.updateCallerStatus([owner.address], [true]);
   });
@@ -258,7 +257,7 @@ describe("BaseExtension", () => {
       subjectDestination = otherAccount.address;
       subjectAmount = ether(1);
 
-      await systemSetup.weth.transfer(baseManagerV2.address, subjectAmount);
+      await systemSetup.weth.transfer(baseManager.address, subjectAmount);
     });
 
     async function subject(): Promise<ContractTransaction> {
@@ -270,12 +269,12 @@ describe("BaseExtension", () => {
     }
 
     it("should send the given amount from the manager to the address", async () => {
-      const preManagerAmount = await systemSetup.weth.balanceOf(baseManagerV2.address);
+      const preManagerAmount = await systemSetup.weth.balanceOf(baseManager.address);
       const preDestinationAmount = await systemSetup.weth.balanceOf(subjectDestination);
 
       await subject();
 
-      const postManagerAmount = await systemSetup.weth.balanceOf(baseManagerV2.address);
+      const postManagerAmount = await systemSetup.weth.balanceOf(baseManager.address);
       const postDestinationAmount = await systemSetup.weth.balanceOf(subjectDestination);
 
       expect(preManagerAmount.sub(postManagerAmount)).to.eq(subjectAmount);
