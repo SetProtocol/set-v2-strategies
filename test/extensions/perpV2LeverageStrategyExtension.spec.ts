@@ -1578,15 +1578,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
               initialPositions[0].baseBalance
             );
 
-            console.log(currentLeverageRatio.toString());
-            console.log(expectedNewLeverageRatio.toString());
-            console.log(initialPositions[0].baseBalance.toString());
-            console.log(totalRebalanceNotional.toString());
-            const max = await (await leverageStrategyExtension.getExchangeSettings()).twapMaxTradeSize;
-            console.log(max.toString());
-            console.log(updatedPosition.baseUnit.toString());
-
-
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(totalRebalanceNotional), totalSupply);
 
