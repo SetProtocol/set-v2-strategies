@@ -12,6 +12,7 @@ import {
   getAccounts,
   getWaffleExpect,
   getRandomAccount,
+  getRandomAddress,
   ether,
 } from "@utils/index";
 
@@ -282,6 +283,38 @@ describe("BaseExtension", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Must be operator");
+      });
+    });
+
+    describe("when the callers and statuses array lengths don't match", async () => {
+      beforeEach(async () => {
+        subjectFunctionCallers = [otherAccount.address, await getRandomAddress()];
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Array length mismatch");
+      });
+    });
+
+    describe("when the arrays are empty", async () => {
+      beforeEach(async () => {
+        subjectFunctionCallers = [];
+        subjectStatuses = [];
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Array length must be > 0");
+      });
+    });
+
+    describe("when there are duplicate callers listed", async () => {
+      beforeEach(async () => {
+        subjectFunctionCallers = [otherAccount.address, otherAccount.address];
+        subjectStatuses = [true, true];
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Cannot duplicate callers");
       });
     });
   });
