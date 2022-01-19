@@ -973,6 +973,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * Calculate total notional rebalance quantity and chunked rebalance quantity in base asset units for engaging the SetToken. Used in engage().
      * Leverage ratio (for the base asset) is zero before engage. We open a new base asset position with size equals to (collateralBalance * targetLeverageRatio / baseAssetPrice)
      * to gain (targetLeverageRatio * collateralBalance) worth of exposure to the base asset.
+     * Note: We can't use `_calculateChunkRebalanceNotional` function because CLR is 0 during engage and it would lead to a divison by zero error.
      *
      * return int256          Chunked rebalance notional in base asset units
      * return int256          Total rebalance notional in base asset units
