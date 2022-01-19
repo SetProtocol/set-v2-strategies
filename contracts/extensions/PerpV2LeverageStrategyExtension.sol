@@ -136,7 +136,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     );
     event RebalanceIterated(
         int256 _currentLeverageRatio,
-        int256 _newLeverageRatio,
+        int256 _newTwapLeverageRatio,
         int256 _chunkRebalanceNotional,
         int256 _totalRebalanceNotional
     );
