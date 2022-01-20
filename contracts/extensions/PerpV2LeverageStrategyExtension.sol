@@ -233,7 +233,9 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     function engage() external onlyOperator {
         ActionInfo memory engageInfo = _createActionInfo();
 
-        require(engageInfo.baseBalance == 0, "Must not have existing base token position");
+        // Assert currentLeverageRatio is 0. Since currentLeverageRatio = baseBalance * basePrice / accountValue,
+        // asserting baseBalance is 0 is equivalent to asserting currentLeverageRatio is 0.
+        require(engageInfo.baseBalance == 0, "Current leverage ratio must be 0");
         require(engageInfo.accountInfo.collateralBalance > 0, "Collateral balance must be > 0");
 
         LeverageInfo memory leverageInfo = LeverageInfo({
@@ -707,14 +709,13 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         ActionInfo memory actionInfo = _createActionInfo();
 
         require(actionInfo.setTotalSupply > 0, "SetToken must have > 0 supply");
-
-        // This function is called during rebalance, iterateRebalance, ripcord and disengage.
-        // |baseBalance| > 0, shows the position exists, and the Set has been engaged. We should not
-        // check for |quoteBalance| > 0, as it is redundant.
-        require(actionInfo.baseBalance.absUint256() > 0, "Base asset balance must be > 0");
         
         // Get current leverage ratio
         int256 currentLeverageRatio = _calculateCurrentLeverageRatio(actionInfo);
+
+        // This function is called during rebalance, iterateRebalance, ripcord and disengage.
+        // Assert currentLeverageRatio is 0 as the set should be engaged before this function is called.
+        require(currentLeverageRatio.absUint256() > 0, "Current leverage ratio must NOT be 0");
 
         return LeverageInfo({
             action: actionInfo,
