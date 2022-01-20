@@ -2547,7 +2547,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
       describe("when not engaged", async () => {
         it("should revert", async () => {
-          await expect(subject()).to.be.revertedWith("Current leverage ratio must NOT be 0 asset balance must be > 0");
+          await expect(subject()).to.be.revertedWith("Current leverage ratio must NOT be 0");
         });
       });
     });
@@ -3064,7 +3064,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
       describe("when not engaged", async () => {
         it("should revert", async () => {
-          await expect(subject()).to.be.revertedWith("Current leverage ratio must NOT be 0 asset balance must be > 0");
+          await expect(subject()).to.be.revertedWith("Current leverage ratio must NOT be 0");
         });
       });
     });
@@ -3145,7 +3145,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             });
 
             it("should revert", async () => {
-              await expect(subject()).to.be.revertedWith("Current leverage ratio must NOT be 0 asset balance must be > 0");
+              await expect(subject()).to.be.revertedWith("Current leverage ratio must NOT be 0");
             });
           });
         });
@@ -3228,7 +3228,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             });
 
             it("should revert", async () => {
-              await expect(subject()).to.be.revertedWith("Current leverage ratio must NOT be 0 asset balance must be > 0");
+              await expect(subject()).to.be.revertedWith("Current leverage ratio must NOT be 0");
             });
           });
         });
