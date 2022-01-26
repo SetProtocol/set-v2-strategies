@@ -1029,7 +1029,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         describe("when rebalance interval has not elapsed and within bounds", async () => {
-
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Cooldown not elapsed or not valid leverage ratio");
           });
@@ -2708,18 +2707,26 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
               expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
             });
+          });
 
+          describe.only("when incentivized cooldown period has not elapsed", async () => {
+            let newIncentivizedMaxTradeSize: BigNumber;
 
-            describe("when incentivized cooldown period has not elapsed", async () => {
-              beforeEach(async () => {
-                await subject();
-                await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(400));
-                await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(400).mul(10 ** 8));
-              });
+            cacheBeforeEach(async () => {
+              newIncentivizedMaxTradeSize = ether(0.01);
+              const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
+                twapMaxTradeSize: ether(0.001),
+                incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
+              };
+              await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+            });
 
-              it("should revert", async () => {
-                await expect(subject()).to.be.revertedWith("TWAP cooldown must have elapsed");
-              });
+            beforeEach(async () => {
+              await subject();
+            });
+
+            it("should revert", async () => {
+              await expect(subject()).to.be.revertedWith("TWAP cooldown must have elapsed");
             });
           });
 
@@ -2983,18 +2990,26 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
               expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
             });
+          });
 
+          describe.only("when incentivized cooldown period has not elapsed", async () => {
+            let newIncentivizedMaxTradeSize: BigNumber;
 
-            describe("when incentivized cooldown period has not elapsed", async () => {
-              beforeEach(async () => {
-                await subject();
-                await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1100));
-                await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1100).mul(10 ** 8));
-              });
+            cacheBeforeEach(async () => {
+              newIncentivizedMaxTradeSize = ether(0.01);
+              const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
+                twapMaxTradeSize: ether(0.001),
+                incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
+              };
+              await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+            });
 
-              it("should revert", async () => {
-                await expect(subject()).to.be.revertedWith("TWAP cooldown must have elapsed");
-              });
+            beforeEach(async () => {
+              await subject();
+            });
+
+            it("should revert", async () => {
+              await expect(subject()).to.be.revertedWith("TWAP cooldown must have elapsed");
             });
           });
 
