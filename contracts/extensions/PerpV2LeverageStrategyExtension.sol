@@ -660,7 +660,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     /* ============ Internal Functions ============ */
 
     /**
-     * Calculate notional rebalance quantity, whether to chunk rebalance based on max trade size and and invoke trade on PerpV2LeverageModule
+     * Calculate base rebalance units, opposite bound units and invoke trade on PerpV2LeverageModule.
      */
     function _trade(
         LeverageInfo memory _leverageInfo,
