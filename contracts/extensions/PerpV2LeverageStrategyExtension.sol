@@ -889,7 +889,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
             owedRealizedPnL <- 0
 
         settling funding (on every trade)
-            owedRealizedPnL <- owedrRealizedPnL + pendingFundingPayment
+            owedRealizedPnL <- owedRealizedPnL + pendingFundingPayment
             pendingFundingPayment <- 0
         
         Note: Collateral balance, owedRealizedPnl and pendingFundingPayments belong to the entire account and 
@@ -901,17 +901,16 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
             .add(_actionInfo.accountInfo.pendingFundingPayments);
         
         // Note: Both basePositionValue and quoteValue are values that belong to the single market managed by this contract.
-        int256 unrealizedPnl = _actionInfo.basePositionValue
-            .add(_actionInfo.quoteValue);
+        int256 unrealizedPnl = _actionInfo.basePositionValue.add(_actionInfo.quoteValue);
 
         int256 accountValue = totalCollateralValue.add(unrealizedPnl);
 
-        if (accountValue == 0) {
+        if (accountValue <= 0) {
             return 0;
         }
 
-        // Assuming accountValue is always positive, we do not use absolute value of basePositionValue in the
-        // below equation, to keep the sign of CLR same as basePositionValue.
+        // `accountValue` is always positive. Do not use absolute value of basePositionValue in the below equation,
+        //  to keep the sign of CLR same as that of basePositionValue.
         return _actionInfo.basePositionValue.preciseDiv(accountValue);
     }
 
