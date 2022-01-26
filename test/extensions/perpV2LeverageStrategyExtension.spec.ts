@@ -2709,7 +2709,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             });
           });
 
-          describe.only("when incentivized cooldown period has not elapsed", async () => {
+          describe("when incentivized cooldown period has not elapsed", async () => {
             let newIncentivizedMaxTradeSize: BigNumber;
 
             cacheBeforeEach(async () => {
@@ -2992,7 +2992,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             });
           });
 
-          describe.only("when incentivized cooldown period has not elapsed", async () => {
+          describe("when incentivized cooldown period has not elapsed", async () => {
             let newIncentivizedMaxTradeSize: BigNumber;
 
             cacheBeforeEach(async () => {
