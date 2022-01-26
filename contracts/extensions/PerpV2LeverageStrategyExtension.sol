@@ -939,7 +939,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         uint256 d = Math.min(c, maxLeverageRatioAbs);
         uint256 newLeverageRatio = Math.max(minLeverageRatioAbs, d);
 
-        return _currentLeverageRatio > 0 ? newLeverageRatio.toInt256() : newLeverageRatio.toInt256().mul(-1);
+        return _currentLeverageRatio > 0 ? newLeverageRatio.toInt256() : newLeverageRatio.toInt256().neg();
     }
 
     /**
@@ -964,7 +964,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         uint256 chunkRebalanceNotionalAbs = Math.min(totalRebalanceNotional.absUint256(), _leverageInfo.twapMaxTradeSize);        
         return (
             // Return int256 chunkRebalanceNotional
-            totalRebalanceNotional >= 0 ? chunkRebalanceNotionalAbs.toInt256() : chunkRebalanceNotionalAbs.toInt256().mul(-1),
+            totalRebalanceNotional >= 0 ? chunkRebalanceNotionalAbs.toInt256() : chunkRebalanceNotionalAbs.toInt256().neg(),
             totalRebalanceNotional
         );
     }
@@ -992,7 +992,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
         return (
             // Return int256 chunkRebalanceNotional
-            totalRebalanceNotional >= 0 ? chunkRebalanceNotionalAbs.toInt256() : chunkRebalanceNotionalAbs.toInt256().mul(-1),
+            totalRebalanceNotional >= 0 ? chunkRebalanceNotionalAbs.toInt256() : chunkRebalanceNotionalAbs.toInt256().neg(),
             totalRebalanceNotional
         );
     }
@@ -1012,7 +1012,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
                 .preciseMul(PreciseUnitMath.preciseUnit().add(_slippageTolerance).toInt256()).toUint256();
         } else {
             oppositeBoundUnits = _baseRebalanceUnits
-                .mul(-1)
+                .neg()
                 .preciseMul(_actionInfo.basePrice)
                 .preciseDiv(_actionInfo.quotePrice)
                 .preciseMul(PreciseUnitMath.preciseUnit().sub(_slippageTolerance).toInt256()).toUint256();
