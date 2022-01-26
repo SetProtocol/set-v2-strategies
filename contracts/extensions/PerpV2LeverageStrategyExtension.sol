@@ -269,8 +269,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
     /**
      * ONLY EOA AND ALLOWED CALLER: Rebalance product. If |min leverage ratio| < |current leverage ratio| < |max leverage ratio|, then rebalance
-     * can only be called once the rebalance interval has elapsed since last timestamp. If outside the max and min, rebalance can be called anytime to bring leverage
-     * ratio back to the max or min bounds. The methodology will determine whether to delever or lever.
+     * can only be called once the rebalance interval has elapsed since last timestamp. If outside the max and min but below incentivized leverage ratio, 
+     * rebalance can be called anytime to bring leverage ratio back to the max or min bounds. The methodology will determine whether to delever or lever.
      *
      * Note: If the calculated current leverage ratio is above the incentivized leverage ratio or in TWAP then rebalance cannot be called. Instead, you must call
      * ripcord() which is incentivized with a reward in Ether or iterateRebalance().
