@@ -4,7 +4,6 @@ import {
   AddressArrayUtilsMock,
   BaseExtensionMock,
   MutualUpgradeMock,
-  PreciseUnitMathMock,
   StandardTokenMock,
   StringArrayUtilsMock,
 } from "../contracts/index";
@@ -21,7 +20,6 @@ import { ContractCallerMock__factory } from "@setprotocol/set-protocol-v2/typech
 import { MutualUpgradeMock__factory } from "../../typechain/factories/MutualUpgradeMock__factory";
 import { StandardTokenMock__factory  } from "../../typechain/factories/StandardTokenMock__factory";
 import { StringArrayUtilsMock__factory  } from "../../typechain/factories/StringArrayUtilsMock__factory";
-import { PreciseUnitMathMock__factory } from "../../typechain/factories/PreciseUnitMathMock__factory";
 
 export default class DeployMocks {
   private _deployerSigner: Signer;
@@ -36,10 +34,6 @@ export default class DeployMocks {
 
   public async deployAddressArrayUtilsMock(): Promise<AddressArrayUtilsMock> {
     return await new AddressArrayUtilsMock__factory(this._deployerSigner).deploy();
-  }
-
-  public async deployPreciseUnitMathMock(): Promise<PreciseUnitMathMock> {
-    return await new PreciseUnitMathMock__factory(this._deployerSigner).deploy();
   }
 
   public async deployMutualUpgradeMock(owner: Address, methodologist: string): Promise<MutualUpgradeMock> {
