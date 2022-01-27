@@ -245,7 +245,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
             twapMaxTradeSize: exchange.twapMaxTradeSize
         });
 
-        // Calculate total rebalance units and kick off TWAP if above max quote or max trade size
+        // Calculate total rebalance units and kick off TWAP if above max trade size
         (
             int256 chunkRebalanceNotional,
             int256 totalRebalanceNotional
@@ -336,7 +336,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * ONLY EOA: In case |current leverage ratio| > |incentivized leverage ratio|, the ripcord function can be called by anyone to return leverage ratio
      * back to the max leverage ratio. This function typically would only be called during times of high downside/upside volatility and / or normal keeper malfunctions. The 
      * caller of ripcord() will receive a reward in Ether. The ripcord function uses it's own TWAP cooldown period, slippage tolerance and TWAP max trade size which are
-     * typically looser than in regular rebalances.
+     * typically looser than in regular rebalances. If chunk rebalance size is above max incentivized trade size, then caller must continue to call this function to pull 
+     * the leverage ratio under the incentivized leverage ratio. The function iterateRebalance will not work.
      */
     function ripcord() external onlyEOA {
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
@@ -365,8 +366,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     /**
      * OPERATOR ONLY: Close open baseToken position on Perpetual Protocol. This can be used for upgrading or shutting down the strategy. SetToken will sell all
      * virtual base token positions into virtual USDC. If the chunk rebalance size is less than the total notional size, then this function will trade out of base
-     * token position in one go. If chunk rebalance size is above max quote or max trade size, then operator must continue to call this function to completely
-     * unwind position. The function iterateRebalance will not work.
+     * token position in one go. If chunk rebalance size is above max trade size, then operator must continue to call this function to completely unwind position.
+     * The function iterateRebalance will not work.
      */
     function disengage() external onlyOperator {
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(

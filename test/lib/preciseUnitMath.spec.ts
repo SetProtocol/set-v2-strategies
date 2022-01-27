@@ -22,7 +22,7 @@ import {
 
 const expect = getWaffleExpect();
 
-describe.skip("PreciseUnitMath", () => {
+describe("PreciseUnitMath", () => {
   let owner: Account;
   let deployer: DeployHelper;
 
