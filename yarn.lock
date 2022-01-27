@@ -1504,9 +1504,9 @@
     tslib "^1.9.3"
 
 "@setprotocol/set-protocol-v2@^0.1.11-hardhat.0":
-  version "0.1.11"
-  resolved "https://registry.yarnpkg.com/@setprotocol/set-protocol-v2/-/set-protocol-v2-0.1.11.tgz#97cb2649c1841398b311abd46a16a8afee40a333"
-  integrity sha512-+Ed5gCX26dEacaVwDW9ct9/AyFu4NJ9kzsk5Z1w8/n2qzUB4uetT/fdhTUQ9iWJsEJWUwLW3Qi5OhgTHKUSRGQ==
+  version "0.1.11-hardhat.0"
+  resolved "https://registry.yarnpkg.com/@setprotocol/set-protocol-v2/-/set-protocol-v2-0.1.11-hardhat.0.tgz#3f940f3c7674e2f0bb350e29a839aa07a834c4d9"
+  integrity sha512-5IMXhoy2PYvNYMSUmjTAnGLlx6R+Wg4b7LXeSjrw0r4Hb7FFVi0jjNiqcU7QDs0Auc6rnXJUZwtM+6BYqmnnhw==
   dependencies:
     "@uniswap/v3-sdk" "^3.5.1"
     ethers "^5.5.2"
