@@ -325,7 +325,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * back to the max leverage ratio. This function typically would only be called during times of high downside/upside volatility and / or normal keeper malfunctions. The 
      * caller of ripcord() will receive a reward in Ether. The ripcord function uses it's own TWAP cooldown period, slippage tolerance and TWAP max trade size which are
      * typically looser than in regular rebalances. If chunk rebalance size is above max incentivized trade size, then caller must continue to call this function to pull 
-     * the leverage ratio under the incentivized leverage ratio. The function iterateRebalance will not work.
+     * the leverage ratio under the incentivized leverage ratio. Incentivized TWAP cooldown period must have elapsed. The function iterateRebalance will not work.
      */
     function ripcord() external onlyEOA {
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
@@ -352,7 +352,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * OPERATOR ONLY: Close open baseToken position on Perpetual Protocol. This can be used for upgrading or shutting down the strategy. SetToken will sell all
+     * OPERATOR ONLY: Close open baseToken position on Perpetual Protocol. TWAP cooldown period must have elapsed. This can be used for upgrading or shutting down the strategy. SetToken will sell all
      * virtual base token positions into virtual USDC. If the chunk rebalance size is less than the total notional size, then this function will trade out of base
      * token position in one go. If chunk rebalance size is above max trade size, then operator must continue to call this function to completely unwind position.
      * The function iterateRebalance will not work.
@@ -362,6 +362,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
             execution.slippageTolerance,
             exchange.twapMaxTradeSize
         );
+
+        _validateDisengage(lastTradeTimestamp);
 
         // Reduce leverage to 0
         int256 newLeverageRatio = 0;
@@ -373,6 +375,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
         _trade(leverageInfo, chunkRebalanceNotional);
 
+        _updateDisengageState();
+        
         emit Disengaged(
             leverageInfo.currentLeverageRatio,
             newLeverageRatio,
@@ -851,6 +855,13 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
+     * Validate cooldown period has elapsed in disengage()
+     */
+    function _validateDisengage(uint256 _lastTradeTimestamp) internal view {
+        require(_lastTradeTimestamp.add(execution.twapCooldownPeriod) < block.timestamp, "TWAP cooldown must have elapsed");
+    }
+
+    /**
      * Validate TWAP in the iterateRebalance() function
      */
     function _validateTWAP() internal view {
@@ -1074,6 +1085,13 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         if (twapLeverageRatio != 0) {
             delete twapLeverageRatio;
         }
+    }
+
+    /**
+     * Update last trade timestamp. Used in the disengage() function.
+     */
+    function _updateDisengageState() internal {
+        _updateLastTradeTimestamp();
     }
 
     /**
