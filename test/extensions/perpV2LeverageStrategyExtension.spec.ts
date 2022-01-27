@@ -658,7 +658,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             });
 
             it("should revert", async () => {
-              await expect(subject()).to.be.revertedWith("Current leverage ratio must be 0");
+              await expect(subject()).to.be.revertedWith("Base balance must be 0");
             });
           });
 

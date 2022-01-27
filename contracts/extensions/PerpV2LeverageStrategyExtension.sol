@@ -231,19 +231,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * Note: Engage should be called after collateral has been deposited to PerpV2 using `deposit()`. 
      */
     function engage() external onlyOperator {
-        ActionInfo memory engageInfo = _createActionInfo();
-
-        // Assert currentLeverageRatio is 0. Since currentLeverageRatio = baseBalance * basePrice / accountValue,
-        // asserting baseBalance is 0 is equivalent to asserting currentLeverageRatio is 0.
-        require(engageInfo.baseBalance == 0, "Current leverage ratio must be 0");
-        require(engageInfo.accountInfo.collateralBalance > 0, "Collateral balance must be > 0");
-
-        LeverageInfo memory leverageInfo = LeverageInfo({
-            action: engageInfo,
-            currentLeverageRatio: 0, // 0 position leverage
-            slippageTolerance: execution.slippageTolerance,
-            twapMaxTradeSize: exchange.twapMaxTradeSize
-        });
+        LeverageInfo memory leverageInfo = _getAndValidateEngageInfo();
 
         // Calculate total rebalance units and kick off TWAP if above max trade size
         (
@@ -702,7 +690,27 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     }
 
     /**
-     * Create the leverage info struct to be used in internal functions
+     * Validate the Set is not already engaged. Create the leverage info struct to be used in engage.
+     */
+    function _getAndValidateEngageInfo() internal view returns(LeverageInfo memory) {
+        ActionInfo memory engageInfo = _createActionInfo();
+        
+        require(engageInfo.accountInfo.collateralBalance > 0, "Collateral balance must be > 0");
+        
+        // Assert currentLeverageRatio is 0. Since currentLeverageRatio = baseBalance * basePrice / accountValue,
+        // asserting baseBalance is 0 is equivalent to asserting currentLeverageRatio is 0.
+        require(engageInfo.baseBalance == 0, "Base balance must be 0");
+
+        return LeverageInfo({
+            action: engageInfo,
+            currentLeverageRatio: 0, // 0 position leverage
+            slippageTolerance: execution.slippageTolerance,
+            twapMaxTradeSize: exchange.twapMaxTradeSize
+        });
+    }
+
+    /**
+     * Create the leverage info struct to be used in internal functions.
      *
      * return LeverageInfo                Struct containing ActionInfo and other data
      */
@@ -742,10 +750,11 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         rebalanceInfo.basePrice = rawBasePrice.mul(10 ** 10);
         rebalanceInfo.quotePrice = rawQuotePrice.mul(10 ** 10);
 
-        rebalanceInfo.baseBalance = strategy.perpV2AccountBalance.getBase(address(strategy.setToken), strategy.virtualBaseAddress);
+        // Note: getTakerPositionSize returns zero if base balance is less than 10 wei
+        rebalanceInfo.baseBalance = strategy.perpV2AccountBalance.getTakerPositionSize(address(strategy.setToken), strategy.virtualBaseAddress);
         
         // Note: Fetching quote balance associated with a single position and not the net quote balance
-        rebalanceInfo.quoteBalance = strategy.perpV2AccountBalance.getQuote(address(strategy.setToken), strategy.virtualBaseAddress);
+        rebalanceInfo.quoteBalance = strategy.perpV2AccountBalance.getTakerOpenNotional(address(strategy.setToken), strategy.virtualBaseAddress);
         rebalanceInfo.accountInfo = strategy.perpV2LeverageModule.getAccountInfo(strategy.setToken);
 
         rebalanceInfo.basePositionValue = rebalanceInfo.basePrice.preciseMul(rebalanceInfo.baseBalance);
