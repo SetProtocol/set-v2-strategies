@@ -356,6 +356,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      * virtual base token positions into virtual USDC. If the chunk rebalance size is less than the total notional size, then this function will trade out of base
      * token position in one go. If chunk rebalance size is above max trade size, then operator must continue to call this function to completely unwind position.
      * The function iterateRebalance will not work.
+     * 
+     * Note: If rebalancing is open to anyone disengage TWAP can be counter traded by a griefing party calling rebalance. Set anyoneCallable to false before disengage to prevent such attacks.
      */
     function disengage() external onlyOperator {
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
