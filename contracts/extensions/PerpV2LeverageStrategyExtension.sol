@@ -703,9 +703,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         
         require(engageInfo.accountInfo.collateralBalance > 0, "Collateral balance must be > 0");
         
-        // Assert currentLeverageRatio is 0. Since currentLeverageRatio = baseBalance * basePrice / accountValue,
-        // asserting baseBalance is 0 is equivalent to asserting currentLeverageRatio is 0.
-        require(engageInfo.baseBalance == 0, "Base balance must be 0");
+        // Assert base position unit is zero. Asserting base position unit instead of base balance allows us to neglect small dust amounts.
+        require(engageInfo.baseBalance.preciseDiv(strategy.setToken.totalSupply().toInt256()) == 0, "Base position must NOT exist");
 
         return LeverageInfo({
             action: engageInfo,

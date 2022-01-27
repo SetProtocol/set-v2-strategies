@@ -658,7 +658,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             });
 
             it("should revert", async () => {
-              await expect(subject()).to.be.revertedWith("Base balance must be 0");
+              await expect(subject()).to.be.revertedWith("Base position must NOT exist");
             });
           });
 
@@ -3129,9 +3129,9 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
             it("should set the last trade timestamp", async () => {
               await subject();
-  
+
               const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
               expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
             });
 
@@ -3220,9 +3220,9 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
             it("should set the last trade timestamp", async () => {
               await subject();
-  
+
               const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
               expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
             });
 
@@ -3322,9 +3322,9 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
             it("should set the last trade timestamp", async () => {
               await subject();
-  
+
               const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
               expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
             });
 
@@ -3387,9 +3387,9 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
             it("should set the last trade timestamp", async () => {
               await subject();
-  
+
               const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
-  
+
               expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
             });
 
