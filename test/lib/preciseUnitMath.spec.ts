@@ -261,7 +261,7 @@ describe("PreciseUnitMath", () => {
         subjectB = ether(2).mul(-1);
       });
 
-      it.skip("should return the correct number", async () => {
+      it("should return the correct number", async () => {
         const division = await subject();
         const expectedDivision = divDown(subjectA, subjectB);
         expect(division).to.eq(expectedDivision);
@@ -273,7 +273,7 @@ describe("PreciseUnitMath", () => {
         subjectB = ether(-4 / 3);
       });
 
-      it.skip("should return the correct number", async () => {
+      it("should return the correct number", async () => {
         const division = await subject();
         const expectedDivision = divDown(subjectA, subjectB);
         expect(division).to.eq(expectedDivision);
