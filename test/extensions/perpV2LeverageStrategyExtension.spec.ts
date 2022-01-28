@@ -658,7 +658,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             });
 
             it("should revert", async () => {
-              await expect(subject()).to.be.revertedWith("Current leverage ratio must be 0");
+              await expect(subject()).to.be.revertedWith("Base position must NOT exist");
             });
           });
 
@@ -1029,7 +1029,6 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         describe("when rebalance interval has not elapsed and within bounds", async () => {
-
           it("should revert", async () => {
             await expect(subject()).to.be.revertedWith("Cooldown not elapsed or not valid leverage ratio");
           });
@@ -2708,18 +2707,26 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
               expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
             });
+          });
 
+          describe("when incentivized cooldown period has not elapsed", async () => {
+            let newIncentivizedMaxTradeSize: BigNumber;
 
-            describe("when incentivized cooldown period has not elapsed", async () => {
-              beforeEach(async () => {
-                await subject();
-                await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(400));
-                await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(400).mul(10 ** 8));
-              });
+            cacheBeforeEach(async () => {
+              newIncentivizedMaxTradeSize = ether(0.01);
+              const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
+                twapMaxTradeSize: ether(0.001),
+                incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
+              };
+              await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+            });
 
-              it("should revert", async () => {
-                await expect(subject()).to.be.revertedWith("TWAP cooldown must have elapsed");
-              });
+            beforeEach(async () => {
+              await subject();
+            });
+
+            it("should revert", async () => {
+              await expect(subject()).to.be.revertedWith("TWAP cooldown must have elapsed");
             });
           });
 
@@ -2983,18 +2990,26 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
               expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
             });
+          });
 
+          describe("when incentivized cooldown period has not elapsed", async () => {
+            let newIncentivizedMaxTradeSize: BigNumber;
 
-            describe("when incentivized cooldown period has not elapsed", async () => {
-              beforeEach(async () => {
-                await subject();
-                await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1100));
-                await chainlinkBasePriceMock.setLatestAnswer(BigNumber.from(1100).mul(10 ** 8));
-              });
+            cacheBeforeEach(async () => {
+              newIncentivizedMaxTradeSize = ether(0.01);
+              const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
+                twapMaxTradeSize: ether(0.001),
+                incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
+              };
+              await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+            });
 
-              it("should revert", async () => {
-                await expect(subject()).to.be.revertedWith("TWAP cooldown must have elapsed");
-              });
+            beforeEach(async () => {
+              await subject();
+            });
+
+            it("should revert", async () => {
+              await expect(subject()).to.be.revertedWith("TWAP cooldown must have elapsed");
             });
           });
 
@@ -3094,6 +3109,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               // Engage to initial leverage
               await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
               await leverageStrategyExtension.engage();
+              await increaseTimeAsync(BigNumber.from(4000));
             }
           };
 
@@ -3109,6 +3125,14 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
               expect(initialPositions.length).to.eq(1);
               expect(newPositions.length).to.eq(0);
+            });
+
+            it("should set the last trade timestamp", async () => {
+              await subject();
+
+              const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
+
+              expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
             });
 
             describe("when SetToken has 0 supply", async () => {
@@ -3160,11 +3184,11 @@ describe("PerpV2LeverageStrategyExtension", () => {
           const intializeContracts = async() => {
             // Add allowed trader
             await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
-            // Engage to initial leverage
             await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
 
             if (ifEngaged) {
               await leverageStrategyExtension.engage();
+              await increaseTimeAsync(BigNumber.from(4000));
 
               newExchangeSettings = {
                 twapMaxTradeSize: ether(1.9),
@@ -3192,6 +3216,24 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(newPositions.length).to.eq(1);
               expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
               expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
+            });
+
+            it("should set the last trade timestamp", async () => {
+              await subject();
+
+              const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
+
+              expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
+            });
+
+            describe("when cooldown has not elapsed", async () => {
+              beforeEach(async () => {
+                await subject();
+              });
+
+              it("should revert", async () => {
+                await expect(subject()).to.be.revertedWith("TWAP cooldown must have elapsed");
+              });
             });
 
             describe("when SetToken has 0 supply", async () => {
@@ -3260,6 +3302,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
               // Engage to initial leverage
               await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
               await leverageStrategyExtension.engage();
+              await increaseTimeAsync(BigNumber.from(4000));
             }
           };
 
@@ -3275,6 +3318,14 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
               expect(initialPositions.length).to.eq(1);
               expect(newPositions.length).to.eq(0);
+            });
+
+            it("should set the last trade timestamp", async () => {
+              await subject();
+
+              const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
+
+              expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
             });
 
             describe("when SetToken has 0 supply", async () => {
@@ -3300,12 +3351,11 @@ describe("PerpV2LeverageStrategyExtension", () => {
           const intializeContracts = async() => {
             // Add allowed trader
             await leverageStrategyExtension.updateCallerStatus([owner.address], [true]);
-
-            // Engage to initial leverage
             await leverageStrategyExtension.deposit(await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address));
 
             if (ifEngaged) {
               await leverageStrategyExtension.engage();
+              await increaseTimeAsync(BigNumber.from(4000));
 
               newExchangeSettings = {
                 twapMaxTradeSize: ether(1.9),
@@ -3333,6 +3383,24 @@ describe("PerpV2LeverageStrategyExtension", () => {
               expect(newPositions.length).to.eq(1);
               expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
               expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
+            });
+
+            it("should set the last trade timestamp", async () => {
+              await subject();
+
+              const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
+
+              expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
+            });
+
+            describe("when cooldown has not elapsed", async () => {
+              beforeEach(async () => {
+                await subject();
+              });
+
+              it("should revert", async () => {
+                await expect(subject()).to.be.revertedWith("TWAP cooldown must have elapsed");
+              });
             });
 
             describe("when SetToken has 0 supply", async () => {

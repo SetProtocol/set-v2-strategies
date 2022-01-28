@@ -27,6 +27,8 @@ interface IAccountBalance {
     function getTotalDebtValue(address trader) external view returns (uint256);
     function getPnlAndPendingFee(address trader) external view returns (int256,int256,uint256);
     function getBase(address trader, address baseToken) external view returns (int256);
+    function getTakerPositionSize(address trader, address baseToken) external view returns (int256 takerPositionSize);
+    function getTakerOpenNotional(address trader, address baseToken) external view returns (int256 openNotional);
     function getQuote(address trader, address baseToken) external view returns (int256);
     function getNetQuoteBalanceAndPendingFee(address trader) external view returns (int256, uint256);
     function getPositionSize(address trader, address baseToken) external view returns (int256);
