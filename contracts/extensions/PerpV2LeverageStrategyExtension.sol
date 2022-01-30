@@ -33,7 +33,7 @@ import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/Prec
 import { BaseExtension } from "../lib/BaseExtension.sol";
 import { IAccountBalance } from "../interfaces/IAccountBalance.sol";
 import { IBaseManager } from "../interfaces/IBaseManager.sol";
-import { IChainlinkAggregatorV3 } from "../interfaces/IChainlinkAggregatorV3.sol";
+import { IPriceFeed } from "../interfaces/IPriceFeed.sol";
 import { IVault } from "../interfaces/IVault.sol";
 
 import { StringArrayUtils } from "../lib/StringArrayUtils.sol";
@@ -90,8 +90,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         ISetToken setToken;                             // Instance of leverage token
         IPerpV2LeverageModule perpV2LeverageModule;     // Instance of Perp V2 leverage module
         IAccountBalance perpV2AccountBalance;           // Instance of Perp V2 AccountBalance contract used to fetch position balances
-        IChainlinkAggregatorV3 basePriceOracle;         // Chainlink oracle feed that returns prices in 8 decimals for base asset
-        IChainlinkAggregatorV3 quotePriceOracle;        // Chainlink oracle feed that returns prices in 8 decimals for quote asset
+        IPriceFeed baseUSDPriceOracle;                  // PerpV2 oracle that returns TWAP price for base asset in USD
+        uint256 twapInterval;                           // TWAP interval to be used to fetch base asset price
         address virtualBaseAddress;                     // Address of virtual base asset (e.g. vETH, vWBTC etc)
         address virtualQuoteAddress;                    // Address of virtual USDC quote asset. The Perp V2 system uses USDC for all markets
     }
@@ -747,23 +747,25 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     function _createActionInfo() internal view returns(ActionInfo memory) {
         ActionInfo memory rebalanceInfo;
 
-        // Calculate prices from chainlink. Chainlink returns prices with 8 decimal places, so we need to adjust by 10 ** 10.
-        // In Perp v2, virtual tokens all have 18 decimals, therefore we do not need to make further adjustments to determine
-        // base and quote valuation
-        int256 rawBasePrice = strategy.basePriceOracle.latestAnswer();
-        int256 rawQuotePrice = strategy.quotePriceOracle.latestAnswer();
-        rebalanceInfo.basePrice = rawBasePrice.mul(10 ** 10);
-        rebalanceInfo.quotePrice = rawQuotePrice.mul(10 ** 10);
+        // Fetch base token prices from PerpV2 oracles and adjust them to 18 decimal places.
+        int256 rawBasePrice = strategy.baseUSDPriceOracle.getPrice(strategy.twapInterval).toInt256();
+        uint256 decimals = strategy.baseUSDPriceOracle.decimals();
+        rebalanceInfo.basePrice = rawBasePrice.mul((10 ** (18 - decimals)).toInt256());
+        
+        // vUSD price is fixed to 1$
+        rebalanceInfo.quotePrice = PreciseUnitMath.preciseUnit().toInt256();
 
         // Note: getTakerPositionSize returns zero if base balance is less than 10 wei
         rebalanceInfo.baseBalance = strategy.perpV2AccountBalance.getTakerPositionSize(address(strategy.setToken), strategy.virtualBaseAddress);
         
         // Note: Fetching quote balance associated with a single position and not the net quote balance
         rebalanceInfo.quoteBalance = strategy.perpV2AccountBalance.getTakerOpenNotional(address(strategy.setToken), strategy.virtualBaseAddress);
+        
         rebalanceInfo.accountInfo = strategy.perpV2LeverageModule.getAccountInfo(strategy.setToken);
 
+        // In Perp v2, all virtual tokens have 18 decimals, therefore we do not need to make further adjustments to determine base valuation.
         rebalanceInfo.basePositionValue = rebalanceInfo.basePrice.preciseMul(rebalanceInfo.baseBalance);
-        rebalanceInfo.quoteValue = rebalanceInfo.quotePrice.preciseMul(rebalanceInfo.quoteBalance);
+        rebalanceInfo.quoteValue = rebalanceInfo.quoteBalance;
 
         rebalanceInfo.setTotalSupply = strategy.setToken.totalSupply();
 
