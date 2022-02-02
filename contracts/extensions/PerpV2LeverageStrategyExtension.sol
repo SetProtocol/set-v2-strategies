@@ -70,12 +70,12 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
     struct ActionInfo {
         int256 baseBalance;                                 // Balance of virtual base asset from Perp in precise units (10e18). E.g. vWBTC = 10e18
-        int256 quoteBalance;                                // Balance of virtual quote asset from Perp in precise units (10e18). E.g. vUSDC = 10e18
+        int256 quoteBalance;                                // Balance of virtual quote asset from Perp in precise units (10e18). E.g. vUSD = 10e18
         IPerpV2LeverageModule.AccountInfo accountInfo;      // Info on perpetual account including, collateral balance, owedRealizedPnl and pendingFunding
         int256 basePositionValue;                           // Valuation in USD adjusted for decimals in precise units (10e18)
         int256 quoteValue;                                  // Valuation in USD adjusted for decimals in precise units (10e18)
-        int256 basePrice;                                   // Price of base asset in precise units (10e18) from Chainlink
-        int256 quotePrice;                                  // Price of quote asset in precise units (10e18) from Chainlink
+        int256 basePrice;                                   // Price of base asset in precise units (10e18) from PerpV2 Oracle
+        int256 quotePrice;                                  // Price of quote asset in precise units (10e18) from PerpV2 Oracle
         uint256 setTotalSupply;                             // Total supply of SetToken
     }
 
@@ -90,8 +90,11 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         ISetToken setToken;                             // Instance of leverage token
         IPerpV2LeverageModule perpV2LeverageModule;     // Instance of Perp V2 leverage module
         IAccountBalance perpV2AccountBalance;           // Instance of Perp V2 AccountBalance contract used to fetch position balances
-        IPriceFeed baseUSDPriceOracle;                  // PerpV2 oracle that returns TWAP price for base asset in USD
-        uint256 twapInterval;                           // TWAP interval to be used to fetch base asset price
+        IPriceFeed baseUSDPriceOracle;                  // PerpV2 oracle that returns TWAP price for base asset in USD. IPriceFeed is a PerpV2 specific interface
+                                                        // to interact with differnt oracle providers, e.g. Band Protocol and Chainlink, for different assets
+                                                        // listed on PerpV2
+        uint256 twapInterval;                           // TWAP interval to be used to fetch base asset price in seconds
+                                                        // PerpV2 uses a 15 min TWAP interval, i.e. twapInterval = 900
         address virtualBaseAddress;                     // Address of virtual base asset (e.g. vETH, vWBTC etc)
         address virtualQuoteAddress;                    // Address of virtual USDC quote asset. The Perp V2 system uses USDC for all markets
     }
