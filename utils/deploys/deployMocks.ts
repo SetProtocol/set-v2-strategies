@@ -6,6 +6,7 @@ import {
   MutualUpgradeMock,
   StandardTokenMock,
   StringArrayUtilsMock,
+  PerpV2PriceFeedMock
 } from "../contracts/index";
 
 import {
@@ -18,6 +19,7 @@ import { BaseExtensionMock__factory } from "../../typechain/factories/BaseExtens
 import { ChainlinkAggregatorMock__factory  } from "@setprotocol/set-protocol-v2/typechain";
 import { ContractCallerMock__factory } from "@setprotocol/set-protocol-v2/typechain";
 import { MutualUpgradeMock__factory } from "../../typechain/factories/MutualUpgradeMock__factory";
+import { PerpV2PriceFeedMock__factory } from "../../typechain/factories/PerpV2PriceFeedMock__factory";
 import { StandardTokenMock__factory  } from "../../typechain/factories/StandardTokenMock__factory";
 import { StringArrayUtilsMock__factory  } from "../../typechain/factories/StringArrayUtilsMock__factory";
 
@@ -60,5 +62,9 @@ export default class DeployMocks {
 
   public async deployContractCallerMock(): Promise<ContractCallerMock> {
     return await new ContractCallerMock__factory(this._deployerSigner).deploy();
+  }
+
+  public async deployPerpV2PriceFeedMock(decimals: number): Promise<PerpV2PriceFeedMock> {
+    return await new PerpV2PriceFeedMock__factory(this._deployerSigner).deploy(decimals);
   }
 }

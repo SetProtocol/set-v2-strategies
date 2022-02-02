@@ -37,8 +37,9 @@ export interface PerpV2ContractSettings {
   setToken: Address;
   perpV2LeverageModule: Address;
   perpV2AccountBalance: Address;
-  basePriceOracle: Address;
-  quotePriceOracle: Address;
+  baseUSDPriceOracle: Address;
+  twapInterval: BigNumber;
+  basePriceDecimalAdjustment: BigNumber;
   virtualBaseAddress: Address;
   virtualQuoteAddress: Address;
 }
