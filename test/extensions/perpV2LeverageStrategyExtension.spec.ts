@@ -64,6 +64,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
   let exchange: PerpV2ExchangeSettings;
   let customTargetLeverageRatio: any;
   let customMinLeverageRatio: any;
+  let basePriceDecimalAdjustment: BigNumber;
 
   let leverageStrategyExtension: PerpV2LeverageStrategyExtension;
   let perpV2LeverageModule: PerpV2LeverageModule;
@@ -177,6 +178,10 @@ describe("PerpV2LeverageStrategyExtension", () => {
     }
 
     // Deploy adapter
+    const vBaseAssetDecimals = await perpV2Setup.vETH.decimals();
+    const priceFeedDecimals = await perpV2PriceFeedMock.decimals();
+    basePriceDecimalAdjustment = BigNumber.from(vBaseAssetDecimals).sub(priceFeedDecimals);
+
     const targetLeverageRatio = customTargetLeverageRatio || ether(2);
     const minLeverageRatio = customMinLeverageRatio || ether(1.7);
     const maxLeverageRatio = ether(2.3);
@@ -199,6 +204,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       perpV2AccountBalance: perpV2Setup.accountBalance.address,
       baseUSDPriceOracle: perpV2PriceFeedMock.address,
       twapInterval: ZERO,
+      basePriceDecimalAdjustment: basePriceDecimalAdjustment,
       virtualBaseAddress: perpV2Setup.vETH.address,
       virtualQuoteAddress: perpV2Setup.vQuote.address,
     };
@@ -258,6 +264,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         perpV2AccountBalance: perpV2Setup.accountBalance.address,
         baseUSDPriceOracle: perpV2PriceFeedMock.address,
         twapInterval: ZERO,
+        basePriceDecimalAdjustment: basePriceDecimalAdjustment,
         virtualBaseAddress: perpV2Setup.vETH.address,
         virtualQuoteAddress: perpV2Setup.vQuote.address,
       };
@@ -312,6 +319,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       expect(strategy.perpV2AccountBalance).to.eq(subjectContractSettings.perpV2AccountBalance);
       expect(strategy.baseUSDPriceOracle).to.eq(subjectContractSettings.baseUSDPriceOracle);
       expect(strategy.twapInterval).to.eq(subjectContractSettings.twapInterval);
+      expect(strategy.basePriceDecimalAdjustment).to.eq(subjectContractSettings.basePriceDecimalAdjustment);
       expect(strategy.virtualBaseAddress).to.eq(subjectContractSettings.virtualBaseAddress);
       expect(strategy.virtualQuoteAddress).to.eq(subjectContractSettings.virtualQuoteAddress);
     });

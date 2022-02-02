@@ -39,6 +39,7 @@ export interface PerpV2ContractSettings {
   perpV2AccountBalance: Address;
   baseUSDPriceOracle: Address;
   twapInterval: BigNumber;
+  basePriceDecimalAdjustment: BigNumber;
   virtualBaseAddress: Address;
   virtualQuoteAddress: Address;
 }

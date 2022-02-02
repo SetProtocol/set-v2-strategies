@@ -95,6 +95,8 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
                                                         // listed on PerpV2
         uint256 twapInterval;                           // TWAP interval to be used to fetch base asset price in seconds
                                                         // PerpV2 uses a 15 min TWAP interval, i.e. twapInterval = 900
+        uint256 basePriceDecimalAdjustment;             // Decimal adjustment for the price returned by the PerpV2 oracle for the base asset. 
+                                                        // Equal to vBaseAsset.decimals() - baseUSDPriceOracle.decimals()
         address virtualBaseAddress;                     // Address of virtual base asset (e.g. vETH, vWBTC etc)
         address virtualQuoteAddress;                    // Address of virtual USDC quote asset. The Perp V2 system uses USDC for all markets
     }
@@ -753,7 +755,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         // Fetch base token prices from PerpV2 oracles and adjust them to 18 decimal places.
         int256 rawBasePrice = strategy.baseUSDPriceOracle.getPrice(strategy.twapInterval).toInt256();
         uint256 decimals = strategy.baseUSDPriceOracle.decimals();
-        rebalanceInfo.basePrice = rawBasePrice.mul((10 ** (18 - decimals)).toInt256());
+        rebalanceInfo.basePrice = rawBasePrice.mul((10 ** strategy.basePriceDecimalAdjustment).toInt256());
         
         // vUSD price is fixed to 1$
         rebalanceInfo.quotePrice = PreciseUnitMath.preciseUnit().toInt256();
