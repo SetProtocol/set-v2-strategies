@@ -17,6 +17,11 @@
 */
 
 pragma solidity 0.6.10;
+pragma experimental ABIEncoderV2;
+
+import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
+
+import { BaseManager } from "../manager/BaseManager.sol";
 
 contract ManagerFactory {
     struct InitializeParams{
@@ -25,13 +30,22 @@ contract ManagerFactory {
     }
     
     address public factory;
-    mapping(address=>InitializeParams) public initialize;
+    mapping(ISetToken=>InitializeParams) public initializeState;
+    mapping(ISetToken=>bool) public isValidSet;
+    address[] internal validSets; 
+
+    modifier onlyInitializer(ISetToken _setToken) {
+        require(msg.sender == initializeState[_setToken].initializer);
+        _;
+    }
 
     constructor(
         address _setTokenFactory
     ) public {
         factory = _setTokenFactory;
     }
+
+    /* ============ External Functions ============ */
 
     function create(
         address[] memory _components,
@@ -46,28 +60,50 @@ contract ManagerFactory {
         address[] memory _extensions
     )
         external
+        returns (ISetToken setToken, address managerAddress)
     {
-        address setTokenAddress = _deploySet(
+        setToken = ISetToken(_deploySet(
             _components,
             _modules,
             _units,
             _name,
             _symbol
-        );
+        ));
 
-        _deployManager(
-            setTokenAddress,
+        managerAddress = _deployManager(
+            setToken,
             _methodologist,
             _operators,
             _assets,
             _extensions
         );
 
-        initialize[setTokenAddress] = InitializeParams({
+        initializeState[setToken] = InitializeParams({
             initializer: msg.sender,
             owner: _owner
         });
+        isValidSet[setToken] = true;
+        validSets.push(address(setToken));
     }
+
+    function initialize(
+        ISetToken _setToken,
+        address[] memory _initializeTargets,
+        bytes[] memory _initializeBytecode
+    )
+        external
+        onlyInitializer(_setToken)
+    {
+
+    }
+
+    /* ============ External View Functions ============ */
+
+    function getValidSets() external view returns (address[] memory) {
+        return validSets;
+    }
+
+    /* ============ Internal Functions ============ */
 
     function _deploySet(
         address[] memory _components,
@@ -81,7 +117,7 @@ contract ManagerFactory {
     {}
 
     function _deployManager(
-        address _setTokenAddress,
+        ISetToken _setToken,
         address _methodologist,
         address[] memory _operators,
         address[] memory _assets,
@@ -89,5 +125,7 @@ contract ManagerFactory {
     )
         internal
         returns (address)
-    {}
+    {
+        return address(new BaseManager(_setToken, address(this), _methodologist));
+    }
 }
