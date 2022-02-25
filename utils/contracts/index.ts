@@ -2,6 +2,7 @@ export { BaseExtensionMock } from "../../typechain/BaseExtensionMock";
 export { AddressArrayUtilsMock } from "../../typechain/AddressArrayUtilsMock";
 export { BaseManager } from "../..//typechain/BaseManager";
 export { ChainlinkAggregatorMock } from "../../typechain/ChainlinkAggregatorMock";
+export { DelegatedManager } from "../..//typechain/DelegatedManager";
 export { MutualUpgradeMock } from "../..//typechain/MutualUpgradeMock";
 export { PerpV2LeverageStrategyExtension } from "../../typechain/PerpV2LeverageStrategyExtension";
 export { FeeSplitExtension } from "../../typechain/FeeSplitExtension";
