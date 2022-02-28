@@ -21,35 +21,34 @@ pragma experimental ABIEncoderV2;
 
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
-import { BaseManager } from "../manager/BaseManager.sol";
+import { DelegatedManager } from "../manager/DelegatedManager.sol";
+import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
+import { ISetTokenCreator } from "../interfaces/ISetTokenCreator.sol";
 
 contract ManagerFactory {
     struct InitializeParams{
-        address initializer;
+        address deployer;
         address owner;
+        IDelegatedManager manager;
+        bool isPending;
     }
     
-    address public factory;
+    ISetTokenCreator public factory;
     mapping(ISetToken=>InitializeParams) public initializeState;
     mapping(ISetToken=>bool) public isValidSet;
     address[] internal validSets; 
 
-    modifier onlyInitializer(ISetToken _setToken) {
-        require(msg.sender == initializeState[_setToken].initializer);
-        _;
-    }
-
     constructor(
-        address _setTokenFactory
+        ISetTokenCreator _setTokenFactory
     ) public {
         factory = _setTokenFactory;
     }
 
     /* ============ External Functions ============ */
 
-    function create(
+    function createSetAndManager(
         address[] memory _components,
-        uint256 _units,
+        int256[] memory _units,
         string memory _name,
         string memory _symbol,
         address _owner,
@@ -60,30 +59,57 @@ contract ManagerFactory {
         address[] memory _extensions
     )
         external
-        returns (ISetToken setToken, address managerAddress)
+        returns (ISetToken, address)
     {
-        setToken = ISetToken(_deploySet(
+        require(_extensions.length > 0, "Must have at least 1 extension");
+        // Require that components of Set are contained in the _assets array
+        // Require there be at least one operator?
+
+        ISetToken setToken = _deploySet(
             _components,
-            _modules,
             _units,
+            _modules,
             _name,
             _symbol
-        ));
-
-        managerAddress = _deployManager(
-            setToken,
-            _methodologist,
-            _operators,
-            _assets,
-            _extensions
         );
 
-        initializeState[setToken] = InitializeParams({
-            initializer: msg.sender,
-            owner: _owner
-        });
-        isValidSet[setToken] = true;
-        validSets.push(address(setToken));
+        DelegatedManager manager = _deployManager(
+            setToken,
+            _methodologist,
+            _extensions,
+            _operators,
+            _assets
+        );
+
+        _setInitializationState(setToken, address(manager), _owner);
+
+        setToken.setManager(address(manager));
+
+        return (setToken, address(manager));
+    }
+
+    function createManager(
+        ISetToken _setToken,
+        address _owner,
+        address _methodologist,
+        address[] memory _operators,
+        address[] memory _assets,
+        address[] memory _extensions
+    )
+        external
+        returns (address)
+    {
+        DelegatedManager manager = _deployManager(
+            _setToken,
+            _methodologist,
+            _extensions,
+            _operators,
+            _assets
+        );
+
+        _setInitializationState(_setToken, address(manager), _owner);
+
+        return address(manager);
     }
 
     function initialize(
@@ -92,9 +118,17 @@ contract ManagerFactory {
         bytes[] memory _initializeBytecode
     )
         external
-        onlyInitializer(_setToken)
     {
+        require(initializeState[_setToken].isPending, "Manager must be awaiting initialization");
+        require(msg.sender == initializeState[_setToken].deployer, "Only deployer can initialize manager");
 
+        for (uint256 i = 0; i < _initializeTargets.length; i++) {
+            // _extensions[i].initialize(_extensionParams[_extensions[i]]);
+        }
+
+        initializeState[_setToken].manager.transferOwnership(initializeState[_setToken].owner);
+
+        delete initializeState[_setToken];
     }
 
     /* ============ External View Functions ============ */
@@ -107,25 +141,61 @@ contract ManagerFactory {
 
     function _deploySet(
         address[] memory _components,
+        int256[] memory _units,
         address[] memory _modules,
-        uint256 _units,
         string memory _name,
         string memory _symbol
     )
         internal
-        returns (address)
-    {}
+        returns (ISetToken)
+    {
+        address setToken = factory.create(
+            _components,
+            _units,
+            _modules,
+            address(this),      // Set Manager to this address so can xfer to manager deployed in next step
+            _name,
+            _symbol
+        );
+
+        return ISetToken(setToken);
+    }
 
     function _deployManager(
         ISetToken _setToken,
         address _methodologist,
+        address[] memory _extensions,
         address[] memory _operators,
-        address[] memory _assets,
-        address[] memory _extensions
+        address[] memory _assets
     )
         internal
-        returns (address)
+        returns (DelegatedManager)
     {
-        return address(new BaseManager(_setToken, address(this), _methodologist));
+        DelegatedManager newManager = new DelegatedManager(
+            _setToken,
+            address(this),
+            _methodologist,
+            _extensions,
+            _operators,
+            _assets
+        );
+        // emit ManagerCreated(address(setToken), _manager, _name, _symbol);
+        return newManager;
+    }
+
+    function _setInitializationState(
+        ISetToken _setToken,
+        address _manager,
+        address _owner
+    ) internal {
+        initializeState[_setToken] = InitializeParams({
+            deployer: msg.sender,
+            owner: _owner,
+            manager: IDelegatedManager(_manager),
+            isPending: true
+        });
+
+        isValidSet[_setToken] = true;
+        validSets.push(address(_setToken));
     }
 }

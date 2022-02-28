@@ -19,7 +19,7 @@
 pragma solidity 0.6.10;
 pragma experimental "ABIEncoderV2";
 
-import { ISetToken } from "./ISetToken.sol";
+import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 interface IGlobalExtension {
     function removeExtension(ISetToken _setToken) external;

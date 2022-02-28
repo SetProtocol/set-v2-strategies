@@ -37,4 +37,6 @@ interface IDelegatedManager {
     function initializeExtension() external;
 
     function transferTokens(address _token, address _destination, uint256 _amount) external;
+
+    function transferOwnership(address _owner) external;
 }
