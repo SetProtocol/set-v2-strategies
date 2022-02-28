@@ -23,6 +23,7 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
 import { ISetToken } from "../interfaces/ISetToken.sol";
+import { IGlobalExtension } from "../interfaces/IGlobalExtension.sol";
 
 
 /**
@@ -40,6 +41,14 @@ import { ISetToken } from "../interfaces/ISetToken.sol";
 contract DelegatedManager is Ownable {
     using Address for address;
     using AddressArrayUtils for address[];
+
+    /* ============ Enums ============ */
+
+    enum ExtensionState {
+        NONE,
+        PENDING,
+        INITIALIZED
+    }
 
     /* ============ Events ============ */
 
@@ -86,7 +95,7 @@ contract DelegatedManager is Ownable {
      * Throws if the sender is not a listed extension
      */
     modifier onlyExtension() {
-        require(extensionAllowlist[msg.sender], "Must be extension");
+        require(extensionAllowlist[msg.sender] == ExtensionState.INITIALIZED, "Must be initialized extension");
         _;
     }
 
@@ -99,7 +108,7 @@ contract DelegatedManager is Ownable {
     address public immutable factory;
 
     // Mapping to check if extension is enabled
-    mapping(address => bool) public extensionAllowlist;
+    mapping(address => ExtensionState) public extensionAllowlist;
 
     // Array of enabled extensions
     address[] internal extensions;
@@ -154,6 +163,18 @@ contract DelegatedManager is Ownable {
     }
 
     /**
+     * Initializes an added extension from PENDING to INITIALIZED state. An address can only
+     * enter a PENDING state if it is an enabled module added by the manager. Only callable
+     * by the module itself, hence msg.sender is the subject of update.
+     */
+    function initializeExtension() external {
+        require(extensionAllowlist[msg.sender] == ExtensionState.PENDING, "Extension must be pending");
+
+        extensionAllowlist[msg.sender] = ExtensionState.INITIALIZED;
+        extensions.push(msg.sender);
+    }
+
+    /**
      * ONLY OWNER: Add a new extension that the DelegatedManager can call.
      *
      * @param _extensions           New extension to add
@@ -171,11 +192,13 @@ contract DelegatedManager is Ownable {
         for (uint256 i = 0; i < _extensions.length; i++) {
             address extension = _extensions[i];
 
-            require(extensionAllowlist[extension], "Extension does not exist");
+            require(extensionAllowlist[extension] == ExtensionState.INITIALIZED, "Extension not initialized");
 
             extensions.removeStorage(extension);
 
-            extensionAllowlist[extension] = false;
+            extensionAllowlist[extension] = ExtensionState.NONE;
+
+            IGlobalExtension(extension).removeExtension(setToken);
 
             emit ExtensionRemoved(extension);
         }
@@ -243,9 +266,8 @@ contract DelegatedManager is Ownable {
      * @param _newMethodologist           New methodologist address
      */
     function setMethodologist(address _newMethodologist) external onlyMethodologist {
-        methodologist = _newMethodologist;
-
         emit MethodologistChanged(methodologist, _newMethodologist);
+        methodologist = _newMethodologist;
     }
 
     /**
@@ -301,11 +323,9 @@ contract DelegatedManager is Ownable {
         for (uint256 i = 0; i < _extensions.length; i++) {
             address extension = _extensions[i];
 
-            require(!extensionAllowlist[extension], "Extension already exists");
+            require(extensionAllowlist[extension] == ExtensionState.NONE , "Extension already exists");
 
-            extensions.push(extension);
-
-            extensionAllowlist[extension] = true;
+            extensionAllowlist[extension] = ExtensionState.PENDING;
 
             emit ExtensionAdded(extension);
         }

@@ -3,6 +3,7 @@ import { Address } from "../types";
 import {
   AddressArrayUtilsMock,
   BaseExtensionMock,
+  BaseGlobalExtensionMock,
   MutualUpgradeMock,
   StandardTokenMock,
   StringArrayUtilsMock,
@@ -16,6 +17,7 @@ import {
 
 import { AddressArrayUtilsMock__factory } from "../../typechain/factories/AddressArrayUtilsMock__factory";
 import { BaseExtensionMock__factory } from "../../typechain/factories/BaseExtensionMock__factory";
+import { BaseGlobalExtensionMock__factory } from "../../typechain/factories/BaseGlobalExtensionMock__factory";
 import { ChainlinkAggregatorMock__factory  } from "@setprotocol/set-protocol-v2/typechain";
 import { ContractCallerMock__factory } from "@setprotocol/set-protocol-v2/typechain";
 import { MutualUpgradeMock__factory } from "../../typechain/factories/MutualUpgradeMock__factory";
@@ -32,6 +34,10 @@ export default class DeployMocks {
 
   public async deployBaseExtensionMock(manager: Address): Promise<BaseExtensionMock> {
     return await new BaseExtensionMock__factory(this._deployerSigner).deploy(manager);
+  }
+
+  public async deployBaseGlobalExtensionMock(): Promise<BaseGlobalExtensionMock> {
+    return await new BaseGlobalExtensionMock__factory(this._deployerSigner).deploy();
   }
 
   public async deployAddressArrayUtilsMock(): Promise<AddressArrayUtilsMock> {
