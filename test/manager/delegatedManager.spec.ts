@@ -17,7 +17,7 @@ import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2
 
 const expect = getWaffleExpect();
 
-describe.only("DelegatedManager", () => {
+describe("DelegatedManager", () => {
   let owner: Account;
   let methodologist: Account;
   let otherAccount: Account;

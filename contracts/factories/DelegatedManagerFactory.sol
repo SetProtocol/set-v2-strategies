@@ -25,7 +25,7 @@ import { DelegatedManager } from "../manager/DelegatedManager.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { ISetTokenCreator } from "../interfaces/ISetTokenCreator.sol";
 
-contract ManagerFactory {
+contract DelegatedManagerFactory {
     struct InitializeParams{
         address deployer;
         address owner;
@@ -33,7 +33,7 @@ contract ManagerFactory {
         bool isPending;
     }
     
-    ISetTokenCreator public factory;
+    ISetTokenCreator public setTokenFactory;
     mapping(ISetToken=>InitializeParams) public initializeState;
     mapping(ISetToken=>bool) public isValidSet;
     address[] internal validSets; 
@@ -41,7 +41,7 @@ contract ManagerFactory {
     constructor(
         ISetTokenCreator _setTokenFactory
     ) public {
-        factory = _setTokenFactory;
+        setTokenFactory = _setTokenFactory;
     }
 
     /* ============ External Functions ============ */
@@ -149,7 +149,7 @@ contract ManagerFactory {
         internal
         returns (ISetToken)
     {
-        address setToken = factory.create(
+        address setToken = setTokenFactory.create(
             _components,
             _units,
             _modules,
