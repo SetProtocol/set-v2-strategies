@@ -171,13 +171,15 @@ contract DelegatedManagerFactory {
         internal
         returns (DelegatedManager)
     {
+        bool useAssetAllowlist = _assets.length > 0;
         DelegatedManager newManager = new DelegatedManager(
             _setToken,
             address(this),
             _methodologist,
             _extensions,
             _operators,
-            _assets
+            _assets,
+            useAssetAllowlist
         );
         // emit ManagerCreated(address(setToken), _manager, _name, _symbol);
         return newManager;

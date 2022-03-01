@@ -19,7 +19,10 @@
 pragma solidity 0.6.10;
 
 import { Address } from "@openzeppelin/contracts/utils/Address.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
@@ -41,6 +44,7 @@ import { IGlobalExtension } from "../interfaces/IGlobalExtension.sol";
 contract DelegatedManager is Ownable {
     using Address for address;
     using AddressArrayUtils for address[];
+    using SafeERC20 for IERC20;
 
     /* ============ Enums ============ */
 
@@ -80,6 +84,8 @@ contract DelegatedManager is Ownable {
     event AllowedAssetRemoved(
         address _asset
     );
+
+    event UseAssetAllowlistUpdated(bool indexed _status);
 
     /* ============ Modifiers ============ */
 
@@ -125,6 +131,9 @@ contract DelegatedManager is Ownable {
     // List of allowed assets
     address[] internal allowedAssets;
 
+    // Toggle if asset allow list is being enforced
+    bool public useAssetAllowlist;
+
     // Address of methodologist which serves as providing methodology for the index
     address public methodologist;
 
@@ -136,13 +145,15 @@ contract DelegatedManager is Ownable {
         address _methodologist,
         address[] memory _extensions,
         address[] memory _operators,
-        address[] memory _allowedAssets
+        address[] memory _allowedAssets,
+        bool _useAssetAllowlist
     )
         public
     {
         setToken = _setToken;
-        methodologist = _methodologist;
         factory = _factory;
+        methodologist = _methodologist;
+        useAssetAllowlist = _useAssetAllowlist;
 
         _addExtensions(_extensions);
         _addOperators(_operators);
@@ -158,8 +169,21 @@ contract DelegatedManager is Ownable {
      * @param _data             Byte data of function to call in module
      */
     function interactManager(address _module, bytes calldata _data) external onlyExtension {
+        require(_module != address(setToken), "Extensions cannot call SetToken");
         // Invoke call to module, assume value will always be 0
         _module.functionCallWithValue(_data, 0);
+    }
+
+    /**
+     * OPERATOR ONLY: Transfers _tokens held by the manager to _destination. Can be used to
+     * distribute fees or recover anything sent here accidentally.
+     *
+     * @param _token           ERC20 token to send
+     * @param _destination     Address receiving the tokens
+     * @param _amount          Quantity of tokens to send
+     */
+    function transferTokens(address _token, address _destination, uint256 _amount) external onlyExtension {
+        IERC20(_token).safeTransfer(_destination, _amount);
     }
 
     /**
@@ -261,6 +285,18 @@ contract DelegatedManager is Ownable {
     }
 
     /**
+     * ONLY OWNER: Toggle useAssetAllowlist on and off. When false asset allowlist is ignored
+     * when true it is enforced.
+     *
+     * @param _useAssetAllowlist           Bool indicating whether to use asset allow list
+     */
+    function updateUseAssetAllowlist(bool _useAssetAllowlist) external onlyOwner {
+        useAssetAllowlist = _useAssetAllowlist;
+
+        emit UseAssetAllowlistUpdated(_useAssetAllowlist);
+    }
+
+    /**
      * ONLY METHODOLOGIST: Update the methodologist address
      *
      * @param _newMethodologist           New methodologist address
@@ -299,6 +335,18 @@ contract DelegatedManager is Ownable {
     }
 
     /* ============ External View Functions ============ */
+
+    function isAllowedAsset(address _asset) external view returns(bool) {
+        return !useAssetAllowlist || assetAllowlist[_asset];
+    }
+
+    function isPendingExtension(address _extension) external view returns(bool) {
+        return extensionAllowlist[_extension] == ExtensionState.PENDING;
+    }
+
+    function isInitializedExtension(address _extension) external view returns(bool) {
+        return extensionAllowlist[_extension] == ExtensionState.INITIALIZED;
+    }
 
     function getExtensions() external view returns(address[] memory) {
         return extensions;

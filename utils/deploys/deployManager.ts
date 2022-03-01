@@ -34,6 +34,7 @@ export default class DeployToken {
     extensions: Address[],
     operators: Address[],
     allowedAssets: Address[],
+    useAssetAllowlist: boolean
   ): Promise<DelegatedManager> {
     return await new DelegatedManager__factory(this._deployerSigner).deploy(
       setToken,
@@ -41,7 +42,8 @@ export default class DeployToken {
       methodologist,
       extensions,
       operators,
-      allowedAssets
+      allowedAssets,
+      useAssetAllowlist
     );
   }
 }

@@ -1,5 +1,6 @@
 import "module-alias/register";
 
+import { BigNumber } from "ethers";
 import { Address, Account, Bytes } from "@utils/types";
 import { ADDRESS_ZERO, EXTENSION_STATE, ZERO } from "@utils/constants";
 import { DelegatedManager, BaseGlobalExtensionMock } from "@utils/contracts/index";
@@ -14,6 +15,7 @@ import {
 } from "@utils/index";
 import { SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
 import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2/utils/test";
+import { ContractTransaction } from "ethers";
 
 const expect = getWaffleExpect();
 
@@ -80,7 +82,8 @@ describe("DelegatedManager", () => {
       methodologist.address,
       [baseExtension.address],
       [operatorOne.address, operatorTwo.address],
-      [setV2Setup.usdc.address, setV2Setup.weth.address]
+      [setV2Setup.usdc.address, setV2Setup.weth.address],
+      true
     );
 
     // Transfer ownership to DelegatedManager
@@ -96,6 +99,7 @@ describe("DelegatedManager", () => {
     let subjectExtensions: Address[];
     let subjectOperators: Address[];
     let subjectAllowedAssets: Address[];
+    let subjectUseAssetAllowlist: boolean;
 
     beforeEach(async () => {
       subjectSetToken = setToken.address;
@@ -104,6 +108,7 @@ describe("DelegatedManager", () => {
       subjectExtensions = [baseExtension.address];
       subjectOperators = [operatorOne.address, operatorTwo.address];
       subjectAllowedAssets = [setV2Setup.usdc.address, setV2Setup.weth.address];
+      subjectUseAssetAllowlist = true;
     });
 
     async function subject(): Promise<DelegatedManager> {
@@ -113,7 +118,8 @@ describe("DelegatedManager", () => {
         subjectMethodologist,
         subjectExtensions,
         subjectOperators,
-        subjectAllowedAssets
+        subjectAllowedAssets,
+        subjectUseAssetAllowlist
       );
     }
 
@@ -170,6 +176,14 @@ describe("DelegatedManager", () => {
       expect(JSON.stringify(actualAssetsArray)).to.eq(JSON.stringify(subjectAllowedAssets));
       expect(isApprovedUSDC).to.be.true;
       expect(isApprovedWETH).to.be.true;
+    });
+
+    it("should indicate whether to use the asset allow list", async () => {
+      const delegatedManager = await subject();
+
+      const useAllowList = await delegatedManager.useAssetAllowlist();
+
+      expect(useAllowList).to.be.true;
     });
   });
 
@@ -237,6 +251,16 @@ describe("DelegatedManager", () => {
       expect(feeStates.feeRecipient).to.eq(otherAccount.address);
     });
 
+    describe("when target address is the SetToken", async () => {
+      beforeEach(async () => {
+        subjectModule = setToken.address;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Extensions cannot call SetToken");
+      });
+    });
+
     describe("when the caller is not an initialized extension", async () => {
       beforeEach(async () => {
         subjectCaller = fakeExtension;
@@ -246,6 +270,56 @@ describe("DelegatedManager", () => {
         await expect(subject()).to.be.revertedWith("Must be initialized extension");
       });
     });
+  });
+
+  describe("#transferTokens", async () => {
+    let subjectCaller: Account;
+    let subjectToken: Address;
+    let subjectDestination: Address;
+    let subjectAmount: BigNumber;
+
+    beforeEach(async () => {
+      await delegatedManager.connect(owner.wallet).addExtensions([otherAccount.address]);
+      await delegatedManager.connect(otherAccount.wallet).initializeExtension();
+
+      subjectCaller = otherAccount;
+      subjectToken = setV2Setup.weth.address;
+      subjectDestination = otherAccount.address;
+      subjectAmount = ether(1);
+
+      await setV2Setup.weth.transfer(delegatedManager.address, subjectAmount);
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return delegatedManager.connect(subjectCaller.wallet).transferTokens(
+        subjectToken,
+        subjectDestination,
+        subjectAmount
+      );
+    }
+
+    it("should send the given amount from the manager to the address", async () => {
+      const preManagerAmount = await setV2Setup.weth.balanceOf(delegatedManager.address);
+      const preDestinationAmount = await setV2Setup.weth.balanceOf(subjectDestination);
+
+      await subject();
+
+      const postManagerAmount = await setV2Setup.weth.balanceOf(delegatedManager.address);
+      const postDestinationAmount = await setV2Setup.weth.balanceOf(subjectDestination);
+
+      expect(preManagerAmount.sub(postManagerAmount)).to.eq(subjectAmount);
+      expect(postDestinationAmount.sub(preDestinationAmount)).to.eq(subjectAmount);
+    });
+
+    describe("when the caller is not an extension", async () => {
+        beforeEach(async () => {
+          subjectCaller = operatorOne;
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be initialized extension");
+        });
+      });
   });
 
   describe("#addExtensions", async () => {
@@ -592,6 +666,42 @@ describe("DelegatedManager", () => {
     });
   });
 
+  describe("#updateUseAssetAllowlist", async () => {
+    let subjectUseAssetAllowlist: boolean;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      subjectUseAssetAllowlist = false;
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return delegatedManager.connect(subjectCaller.wallet).updateUseAssetAllowlist(subjectUseAssetAllowlist);
+    }
+
+    it("should update the callAllowList", async () => {
+      await subject();
+      const useAssetAllowlist = await delegatedManager.useAssetAllowlist();
+      expect(useAssetAllowlist).to.be.false;
+    });
+
+    it("should emit UseAssetAllowlistUpdated event", async () => {
+      await expect(subject()).to.emit(delegatedManager, "UseAssetAllowlistUpdated").withArgs(
+        subjectUseAssetAllowlist
+      );
+    });
+
+    describe("when the sender is not operator", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+    });
+  });
+
   describe("#setMethodologist", async () => {
     let subjectNewMethodologist: Address;
     let subjectCaller: Account;
@@ -725,6 +835,136 @@ describe("DelegatedManager", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+    });
+  });
+
+  describe("#isAllowedAsset", async () => {
+    let subjectAsset: Address;
+
+    beforeEach(async () => {
+      subjectAsset = setV2Setup.usdc.address;
+    });
+
+    async function subject(): Promise<boolean> {
+      return delegatedManager.isAllowedAsset(subjectAsset);
+    }
+
+    it("should return true", async () => {
+      const isAllowAsset = await subject();
+
+      expect(isAllowAsset).to.be.true;
+    });
+
+    describe("when useAssetAllowlist is flipped to false", async () => {
+      beforeEach(async () => {
+        await delegatedManager.connect(owner.wallet).updateUseAssetAllowlist(false);
+
+        subjectAsset = setV2Setup.wbtc.address;
+      });
+
+      it("should return true", async () => {
+        const isAllowAsset = await subject();
+
+        expect(isAllowAsset).to.be.true;
+      });
+    });
+
+    describe("when the asset is not on allowlist", async () => {
+      beforeEach(async () => {
+        subjectAsset = setV2Setup.wbtc.address;
+      });
+
+      it("should return false", async () => {
+        const isAllowAsset = await subject();
+
+        expect(isAllowAsset).to.be.false;
+      });
+    });
+  });
+
+  describe("#isPendingExtension", async () => {
+    let subjectExtension: Address;
+
+    beforeEach(async () => {
+      subjectExtension = baseExtension.address;
+    });
+
+    async function subject(): Promise<boolean> {
+      return delegatedManager.isPendingExtension(subjectExtension);
+    }
+
+    it("should return true", async () => {
+      const isPendingExtension = await subject();
+
+      expect(isPendingExtension).to.be.true;
+    });
+
+    describe("when extension is initialized", async () => {
+      beforeEach(async () => {
+        await baseExtension.connect(owner.wallet).initializeExtension(setToken.address, delegatedManager.address);
+      });
+
+      it("should return false", async () => {
+        const isPendingExtension = await subject();
+
+        expect(isPendingExtension).to.be.false;
+      });
+    });
+
+    describe("when the extension is not tracked in allowlist", async () => {
+      beforeEach(async () => {
+        await baseExtension.connect(owner.wallet).initializeExtension(setToken.address, delegatedManager.address);
+        await delegatedManager.connect(owner.wallet).removeExtensions([baseExtension.address]);
+      });
+
+      it("should return false", async () => {
+        const isPendingExtension = await subject();
+
+        expect(isPendingExtension).to.be.false;
+      });
+    });
+  });
+
+  describe("#isInitializedExtension", async () => {
+    let subjectExtension: Address;
+
+    beforeEach(async () => {
+      subjectExtension = baseExtension.address;
+    });
+
+    async function subject(): Promise<boolean> {
+      return delegatedManager.isInitializedExtension(subjectExtension);
+    }
+
+    it("should return true", async () => {
+      const isInitializedExtension = await subject();
+
+      expect(isInitializedExtension).to.be.false;
+    });
+
+    describe("when extension is initialized", async () => {
+      beforeEach(async () => {
+        await baseExtension.connect(owner.wallet).initializeExtension(setToken.address, delegatedManager.address);
+      });
+
+      it("should return false", async () => {
+        const isInitializedExtension = await subject();
+
+        expect(isInitializedExtension).to.be.true;
+      });
+    });
+
+    describe("when the extension is not tracked in allowlist", async () => {
+      beforeEach(async () => {
+        await baseExtension.connect(owner.wallet).initializeExtension(setToken.address, delegatedManager.address);
+        await delegatedManager.connect(owner.wallet).removeExtensions([baseExtension.address]);
+      });
+
+      it("should return false", async () => {
+        const isInitializedExtension = await subject();
+
+        expect(isInitializedExtension).to.be.false;
       });
     });
   });

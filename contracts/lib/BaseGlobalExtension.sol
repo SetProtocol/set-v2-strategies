@@ -59,10 +59,10 @@ abstract contract BaseGlobalExtension {
     }
 
         /**
-     * Throws if the sender is not the SetToken operator
+     * Throws if the sender is not the SetToken manager contract
      */
     modifier onlyManager(ISetToken _setToken) {
-        require(address(_manager(_setToken)) == msg.sender, "Manager must be sender");
+        require(address(_manager(_setToken)) == msg.sender, "Must be manager");
         _;
     }
 
