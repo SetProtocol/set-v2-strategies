@@ -207,6 +207,10 @@ describe("DelegatedManager", () => {
       expect(isInitializedExternsion).to.eq(EXTENSION_STATE["INITIALIZED"]);
     });
 
+    it("should emit the correct ExtensionInitialized event for the first address", async () => {
+      await expect(subject()).to.emit(delegatedManager, "ExtensionInitialized").withArgs(otherAccount.address);
+    });
+
     describe("when the caller is not a pending extension", async () => {
       beforeEach(async () => {
         subjectCaller = fakeExtension;
@@ -732,6 +736,102 @@ describe("DelegatedManager", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Must be methodologist");
+      });
+    });
+  });
+
+  describe("#updateOwnerFeeSplit", async () => {
+    let subjectNewFeeSplit: BigNumber;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      subjectNewFeeSplit = ether(.1);
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<any> {
+      return delegatedManager.connect(subjectCaller.wallet).updateOwnerFeeSplit(subjectNewFeeSplit);
+    }
+
+    it("should set the new owner fee split", async () => {
+      await subject();
+
+      const newFeeSplit =  await delegatedManager.ownerFeeSplit();
+
+      expect(newFeeSplit).to.eq(subjectNewFeeSplit);
+    });
+
+    it("should emit the correct OwnerFeeSplitUpdated event", async () => {
+      await expect(subject()).to.emit(delegatedManager, "OwnerFeeSplitUpdated").withArgs(subjectNewFeeSplit);
+    });
+
+    describe("when a fee split greater than 100% is passed", async () => {
+      beforeEach(async () => {
+        subjectNewFeeSplit = ether(1.1);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Invalid fee split");
+      });
+    });
+
+    describe("when the caller is not the owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+    });
+  });
+
+  describe("#updateOwnerFeeRecipient", async () => {
+    let subjectNewFeeRecipient: Address;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      subjectNewFeeRecipient = owner.address;
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<any> {
+      return delegatedManager.connect(subjectCaller.wallet).updateOwnerFeeRecipient(subjectNewFeeRecipient);
+    }
+
+    it("should set the new owner fee recipient", async () => {
+      const currentFeeRecipient =  await delegatedManager.ownerFeeRecipient();
+
+      expect(currentFeeRecipient).to.eq(ADDRESS_ZERO);
+
+      await subject();
+
+      const newFeeRecipient =  await delegatedManager.ownerFeeRecipient();
+
+      expect(newFeeRecipient).to.eq(subjectNewFeeRecipient);
+    });
+
+    it("should emit the correct OwnerFeeRecipientUpdated event", async () => {
+      await expect(subject()).to.emit(delegatedManager, "OwnerFeeRecipientUpdated").withArgs(subjectNewFeeRecipient);
+    });
+
+    describe("when the fee recipient is the zero address", async () => {
+      beforeEach(async () => {
+        subjectNewFeeRecipient = ADDRESS_ZERO;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Null address passed");
+      });
+    });
+
+    describe("when the caller is not the owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Ownable: caller is not the owner");
       });
     });
   });

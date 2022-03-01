@@ -24,6 +24,7 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
+import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/PreciseUnitMath.sol";
 
 import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
 import { IGlobalExtension } from "../interfaces/IGlobalExtension.sol";
@@ -69,6 +70,10 @@ contract DelegatedManager is Ownable {
         address _extension
     );
 
+    event ExtensionInitialized(
+        address _extension
+    );
+
     event OperatorAdded(
         address _operator
     );
@@ -85,7 +90,17 @@ contract DelegatedManager is Ownable {
         address _asset
     );
 
-    event UseAssetAllowlistUpdated(bool indexed _status);
+    event UseAssetAllowlistUpdated(
+        bool indexed _status
+    );
+
+    event OwnerFeeSplitUpdated(
+        uint256 _newFeeSplit
+    );
+
+    event OwnerFeeRecipientUpdated(
+        address _newFeeRecipient
+    );
 
     /* ============ Modifiers ============ */
 
@@ -134,7 +149,13 @@ contract DelegatedManager is Ownable {
     // Toggle if asset allow list is being enforced
     bool public useAssetAllowlist;
 
-    // Address of methodologist which serves as providing methodology for the index
+    // Global owner fee split that can be referenced by Extensions
+    uint256 public ownerFeeSplit;
+
+    // Address owners portions of fees get sent to
+    address public ownerFeeRecipient;
+
+    // Address of methodologist which serves as providing methodology for the index and receives fee splits
     address public methodologist;
 
     /* ============ Constructor ============ */
@@ -188,14 +209,16 @@ contract DelegatedManager is Ownable {
 
     /**
      * Initializes an added extension from PENDING to INITIALIZED state. An address can only
-     * enter a PENDING state if it is an enabled module added by the manager. Only callable
-     * by the module itself, hence msg.sender is the subject of update.
+     * enter a PENDING state if it is an enabled extension added by the manager. Only callable
+     * by the extension itself, hence msg.sender is the subject of update.
      */
     function initializeExtension() external {
         require(extensionAllowlist[msg.sender] == ExtensionState.PENDING, "Extension must be pending");
 
         extensionAllowlist[msg.sender] = ExtensionState.INITIALIZED;
         extensions.push(msg.sender);
+
+        emit ExtensionInitialized(msg.sender);
     }
 
     /**
@@ -294,6 +317,32 @@ contract DelegatedManager is Ownable {
         useAssetAllowlist = _useAssetAllowlist;
 
         emit UseAssetAllowlistUpdated(_useAssetAllowlist);
+    }
+
+    /**
+     * ONLY OWNER: Update percent of fees that are sent to owner
+     *
+     * @param _newFeeSplit           Percent in precise units (100% = 10**18) of fees that accrue to owner
+     */
+    function updateOwnerFeeSplit(uint256 _newFeeSplit) external onlyOwner {
+        require(_newFeeSplit <= PreciseUnitMath.preciseUnit(), "Invalid fee split");
+
+        ownerFeeSplit = _newFeeSplit;
+
+        emit OwnerFeeSplitUpdated(_newFeeSplit);
+    }
+
+    /**
+     * ONLY OWNER: Update address owner receives fees at
+     *
+     * @param _newFeeRecipient           Address to send owner fees to
+     */
+    function updateOwnerFeeRecipient(address _newFeeRecipient) external onlyOwner {
+        require(_newFeeRecipient != address(0), "Null address passed");
+
+        ownerFeeRecipient = _newFeeRecipient;
+
+        emit OwnerFeeRecipientUpdated(_newFeeRecipient);
     }
 
     /**

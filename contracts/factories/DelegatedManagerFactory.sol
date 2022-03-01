@@ -19,13 +19,18 @@
 pragma solidity 0.6.10;
 pragma experimental ABIEncoderV2;
 
+import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
+import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
 import { DelegatedManager } from "../manager/DelegatedManager.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { ISetTokenCreator } from "../interfaces/ISetTokenCreator.sol";
 
 contract DelegatedManagerFactory {
+    using AddressArrayUtils for address[];
+    using Address for address;
+
     struct InitializeParams{
         address deployer;
         address owner;
@@ -83,8 +88,6 @@ contract DelegatedManagerFactory {
 
         _setInitializationState(setToken, address(manager), _owner);
 
-        setToken.setManager(address(manager));
-
         return (setToken, address(manager));
     }
 
@@ -99,6 +102,8 @@ contract DelegatedManagerFactory {
         external
         returns (address)
     {
+        require(msg.sender == _setToken.manager(), "Must be manager");
+
         DelegatedManager manager = _deployManager(
             _setToken,
             _methodologist,
@@ -114,6 +119,8 @@ contract DelegatedManagerFactory {
 
     function initialize(
         ISetToken _setToken,
+        uint256 _ownerFeeSplit,
+        address _ownerFeeRecipient,
         address[] memory _initializeTargets,
         bytes[] memory _initializeBytecode
     )
@@ -121,11 +128,17 @@ contract DelegatedManagerFactory {
     {
         require(initializeState[_setToken].isPending, "Manager must be awaiting initialization");
         require(msg.sender == initializeState[_setToken].deployer, "Only deployer can initialize manager");
+        _initializeTargets.validatePairsWithArray(_initializeBytecode);
+
+        IDelegatedManager manager = initializeState[_setToken].manager;
+        manager.updateOwnerFeeSplit(_ownerFeeSplit);
+        manager.updateOwnerFeeRecipient(_ownerFeeRecipient);
 
         for (uint256 i = 0; i < _initializeTargets.length; i++) {
-            // _extensions[i].initialize(_extensionParams[_extensions[i]]);
+            _initializeTargets[i].functionCallWithValue(_initializeBytecode[i], 0);
         }
 
+        _setToken.setManager(address(manager));
         initializeState[_setToken].manager.transferOwnership(initializeState[_setToken].owner);
 
         delete initializeState[_setToken];

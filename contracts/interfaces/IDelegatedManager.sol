@@ -38,5 +38,9 @@ interface IDelegatedManager {
 
     function transferTokens(address _token, address _destination, uint256 _amount) external;
 
+    function updateOwnerFeeSplit(uint256 _newFeeSplit) external;
+
+    function updateOwnerFeeRecipient(address _newFeeRecipient) external;
+
     function transferOwnership(address _owner) external;
 }
