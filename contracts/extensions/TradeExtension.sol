@@ -27,7 +27,7 @@ import { ITradeModule } from "../interfaces/ITradeModule.sol";
  * @title TradeExtension
  * @author Set Protocol
  *
- * Smart contract global extension privileged operator(s) from a DelegatedManager the ability 
+ * Smart contract global extension which provides DelegatedManager privileged operator(s) the ability 
  * to trade on a DEX and the owner the ability to restrict operator(s) permissions with an asset whitelist.
  */
 contract TradeExtension is BaseGlobalExtension {
@@ -100,7 +100,7 @@ contract TradeExtension is BaseGlobalExtension {
      * @param _setToken     Instance of the SetToken to remove
      */
     function removeExtension(ISetToken _setToken) external override onlyOwner(_setToken) {
-        require(address(setManagers[_setToken]) != address(0), "Must be existing Set Token");
+        require(address(_manager(_setToken)) != address(0), "Must be existing Set Token");
         delete setManagers[_setToken];
     }
 
@@ -143,7 +143,7 @@ contract TradeExtension is BaseGlobalExtension {
     /* ============ Internal Functions ============ */
 
     /**
-     * Internal function to grab manager of passed SetToken from TradeExtensions data structure.
+     * Internal function to grab manager of passed SetToken from TradeExtension data structure.
      *
      * @param _setToken         SetToken who's manager is needed 
      */
