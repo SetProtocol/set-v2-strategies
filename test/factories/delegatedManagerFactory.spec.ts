@@ -10,7 +10,7 @@ import {
 } from "@utils/contracts/index";
 import DeployHelper from "@utils/deploys";
 import {
-  addSnapshotBeforeRestoreAfterEach,
+  cacheBeforeEach,
   ether,
   getAccounts,
   getWaffleExpect,
@@ -46,7 +46,7 @@ describe("DelegatedManagerFactory", () => {
   let mockFeeExtension: BaseGlobalExtensionMock;
   let mockIssuanceExtension: BaseGlobalExtensionMock;
 
-  before(async () => {
+  cacheBeforeEach(async () => {
     [
       owner,
       otherAccount,
@@ -68,8 +68,6 @@ describe("DelegatedManagerFactory", () => {
       setV2Setup.factory.address
     );
   });
-
-  addSnapshotBeforeRestoreAfterEach();
 
   describe("#constructor", async () => {
     let subjectSetTokenFactory: Address;
@@ -207,7 +205,7 @@ describe("DelegatedManagerFactory", () => {
     let units: BigNumber[];
     let modules: Address[];
 
-    beforeEach(async() => {
+    cacheBeforeEach(async() => {
       components = [setV2Setup.dai.address];
       units = [ether(1)];
       modules = [setV2Setup.issuanceModule.address, setV2Setup.streamingFeeModule.address];
@@ -309,30 +307,49 @@ describe("DelegatedManagerFactory", () => {
     let subjectInitializeTargets: Address[];
     let subjectInitializeBytecode: string[];
 
-    async function createSetAndManager(module: Address, extension: Address): Promise<ContractTransaction> {
-      return await delegatedManagerFactory.createSetAndManager(
-        [setV2Setup.dai.address, setV2Setup.wbtc.address],
-        [ether(1), ether(.1)],
-        "TestToken",
-        "TT",
-        otherAccount.address,
-        methodologist.address,
-        [module],
-        [operatorOne.address, operatorTwo.address],
-        [setV2Setup.dai.address, setV2Setup.wbtc.address],
+    async function create(module: Address, extension: Address, existingSetToken?: Address): Promise<ContractTransaction> {
+      const tokens = [setV2Setup.dai.address, setV2Setup.wbtc.address];
+      const operators = [operatorOne.address, operatorTwo.address];
+      const otherAccountAddress = otherAccount.address;
+      const methodologistAddress = methodologist.address;
+
+      if (existingSetToken === undefined) {
+        return await delegatedManagerFactory.createSetAndManager(
+          tokens,
+          [ether(1), ether(.1)],
+          "TestToken",
+          "TT",
+          otherAccountAddress,
+          methodologistAddress,
+          [module],
+          operators,
+          tokens,
+          [extension]
+        );
+      }
+
+      return await delegatedManagerFactory.createManager(
+        existingSetToken as string,
+        otherAccountAddress,
+        methodologistAddress,
+        operators,
+        tokens,
         [extension]
       );
     }
 
     async function generateBytecode(setToken: Address, manager: Address): Promise<string[]> {
-      const iFace = new ethersUtils.Interface(["function initialize(address,address)"]);
+      const iFace = new ethersUtils.Interface([
+        "function initialize(address,address)",
+        "function initializeExtension(address,address)"
+      ]);
 
       const moduleBytecode = iFace.encodeFunctionData("initialize", [
         setToken,
         await getRandomAddress()
       ]);
 
-      const extensionBytecode = iFace.encodeFunctionData("initialize", [
+      const extensionBytecode = iFace.encodeFunctionData("initializeExtension", [
         setToken,
         manager
       ]);
@@ -359,11 +376,11 @@ describe("DelegatedManagerFactory", () => {
     }
 
     describe("when the SetToken was created by the factory", () => {
-      beforeEach(async () => {
+      cacheBeforeEach(async () => {
         module = setV2Setup.issuanceModule.address;
         extension = mockIssuanceExtension.address;
 
-        const tx = await createSetAndManager(module, extension);
+        const tx = await create(module, extension);
         setTokenAddress = await protocolUtils.getCreatedSetTokenAddress(tx.hash);
 
         initializeParams = await delegatedManagerFactory.initializeState(setTokenAddress);
@@ -371,20 +388,23 @@ describe("DelegatedManagerFactory", () => {
         setToken = await deployer.setV2.getSetToken(setTokenAddress);
 
         subjectSetToken = setTokenAddress;
+      });
+
+      beforeEach(async () => {
         subjectInitializeTargets = [module, extension];
-        subjectInitializeBytecode = await generateBytecode(setTokenAddress, manager.address);
+        subjectInitializeBytecode = await generateBytecode(setTokenAddress, initializeParams.manager);
       });
 
       it("should initialize the module", async() => {
         await subject();
 
-        expect(await setToken.moduleStates(module)).eq(MODULE_STATE.PENDING);
+        expect(await setToken.moduleStates(module)).eq(MODULE_STATE.INITIALIZED);
       });
 
-      it("should initialize the extensions", async() => {
+      it("should initialize the extension", async() => {
         await subject();
 
-        expect(await manager.extensionAllowlist(extension)).eq(MODULE_STATE.PENDING);
+        expect(await manager.isInitializedExtension(extension)).eq(true);
       });
 
       it("should set the ownerFeeSplit on the DelegatedManager", async() => {
@@ -396,7 +416,7 @@ describe("DelegatedManagerFactory", () => {
       it("should set the ownerFeeRecipient on the DelegatedManager", async() => {
         await subject();
 
-        expect(await manager.ownerFeeRecipient()).eq(subjectOwnerFeeSplit);
+        expect(await manager.ownerFeeRecipient()).eq(subjectOwnerFeeRecipient);
       });
 
       it("should set the SetToken's manager to the `manager` specified initializeParams", async () => {
@@ -438,7 +458,7 @@ describe("DelegatedManagerFactory", () => {
     });
 
     describe("when a SetToken is being migrated to a DelegatedManager", async () => {
-      beforeEach(async () => {
+      cacheBeforeEach(async () => {
         module = setV2Setup.issuanceModule.address;
         extension = mockIssuanceExtension.address;
 
@@ -448,13 +468,19 @@ describe("DelegatedManagerFactory", () => {
           [setV2Setup.issuanceModule.address]
         );
 
-        initializeParams = await delegatedManagerFactory.initializeState(setTokenAddress);
+        await create(module, extension, setToken.address);
+
+        initializeParams = await delegatedManagerFactory.initializeState(setToken.address);
         manager = await deployer.manager.getDelegatedManager(initializeParams.manager);
         setToken = await deployer.setV2.getSetToken(setToken.address);
 
         subjectSetToken = setToken.address;
-        subjectInitializeTargets = [module, extension];
-        subjectInitializeBytecode = await generateBytecode(setToken.address, manager.address);
+      });
+
+      beforeEach(async () => {
+        const extensionBytecode = (await generateBytecode(setToken.address, manager.address))[1];
+        subjectInitializeTargets = [extension];
+        subjectInitializeBytecode = [extensionBytecode];
       });
 
       it("should initialize the module", async() => {
@@ -463,10 +489,10 @@ describe("DelegatedManagerFactory", () => {
         expect(await setToken.moduleStates(module)).eq(MODULE_STATE.PENDING);
       });
 
-      it("should initialize the extensions", async() => {
+      it("should initialize the extension", async() => {
         await subject();
 
-        expect(await manager.extensionAllowlist(extension)).eq(MODULE_STATE.PENDING);
+        expect(await manager.isInitializedExtension(extension)).eq(true);
       });
 
       it("should set the ownerFeeSplit on the DelegatedManager", async() => {
@@ -478,7 +504,7 @@ describe("DelegatedManagerFactory", () => {
       it("should set the ownerFeeRecipient on the DelegatedManager", async() => {
         await subject();
 
-        expect(await manager.ownerFeeRecipient()).eq(subjectOwnerFeeSplit);
+        expect(await manager.ownerFeeRecipient()).eq(subjectOwnerFeeRecipient);
       });
 
       it("should NOT set the SetToken's manager", async () => {
@@ -505,7 +531,7 @@ describe("DelegatedManagerFactory", () => {
       it("should delete the initializeState for the SetToken", async () => {
         await subject();
 
-        const finalInitializeParams = await delegatedManagerFactory.initializeState(setTokenAddress);
+        const finalInitializeParams = await delegatedManagerFactory.initializeState(setToken.address);
 
         expect(finalInitializeParams.deployer).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.owner).eq(ADDRESS_ZERO);
@@ -522,7 +548,7 @@ describe("DelegatedManagerFactory", () => {
 
     describe("when the caller is not the deployer", async() => {
       beforeEach(async() => {
-        await createSetAndManager(module, extension);
+        await create(module, extension);
         subjectCaller = otherAccount;
       });
 
@@ -533,7 +559,7 @@ describe("DelegatedManagerFactory", () => {
 
     describe("when initializeTargets and initializeBytecodes do not have the same length", async() => {
       beforeEach(async () => {
-        await createSetAndManager(module, extension);
+        await create(module, extension);
         subjectInitializeBytecode = [];
       });
 

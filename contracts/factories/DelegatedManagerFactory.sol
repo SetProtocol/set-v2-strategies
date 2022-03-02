@@ -37,11 +37,11 @@ contract DelegatedManagerFactory {
         IDelegatedManager manager;
         bool isPending;
     }
-    
+
     ISetTokenCreator public setTokenFactory;
     mapping(ISetToken=>InitializeParams) public initializeState;
     mapping(ISetToken=>bool) public isValidSet;
-    address[] internal validSets; 
+    address[] internal validSets;
 
     constructor(
         ISetTokenCreator _setTokenFactory
@@ -138,7 +138,10 @@ contract DelegatedManagerFactory {
             _initializeTargets[i].functionCallWithValue(_initializeBytecode[i], 0);
         }
 
-        _setToken.setManager(address(manager));
+        if (_setToken.manager() == address(this)) {
+            _setToken.setManager(address(manager));
+        }
+
         initializeState[_setToken].manager.transferOwnership(initializeState[_setToken].owner);
 
         delete initializeState[_setToken];
