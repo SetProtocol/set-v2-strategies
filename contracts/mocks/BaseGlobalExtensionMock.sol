@@ -59,8 +59,17 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
         onlyOperator(_setToken)
     {}
 
+    function testOnlyManager(ISetToken _setToken)
+        external
+        onlyManager(_setToken)
+    {}
+
+    function testOnlyAllowedAsset(ISetToken _setToken, address _asset)
+        external
+        onlyAllowedAsset(_setToken, _asset)
+    {}
+
     function removeExtension(ISetToken _setToken) external override onlyManager(_setToken) {
-        require(address(_manager(_setToken)) == msg.sender, "Manager must be sender");
         delete initializeInfo[_setToken];
     }
 

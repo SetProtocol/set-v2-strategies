@@ -58,7 +58,7 @@ abstract contract BaseGlobalExtension {
         _;
     }
 
-        /**
+    /**
      * Throws if the sender is not the SetToken manager contract
      */
     modifier onlyManager(ISetToken _setToken) {
@@ -66,6 +66,17 @@ abstract contract BaseGlobalExtension {
         _;
     }
 
+    /**
+     * Throws if asset is not allowed to be held by the Set
+     */
+    modifier onlyAllowedAsset(ISetToken _setToken, address _asset) {
+        require(_manager(_setToken).isAllowedAsset(_asset), "Must be allowed asset");
+        _;
+    }
+
+    /**
+     * ONLY MANAGER: Deletes SetToken/Manager state from extension. Must only be callable by manager!
+     */
     function removeExtension(ISetToken _setToken) external virtual;
 
     /* ============ Internal Functions ============ */
