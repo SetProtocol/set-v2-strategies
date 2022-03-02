@@ -43,4 +43,11 @@ interface IDelegatedManager {
     function updateOwnerFeeRecipient(address _newFeeRecipient) external;
 
     function transferOwnership(address _owner) external;
+
+    function isAllowedAsset(address _asset) external view returns(bool);
+    function isPendingExtension(address _extension) external view returns(bool);
+    function isInitializedExtension(address _extension) external view returns(bool);
+    function getExtensions() external view returns(address[] memory);
+    function getOperators() external view returns(address[] memory);
+    function getAllowedAssets() external view returns(address[] memory);
 }
