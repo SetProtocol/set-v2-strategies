@@ -27,16 +27,16 @@ import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/Prec
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { ISetToken } from "../interfaces/ISetToken.sol";
-import { IStreamingFeeModule } from "../interfaces/IStreamingFeeModule.sol";
+import { IIssuanceModule } from "../interfaces/IIssuanceModule.sol";
 
 /**
- * @title StreamingFeeSplitExtension
+ * @title BasicIssuanceExtension
  * @author Set Protocol
  *
  * Smart contract global extension which provides DelegatedManager owner and 
- * methodologist the ability to accrue and split streaming fees at an mutable percentage.
+ * methodologist the ability to accrue and split issuance and redemption fees at an mutable percentage.
  */
-contract StreamingFeeSplitExtension is BaseGlobalExtension {
+contract BasicIssuanceExtension is BaseGlobalExtension {
     using Address for address;
     using PreciseUnitMath for uint256;
     using SafeMath for uint256;
@@ -58,8 +58,8 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
 
     /* ============ State Variables ============ */
 
-    // Instance of StreamingFeeModule
-    IStreamingFeeModule public immutable streamingFeeModule;
+    // Instance of BasicIssuanceModule
+    IIssuanceModule public immutable issuanceModule;
 
     // Mapping from Set Token to DelegatedManager 
     mapping(ISetToken => IDelegatedManager) public setManagers;
@@ -67,23 +67,20 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     /* ============ Constructor ============ */
 
     constructor(
-        IStreamingFeeModule _streamingFeeModule
+        IIssuanceModule _issuanceModule
     )
         public
     {
-        streamingFeeModule = _streamingFeeModule;
+        issuanceModule = _issuanceModule;
     }
 
     /* ============ External Functions ============ */
 
     /**
-     * ANYONE CALLABLE: Accrues fees from streaming fee module. Gets resulting balance after fee accrual, calculates fees for
+     * ANYONE CALLABLE: Distributes fees accrued to the DelegatedManager. Calculates fees for
      * owner and methodologist, and sends to owner fee recipient and methodologist respectively.
      */
-    function accrueFeesAndDistribute(ISetToken _setToken) public {
-        // Emits a FeeActualized event
-        streamingFeeModule.accrueFee(_setToken);
-
+    function distributeFees(ISetToken _setToken) public {
         uint256 totalFees = _setToken.balanceOf(address(_manager(_setToken)));
 
         address methodologist = _manager(_setToken).methodologist();
@@ -104,7 +101,7 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY OWNER: Initializes StreamingFeeSplitExtension to the DelegatedManager.
+     * ONLY OWNER: Initializes BasicIssuanceExtension to the DelegatedManager.
      *
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
@@ -120,32 +117,47 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY OWNER: Initializes StreamingFeeSplitExtension to the DelegatedManager and StreamingFeeModule to the SetToken
+     * ONLY OWNER: Initializes BasicIssuanceExtension to the DelegatedManager and BasicIssuanceModule to the SetToken
      *
-     * @param _delegatedManager     Instance of the DelegatedManager to initialize
-     * @param _settings             FeeState struct defining fee parameters for StreamingFeeModule initialization
+     * @param _delegatedManager             Instance of the DelegatedManager to initialize
+     * @param _maxManagerFee                Maximum fee that can be charged on issue and redeem
+     * @param _managerIssueFee              Fee to charge on issuance
+     * @param _managerRedeemFee             Fee to charge on redemption
+     * @param _feeRecipient                 Address to send fees to
+     * @param _managerIssuanceHook          Instance of the Manager Contract with the Pre-Issuance Hook function
      */
     function initializeModuleAndExtension(
         IDelegatedManager _delegatedManager,
-        IStreamingFeeModule.FeeState memory _settings
+        uint256 _maxManagerFee,
+        uint256 _managerIssueFee,
+        uint256 _managerRedeemFee,
+        address _feeRecipient,
+        address _managerIssuanceHook
     ) 
         external 
     {
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
-        require(_delegatedManager.setToken().isPendingModule(address(streamingFeeModule)), "StreamingFeeModule must be pending");
+        require(_delegatedManager.setToken().isPendingModule(address(issuanceModule)), "BasicIssuanceModule must be pending");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
         initializeExtension(_delegatedManager);
 
         _delegatedManager.initializeExtension();
 
-        streamingFeeModule.initialize(_delegatedManager.setToken(), _settings);
+        issuanceModule.initialize(
+            _delegatedManager.setToken(),
+            _maxManagerFee,
+            _managerIssueFee,
+            _managerRedeemFee,
+            _feeRecipient,
+            _managerIssuanceHook
+        );
 
         ExtensionInitialized(address(_delegatedManager.setToken()), address(_delegatedManager));
     }
 
     /**
-     * ONLY OWNER: Remove an existing SetToken and DelegatedManager tracked by the StreamingFeeSplitExtension 
+     * ONLY OWNER: Remove an existing SetToken and DelegatedManager tracked by the BasicIssuanceExtension 
      *
      * @param _setToken     Instance of the SetToken to remove
      */
@@ -155,23 +167,35 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY OWNER: Updates streaming fee on StreamingFeeModule.
+     * ONLY OWNER: Updates issuance fee on BasicIssuanceModule.
      *
-     * NOTE: This will accrue streaming fees though not send to owner fee recipient and methodologist.
-     *
-     * @param _setToken     Instance of the SetToken to update streaming fee for
-     * @param _newFee       Percent of Set accruing to fee extension annually (1% = 1e16, 100% = 1e18)
+     * @param _setToken     Instance of the SetToken to update issue fee for
+     * @param _newFee       New issue fee percentage in precise units (1% = 1e16, 100% = 1e18)
      */
-    function updateStreamingFee(ISetToken _setToken, uint256 _newFee)
+    function updateIssueFee(ISetToken _setToken, uint256 _newFee)
         external
         onlyOwner(_setToken)
     {
-        bytes memory callData = abi.encodeWithSignature("updateStreamingFee(address,uint256)", _setToken, _newFee);
-        invokeManager(_setToken, address(streamingFeeModule), callData);
+        bytes memory callData = abi.encodeWithSignature("updateIssueFee(address,uint256)", _setToken, _newFee);
+        invokeManager(_setToken, address(issuanceModule), callData);
     }
 
     /**
-     * ONLY OWNER: Updates fee recipient on StreamingFeeModule
+     * ONLY OWNER: Updates redemption fee on BasicIssuanceModule.
+     *
+     * @param _setToken     Instance of the SetToken to update redeem fee for
+     * @param _newFee       New redeem fee percentage in precise units (1% = 1e16, 100% = 1e18)
+     */
+    function updateRedeemFee(ISetToken _setToken, uint256 _newFee)
+        external
+        onlyOwner(_setToken)
+    {
+        bytes memory callData = abi.encodeWithSignature("updateRedeemFee(address,uint256)", _setToken, _newFee);
+        invokeManager(_setToken, address(issuanceModule), callData);
+    }
+
+    /**
+     * ONLY OWNER: Updates fee recipient on BasicIssuanceModule
      *
      * @param _setToken         Instance of the SetToken to update fee recipient for
      * @param _newFeeRecipient  Address of new fee recipient. This should be the address of the DelegatedManager
@@ -181,17 +205,17 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
         onlyOwner(_setToken)
     {
         bytes memory callData = abi.encodeWithSignature("updateFeeRecipient(address,address)", _setToken, _newFeeRecipient);
-        invokeManager(_setToken, address(streamingFeeModule), callData);
+        invokeManager(_setToken, address(issuanceModule), callData);
     }
 
     /* ============ Internal Functions ============ */
 
     /**
-     * Internal function to grab manager of passed SetToken from StreamingFeeSplitExtension data structure.
+     * Internal function to grab manager of passed SetToken from BasicIssuanceExtension data structure.
      *
      * @param _setToken         SetToken who's manager is needed 
      */
     function _manager(ISetToken _setToken) internal override view returns (IDelegatedManager) {
         return setManagers[_setToken];
     }
- }
+}
