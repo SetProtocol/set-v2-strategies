@@ -50,4 +50,7 @@ interface IDelegatedManager {
     function getExtensions() external view returns(address[] memory);
     function getOperators() external view returns(address[] memory);
     function getAllowedAssets() external view returns(address[] memory);
+
+    function ownerFeeRecipient() external returns(address);
+    function ownerFeeSplit() external returns(uint256);
 }
