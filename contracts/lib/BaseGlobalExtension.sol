@@ -20,14 +20,14 @@ pragma solidity 0.6.10;
 
 import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
-import { ISetToken } from "../interfaces/ISetToken.sol";
+import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 /**
  * @title BaseExtension
  * @author Set Protocol
  *
  * Abstract class that houses common global extension-related functions. Global extensions must
- * also have their own initializeExtension function.
+ * also have their own initializeExtension function (not included here because interfaces will vary).
  */
 abstract contract BaseGlobalExtension {
     using AddressArrayUtils for address[];
@@ -35,7 +35,7 @@ abstract contract BaseGlobalExtension {
     /* ============ Modifiers ============ */
 
     /**
-     * Throws if the sender is not the SetToken operator
+     * Throws if the sender is not the SetToken manager contract owner
      */
     modifier onlyOwner(ISetToken _setToken) {
         require(msg.sender == _manager(_setToken).owner(), "Must be owner");
@@ -51,7 +51,7 @@ abstract contract BaseGlobalExtension {
     }
 
     /**
-     * Throws if the sender is not the SetToken operator
+     * Throws if the sender is not a SetToken operator
      */
     modifier onlyOperator(ISetToken _setToken) {
         require(_manager(_setToken).operatorAllowlist(msg.sender), "Must be approved operator");

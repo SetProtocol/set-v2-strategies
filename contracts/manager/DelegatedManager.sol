@@ -39,7 +39,7 @@ import { IGlobalExtension } from "../interfaces/IGlobalExtension.sol";
  * operations to operator(s). There can be more than one operator, however they have a global role so once
  * delegated to they can perform any operator delegated roles. The owner is able to set restrictions on what
  * operators can do in the form of asset whitelists. Operators cannot trade/wrap/claim/etc. an asset that is not
- * a part of the asset whitelist a hence they are a semi-trusted party. It is recommended that the owner address
+ * a part of the asset whitelist, hence they are a semi-trusted party. It is recommended that the owner address
  * be managed by a multi-sig or some form of permissioning system.
  */
 contract DelegatedManager is Ownable {
@@ -58,7 +58,6 @@ contract DelegatedManager is Ownable {
     /* ============ Events ============ */
 
     event MethodologistChanged(
-        address _oldMethodologist,
         address _newMethodologist
     );
 
@@ -128,10 +127,10 @@ contract DelegatedManager is Ownable {
     // Address of factory contract used to deploy contract
     address public immutable factory;
 
-    // Mapping to check if extension is enabled
+    // Mapping to check which ExtensionState an given extension is in
     mapping(address => ExtensionState) public extensionAllowlist;
 
-    // Array of enabled extensions
+    // Array of initialized extensions
     address[] internal extensions;
 
     // Mapping indicating if address is an approved operator
@@ -184,7 +183,9 @@ contract DelegatedManager is Ownable {
     /* ============ External Functions ============ */
 
     /**
-     * ONLY EXTENSION: Interact with a module registered on the SetToken.
+     * ONLY EXTENSION: Interact with a module registered on the SetToken. In order to ensure SetToken admin
+     * functions can only be changed from this contract no calls to the SetToken can originate from Extensions.
+     * To transfer SetTokens use the `transferTokens` function.
      *
      * @param _module           Module to interact with
      * @param _data             Byte data of function to call in module
@@ -208,9 +209,9 @@ contract DelegatedManager is Ownable {
     }
 
     /**
-     * Initializes an added extension from PENDING to INITIALIZED state. An address can only
-     * enter a PENDING state if it is an enabled extension added by the manager. Only callable
-     * by the extension itself, hence msg.sender is the subject of update.
+     * Initializes an added extension from PENDING to INITIALIZED state and adds to extension array. An 
+     * address can only enter a PENDING state if it is an enabled extension added by the manager. Only
+     * callable by the extension itself, hence msg.sender is the subject of update.
      */
     function initializeExtension() external {
         require(extensionAllowlist[msg.sender] == ExtensionState.PENDING, "Extension must be pending");
@@ -222,16 +223,18 @@ contract DelegatedManager is Ownable {
     }
 
     /**
-     * ONLY OWNER: Add a new extension that the DelegatedManager can call.
+     * ONLY OWNER: Add new extension(s) that the DelegatedManager can call. Puts extensions into PENDING
+     * state, each must be initialized in order to be used.
      *
-     * @param _extensions           New extension to add
+     * @param _extensions           New extension(s) to add
      */
     function addExtensions(address[] memory _extensions) external onlyOwner {
         _addExtensions(_extensions);
     }
 
     /**
-     * ONLY OWNER: Remove an existing extension tracked by the DelegatedManager.
+     * ONLY OWNER: Remove an existing extension(s) tracked by the DelegatedManager. Removed extensions are
+     * placed in NONE state.
      *
      * @param _extensions           Old extension to remove
      */
@@ -252,9 +255,9 @@ contract DelegatedManager is Ownable {
     }
 
     /**
-     * ONLY OWNER: Add new operator(s) address
+     * ONLY OWNER: Add new operator(s) address(es)
      *
-     * @param _operators           New operator to add
+     * @param _operators           New operator(s) to add
      */
     function addOperators(address[] memory _operators) external onlyOwner {
         _addOperators(_operators);
@@ -263,7 +266,7 @@ contract DelegatedManager is Ownable {
     /**
      * ONLY OWNER: Remove operator(s) from the allowlist
      *
-     * @param _operators           New operator to add
+     * @param _operators           New operator(s) to remove
      */
     function removeOperators(address[] memory _operators) external onlyOwner {
         for (uint256 i = 0; i < _operators.length; i++) {
@@ -282,7 +285,7 @@ contract DelegatedManager is Ownable {
     /**
      * ONLY OWNER: Add new asset(s) that can be traded to, wrapped to, or claimed
      *
-     * @param _assets           New asset to add
+     * @param _assets           New asset(s) to add
      */
     function addAllowedAssets(address[] memory _assets) external onlyOwner {
         _addAllowedAssets(_assets);
@@ -291,7 +294,7 @@ contract DelegatedManager is Ownable {
     /**
      * ONLY OWNER: Remove asset(s) so that it/they can't be traded to, wrapped to, or claimed
      *
-     * @param _assets           Asset to remove
+     * @param _assets           Asset(s) to remove
      */
     function removeAllowedAssets(address[] memory _assets) external onlyOwner {
         for (uint256 i = 0; i < _assets.length; i++) {
@@ -351,8 +354,9 @@ contract DelegatedManager is Ownable {
      * @param _newMethodologist           New methodologist address
      */
     function setMethodologist(address _newMethodologist) external onlyMethodologist {
-        emit MethodologistChanged(methodologist, _newMethodologist);
         methodologist = _newMethodologist;
+
+        emit MethodologistChanged(_newMethodologist);
     }
 
     /**

@@ -726,7 +726,7 @@ describe("DelegatedManager", () => {
     });
 
     it("should emit the correct MethodologistChanged event", async () => {
-      await expect(subject()).to.emit(delegatedManager, "MethodologistChanged").withArgs(methodologist.address, subjectNewMethodologist);
+      await expect(subject()).to.emit(delegatedManager, "MethodologistChanged").withArgs(subjectNewMethodologist);
     });
 
     describe("when the caller is not the methodologist", async () => {
