@@ -36,7 +36,7 @@ import { IStreamingFeeModule } from "../interfaces/IStreamingFeeModule.sol";
  * Smart contract global extension which provides DelegatedManager owner and 
  * methodologist the ability to accrue and split streaming fees at an mutable percentage.
  */
- contract StreamingFeeSplitExtension is BaseGlobalExtension {
+contract StreamingFeeSplitExtension is BaseGlobalExtension {
     using Address for address;
     using PreciseUnitMath for uint256;
     using SafeMath for uint256;
