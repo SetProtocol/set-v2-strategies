@@ -366,6 +366,7 @@ contract DelegatedManager is Ownable {
      */
     function setManager(address _newManager) external onlyOwner {
         require(_newManager != address(0), "Zero address not valid");
+        require(extensions.length == 0, "Must remove all extensions");
         setToken.setManager(_newManager);
     }
 

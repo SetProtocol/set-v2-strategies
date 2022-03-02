@@ -898,7 +898,7 @@ describe("DelegatedManager", () => {
     });
   });
 
-  describe("#setManager", async () => {
+  describe.only("#setManager", async () => {
     let subjectNewManager: Address;
     let subjectCaller: Account;
 
@@ -916,6 +916,16 @@ describe("DelegatedManager", () => {
       const manager = await setToken.manager();
 
       expect(manager).to.eq(newManager.address);
+    });
+
+    describe("when manager still has extension initialized", async () => {
+      beforeEach(async () => {
+        await baseExtension.initializeExtension(setToken.address, delegatedManager.address);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must remove all extensions");
+      });
     });
 
     describe("when passed manager is the zero address", async () => {
