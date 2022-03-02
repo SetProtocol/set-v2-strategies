@@ -46,4 +46,10 @@ export default class DeployToken {
       useAssetAllowlist
     );
   }
+
+  /* GETTERS */
+
+  public async getDelegatedManager(managerAddress: Address): Promise<DelegatedManager> {
+    return await new DelegatedManager__factory(this._deployerSigner).attach(managerAddress);
+  }
 }
