@@ -139,8 +139,8 @@ describe("DelegatedManagerFactory", () => {
       const setToken = await deployer.setV2.getSetToken(setTokenAddress);
 
       expect(await setToken.getComponents()).deep.eq(subjectComponents);
-      expect(await setToken.name).eq(subjectName);
-      expect(await setToken.symbol).eq(subjectSymbol);
+      expect(await setToken.name()).eq(subjectName);
+      expect(await setToken.symbol()).eq(subjectSymbol);
     });
 
     it("should set the manager factory as the SetToken manager", async() => {
@@ -149,7 +149,7 @@ describe("DelegatedManagerFactory", () => {
       const setTokenAddress = await protocolUtils.getCreatedSetTokenAddress(tx.hash);
       const setToken = await deployer.setV2.getSetToken(setTokenAddress);
 
-      expect(await setToken.manager).eq(delegatedManagerFactory.address);
+      expect(await setToken.manager()).eq(delegatedManagerFactory.address);
     });
 
     it("should configure the DelegatedBaseManager correctly", async () => {
@@ -162,11 +162,8 @@ describe("DelegatedManagerFactory", () => {
 
       expect(await delegatedManager.setToken()).eq(setTokenAddress);
       expect(await delegatedManager.factory()).eq(delegatedManagerFactory.address);
-      expect(await delegatedManager.methodologist).eq(subjectMethodologist);
-      expect(await delegatedManager.useAssetAllowlist).eq(true);
-      expect(await delegatedManager.getExtensions()).deep.eq(subjectExtensions);
-      expect(await delegatedManager.getOperators()).deep.eq(subjectOperators);
-      expect(await delegatedManager.getAllowedAssets()).deep.eq(subjectAssets);
+      expect(await delegatedManager.methodologist()).eq(subjectMethodologist);
+      expect(await delegatedManager.useAssetAllowlist()).eq(true);
     });
 
     it("should set the intialization state correctly", async() => {
@@ -227,7 +224,7 @@ describe("DelegatedManagerFactory", () => {
 
       const streamingFeeSettings = {
         feeRecipient: owner.address,
-        maxStreamingFeePercentage: ether(1),
+        maxStreamingFeePercentage: ether(.05),
         streamingFeePercentage: ether(.02),
         lastStreamingFeeTimestamp: ZERO,
       };
@@ -265,11 +262,8 @@ describe("DelegatedManagerFactory", () => {
 
       expect(await delegatedManager.setToken()).eq(subjectSetToken);
       expect(await delegatedManager.factory()).eq(delegatedManagerFactory.address);
-      expect(await delegatedManager.methodologist).eq(subjectMethodologist);
-      expect(await delegatedManager.useAssetAllowlist).eq(true);
-      expect(await delegatedManager.getExtensions()).deep.eq(subjectExtensions);
-      expect(await delegatedManager.getOperators()).deep.eq(subjectOperators);
-      expect(await delegatedManager.getAllowedAssets()).deep.eq(subjectAssets);
+      expect(await delegatedManager.methodologist()).eq(subjectMethodologist);
+      expect(await delegatedManager.useAssetAllowlist()).eq(true);
     });
 
     it("should set the intialization state correctly", async() => {
@@ -308,22 +302,38 @@ describe("DelegatedManagerFactory", () => {
     let setToken: SetToken;
     let setTokenAddress: Address;
 
+    let subjectCaller: Account;
     let subjectSetToken: Address;
     let subjectOwnerFeeSplit: BigNumber;
     let subjectOwnerFeeRecipient: Address;
     let subjectInitializeTargets: Address[];
     let subjectInitializeBytecode: string[];
 
-    async function generateBytecode(manager: Address) {
-      const iFace = new ethersUtils.Interface(["initialize(address,address)"]);
+    async function createSetAndManager(module: Address, extension: Address): Promise<ContractTransaction> {
+      return await delegatedManagerFactory.createSetAndManager(
+        [setV2Setup.dai.address, setV2Setup.wbtc.address],
+        [ether(1), ether(.1)],
+        "TestToken",
+        "TT",
+        otherAccount.address,
+        methodologist.address,
+        [module],
+        [operatorOne.address, operatorTwo.address],
+        [setV2Setup.dai.address, setV2Setup.wbtc.address],
+        [extension]
+      );
+    }
+
+    async function generateBytecode(setToken: Address, manager: Address): Promise<string[]> {
+      const iFace = new ethersUtils.Interface(["function initialize(address,address)"]);
 
       const moduleBytecode = iFace.encodeFunctionData("initialize", [
-        setTokenAddress,
+        setToken,
         await getRandomAddress()
       ]);
 
       const extensionBytecode = iFace.encodeFunctionData("initialize", [
-        setTokenAddress,
+        setToken,
         manager
       ]);
 
@@ -331,15 +341,15 @@ describe("DelegatedManagerFactory", () => {
     }
 
     beforeEach(() => {
-      subjectSetToken;
+      subjectCaller = owner;
       subjectOwnerFeeSplit = ether(.5);
       subjectOwnerFeeRecipient = otherAccount.address;
-      subjectInitializeTargets;
-      subjectInitializeBytecode;
+      subjectInitializeTargets = [];
+      subjectInitializeBytecode = [];
     });
 
     async function subject(): Promise<ContractTransaction> {
-      return await delegatedManagerFactory.initialize(
+      return await delegatedManagerFactory.connect(subjectCaller.wallet).initialize(
         subjectSetToken,
         subjectOwnerFeeSplit,
         subjectOwnerFeeRecipient,
@@ -353,27 +363,16 @@ describe("DelegatedManagerFactory", () => {
         module = setV2Setup.issuanceModule.address;
         extension = mockIssuanceExtension.address;
 
-        const tx = await delegatedManagerFactory.createSetAndManager(
-          [setV2Setup.dai.address, setV2Setup.wbtc.address],
-          [ether(1), ether(.1)],
-          "TestToken",
-          "TT",
-          otherAccount.address,
-          methodologist.address,
-          [module],
-          [operatorOne.address, operatorTwo.address],
-          [setV2Setup.dai.address, setV2Setup.wbtc.address],
-          [extension]
-        );
-
+        const tx = await createSetAndManager(module, extension);
         setTokenAddress = await protocolUtils.getCreatedSetTokenAddress(tx.hash);
 
         initializeParams = await delegatedManagerFactory.initializeState(setTokenAddress);
         manager = await deployer.manager.getDelegatedManager(initializeParams.manager);
         setToken = await deployer.setV2.getSetToken(setTokenAddress);
 
+        subjectSetToken = setTokenAddress;
         subjectInitializeTargets = [module, extension];
-        subjectInitializeBytecode = await generateBytecode(manager.address);
+        subjectInitializeBytecode = await generateBytecode(setTokenAddress, manager.address);
       });
 
       it("should initialize the module", async() => {
@@ -451,10 +450,11 @@ describe("DelegatedManagerFactory", () => {
 
         initializeParams = await delegatedManagerFactory.initializeState(setTokenAddress);
         manager = await deployer.manager.getDelegatedManager(initializeParams.manager);
-        setToken = await deployer.setV2.getSetToken(setTokenAddress);
+        setToken = await deployer.setV2.getSetToken(setToken.address);
 
+        subjectSetToken = setToken.address;
         subjectInitializeTargets = [module, extension];
-        subjectInitializeBytecode = await generateBytecode(manager.address);
+        subjectInitializeBytecode = await generateBytecode(setToken.address, manager.address);
       });
 
       it("should initialize the module", async() => {
@@ -521,6 +521,11 @@ describe("DelegatedManagerFactory", () => {
     });
 
     describe("when the caller is not the deployer", async() => {
+      beforeEach(async() => {
+        await createSetAndManager(module, extension);
+        subjectCaller = otherAccount;
+      });
+
       it("should revert", async() => {
         await expect(subject()).to.be.revertedWith("Only deployer can initialize manager");
       });
@@ -528,11 +533,12 @@ describe("DelegatedManagerFactory", () => {
 
     describe("when initializeTargets and initializeBytecodes do not have the same length", async() => {
       beforeEach(async () => {
+        await createSetAndManager(module, extension);
         subjectInitializeBytecode = [];
       });
 
       it("should revert", async() => {
-        await expect(subject()).to.be.revertedWith("Must be....");
+        await expect(subject()).to.be.revertedWith("Array length must be > 0");
       });
     });
   });
