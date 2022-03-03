@@ -112,7 +112,7 @@ contract DelegatedManagerFactory {
      * @param _methodologist    Address to set as the DelegateManager's methodologist role
      * @param _modules          List of modules to enable. All modules must be approved by the Controller
      * @param _operators        List of operators authorized for the DelegateManager
-     * @param _assets           List of assets DelegateManager can trade. When empty, manager can trade any asset
+     * @param _assets           List of assets DelegateManager can trade. When empty, asset allow list is not enforced
      * @param _extensions       List of extensions authorized for the DelegateManager
      *
      * @return (ISetToken, address) The created SetToken and DelegatedManager addresses, respectively
