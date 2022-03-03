@@ -81,12 +81,12 @@ contract TradeExtension is BaseGlobalExtension {
         require(_delegatedManager.setToken().isPendingModule(address(tradeModule)), "TradeModule must be pending");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        bytes memory callData = abi.encodeWithSignature("initialize(address)", _delegatedManager.setToken());
-        invokeManager(_delegatedManager.setToken(), address(tradeModule), callData);
-
         setManagers[_delegatedManager.setToken()] = _delegatedManager;
 
         _delegatedManager.initializeExtension();
+
+        bytes memory callData = abi.encodeWithSignature("initialize(address)", _delegatedManager.setToken());
+        invokeManager(_delegatedManager.setToken(), address(tradeModule), callData);
 
         ExtensionInitialized(address(_delegatedManager.setToken()), address(_delegatedManager));
     }

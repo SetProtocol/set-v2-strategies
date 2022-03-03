@@ -201,5 +201,110 @@ describe.only("TradeExtension", () => {
         await subject();
       });
     });
+
+    describe("when the sender is not the owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+        subjectDelegatedManager = delegatedManager.address;
+
+        // Put TradeExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([tradeExtension.address]);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be owner");
+      });
+    });
+
+    describe("when the extension is not pending or initialized", async () => {
+      beforeEach(async () => {
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager.address;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Extension must be pending");
+      });
+    });
+
+    describe("when the extension is pending", async () => {
+      beforeEach(async () => {
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager.address;
+
+        // Put TradeExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([tradeExtension.address]);
+      });
+
+      it("should succeed without revert", async () => {
+        await subject();
+      });
+    });
+
+    describe("when the extension is already initialized", async () => {
+      beforeEach(async () => {
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager.address;
+
+        // Put TradeExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([tradeExtension.address]);
+
+        // Initialize TradeExtension
+        tradeExtension.initializeExtension(subjectDelegatedManager)
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Extension must be pending");
+      });
+    });
+
+    describe("when the module is pending", async () => {
+      beforeEach(async () => {
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager.address;
+
+        // Put TradeExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([tradeExtension.address]);
+      });
+
+      it("should succeed without revert", async () => {
+        await subject();
+      });
+    });
+
+    describe("when initializeModuleAndExtension completes successfully", async () => {
+      beforeEach(async () => {
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager.address;
+
+        // Put TradeExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([tradeExtension.address]);
+      });
+
+      it("should initialize the module on the SetToken", async () => {
+        await subject();
+
+        const isModuleInitialized: Boolean = await setToken.isInitializedModule(tradeModule.address);
+        expect(isModuleInitialized).to.eq(true);
+      });
+
+      it("should store the correct SetToken and DelegatedManager on the TradeExtension", async () => {
+        await subject();
+
+        const storedDelegatedManager: Address = await tradeExtension.setManagers(setToken.address);
+        expect(storedDelegatedManager).to.eq(delegatedManager.address);
+      });
+
+      it("should initialize the extension on the DelegatedManager", async () => {
+        await subject();
+
+        const isExtensionInitialized: Boolean = await delegatedManager.isInitializedExtension(tradeExtension.address);
+        expect(isExtensionInitialized).to.eq(true);
+      });
+
+      it("should emit the correct ExtensionInitialized event", async () => {
+        await expect(subject()).to.emit(tradeExtension, "ExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
+      });
+    })
   });
 });
