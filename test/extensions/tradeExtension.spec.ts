@@ -249,6 +249,17 @@ describe.only("TradeExtension", () => {
       });
     });
 
+    describe("when the extension is not pending or initialized", async () => {
+      beforeEach(async () => {
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager2.address;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Extension must be pending");
+      });
+    });
+
     describe("when the extension is pending", async () => {
       beforeEach(async () => {
         subjectCaller = owner;
@@ -257,17 +268,6 @@ describe.only("TradeExtension", () => {
 
       it("should succeed without revert", async () => {
         await subject();
-      });
-    });
-
-    describe("when the extension is not pending", async () => {
-      beforeEach(async () => {
-        subjectCaller = owner;
-        subjectDelegatedManager = delegatedManager2.address;
-      });
-
-      it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("Extension must be pending");
       });
     });
 
@@ -282,15 +282,30 @@ describe.only("TradeExtension", () => {
       });
     });
 
-    // describe("when the extension is initialized", async () => {
+    describe("when the extension is initialized", async () => {
+      beforeEach(async () => {
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager1.address;
+      });
 
-    //   it("should store the correct SetToken and DelegatedManager pair", async () => {});
+      it("should store the correct SetToken and DelegatedManager pair", async () => {
+        await subject();
 
-    //   it("should initialize the extension on the DelegatedManager", async () => {});
+        const storedDelegatedManager: Address = await tradeExtension.setManagers(setToken1.address);
+        expect(storedDelegatedManager).to.eq(delegatedManager1.address);
+      });
 
-    //   it("should emit the correct ExtensionInitialized event for the SetToken and DelegatedManager pair", async () => {});
+      it("should initialize the extension on the DelegatedManager", async () => {
+        await subject();
 
-    // })
+        const isExtensionInitialized: Boolean = await delegatedManager1.isInitializedExtension(tradeExtension.address);
+        expect(isExtensionInitialized).to.eq(true);
+      });
+
+      it("should emit the correct ExtensionInitialized event for the SetToken and DelegatedManager pair", async () => {
+        await expect(subject()).to.emit(tradeExtension, "ExtensionInitialized").withArgs(setToken1.address, delegatedManager1.address);
+      });
+    })
   });
 
   describe("#testInitializeModuleAndExtension", async () => {
@@ -323,6 +338,17 @@ describe.only("TradeExtension", () => {
       });
     });
 
+    describe("when the extension is not pending or initialized", async () => {
+      beforeEach(async () => {
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager4.address;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Extension must be pending");
+      });
+    });
+
     describe("when the extension is pending", async () => {
       beforeEach(async () => {
         subjectCaller = owner;
@@ -334,17 +360,6 @@ describe.only("TradeExtension", () => {
       });
     });
 
-    describe("when the extension is not pending", async () => {
-      beforeEach(async () => {
-        subjectCaller = owner;
-        subjectDelegatedManager = delegatedManager4.address;
-      });
-
-      it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("Extension must be pending");
-      });
-    });
-
     describe("when the extension is initialized", async () => {
       beforeEach(async () => {
         subjectCaller = owner;
@@ -353,6 +368,17 @@ describe.only("TradeExtension", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Extension must be pending");
+      });
+    });
+
+    describe("when the module not pending or initialized", async () => {
+      beforeEach(async () => {
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager5.address;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("TradeModule must be pending");
       });
     });
 
@@ -378,27 +404,36 @@ describe.only("TradeExtension", () => {
       });
     });
 
-    describe("when the module not pending or initialized", async () => {
+    describe("when the module and extension is initialized", async () => {
       beforeEach(async () => {
         subjectCaller = owner;
-        subjectDelegatedManager = delegatedManager5.address;
+        subjectDelegatedManager = delegatedManager3.address;
       });
 
-      it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("TradeModule must be pending");
+      it("should initialize the module on the SetToken", async () => {
+        await subject();
+
+        const isModuleInitialized: Boolean = await setToken3.isInitializedModule(tradeModule.address);
+        expect(isModuleInitialized).to.eq(true);
       });
-    });
 
-    // describe("when the module and extension is initialized", async () => {
+      it("should store the correct SetToken and DelegatedManager pair", async () => {
+        await subject();
 
-    //   it("should initialize the module on the SetToken", async () => {});
+        const storedDelegatedManager: Address = await tradeExtension.setManagers(setToken3.address);
+        expect(storedDelegatedManager).to.eq(delegatedManager3.address);
+      });
 
-    //   it("should store the correct SetToken and DelegatedManager pair", async () => {});
+      it("should initialize the extension on the DelegatedManager", async () => {
+        await subject();
 
-    //   it("should initialize the extension on the DelegatedManager", async () => {});
+        const isExtensionInitialized: Boolean = await delegatedManager3.isInitializedExtension(tradeExtension.address);
+        expect(isExtensionInitialized).to.eq(true);
+      });
 
-    //   it("should emit the correct ExtensionInitialized event for the SetToken and DelegatedManager pair", async () => {});
-
-    // })
+      it("should emit the correct ExtensionInitialized event for the SetToken and DelegatedManager pair", async () => {
+        await expect(subject()).to.emit(tradeExtension, "ExtensionInitialized").withArgs(setToken3.address, delegatedManager3.address);
+      });
+    })
   });
 });
