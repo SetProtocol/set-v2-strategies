@@ -112,7 +112,7 @@ contract DelegatedManager is Ownable {
     }
 
     /**
-     * Throws if the sender is not a listed extension
+     * Throws if the sender is not an initialized extension
      */
     modifier onlyExtension() {
         require(extensionAllowlist[msg.sender] == ExtensionState.INITIALIZED, "Must be initialized extension");
@@ -127,7 +127,7 @@ contract DelegatedManager is Ownable {
     // Address of factory contract used to deploy contract
     address public immutable factory;
 
-    // Mapping to check which ExtensionState an given extension is in
+    // Mapping to check which ExtensionState a given extension is in
     mapping(address => ExtensionState) public extensionAllowlist;
 
     // Array of initialized extensions
@@ -197,7 +197,7 @@ contract DelegatedManager is Ownable {
     }
 
     /**
-     * OPERATOR ONLY: Transfers _tokens held by the manager to _destination. Can be used to
+     * EXTENSION ONLY: Transfers _tokens held by the manager to _destination. Can be used to
      * distribute fees or recover anything sent here accidentally.
      *
      * @param _token           ERC20 token to send
