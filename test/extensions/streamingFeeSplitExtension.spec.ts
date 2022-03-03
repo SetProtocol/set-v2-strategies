@@ -20,7 +20,7 @@ import { ZERO } from "@setprotocol/set-protocol-v2/utils/constants";
 
 const expect = getWaffleExpect();
 
-describe("StreamingFeeSplitExtension", () => {
+describe.only("StreamingFeeSplitExtension", () => {
   let owner: Account;
   let methodologist: Account;
   let operator: Account;
@@ -29,9 +29,7 @@ describe("StreamingFeeSplitExtension", () => {
   let deployer: DeployHelper;
   let setToken: SetToken;
   let setV2Setup: SystemFixture;
-  
-  let streamingFeeModule: StreamingFeeModule;
-  
+    
   let delegatedManager: DelegatedManager;
   let streamingFeeSplitExtension: StreamingFeeSplitExtension;
 
@@ -53,15 +51,12 @@ describe("StreamingFeeSplitExtension", () => {
     setV2Setup = getSystemFixture(owner.address);
     await setV2Setup.initialize();
   
-    streamingFeeModule = await deployer.setDeployer.modules.deployStreamingFeeModule(setV2Setup.controller.address);
-    await setV2Setup.controller.addModule(streamingFeeModule.address);
-  
-    streamingFeeSplitExtension = await deployer.globalExtensions.deployStreamingFeeSplitExtension(streamingFeeModule.address);
+    streamingFeeSplitExtension = await deployer.globalExtensions.deployStreamingFeeSplitExtension(setV2Setup.streamingFeeModule.address);
   
     setToken = await setV2Setup.createSetToken(
       [setV2Setup.dai.address],
       [ether(1)],
-      [setV2Setup.issuanceModule.address, streamingFeeModule.address]
+      [setV2Setup.issuanceModule.address, setV2Setup.streamingFeeModule.address]
     );
   
     await setV2Setup.issuanceModule.initialize(setToken.address, ADDRESS_ZERO);
@@ -276,6 +271,86 @@ describe("StreamingFeeSplitExtension", () => {
         await expect(subject()).to.be.revertedWith("Extension must be pending");
       });
     });
+
+    describe("when the module is not pending or initialized", async () => {
+      let setToken2: SetToken;
+      let delegatedManager2: DelegatedManager;
+
+      beforeEach(async () => {
+        setToken2 = await setV2Setup.createSetToken(
+          [setV2Setup.dai.address],
+          [ether(1)],
+          [setV2Setup.issuanceModule.address]
+        );
+
+        delegatedManager2 = await deployer.manager.deployDelegatedManager(
+          setToken2.address,
+          factory.address,
+          methodologist.address,
+          [streamingFeeSplitExtension.address],
+          [operator.address],
+          [setV2Setup.usdc.address, setV2Setup.weth.address],
+          true
+        );
+
+        await setToken2.setManager(delegatedManager2.address);
+
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager2.address;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("StreamingFeeModule must be pending");
+      });
+    });
+
+    describe("when the module is pending", async () => {
+      beforeEach(async () => {
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager.address;
+
+        // Put StreamingFeeSplitExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([streamingFeeSplitExtension.address]);
+      });
+
+      it("should succeed without revert", async () => {
+        await subject();
+      });
+    });
+
+    describe("when the module is already initialized", async () => {
+      let setToken3: SetToken;
+      let delegatedManager3: DelegatedManager;
+
+      beforeEach(async () => {
+        setToken3 = await setV2Setup.createSetToken(
+          [setV2Setup.dai.address],
+          [ether(1)],
+          [setV2Setup.issuanceModule.address, setV2Setup.streamingFeeModule.address]
+        );
+
+        await setV2Setup.streamingFeeModule.initialize(setToken3.address, feeSettings);
+
+        delegatedManager3 = await deployer.manager.deployDelegatedManager(
+          setToken3.address,
+          factory.address,
+          methodologist.address,
+          [streamingFeeSplitExtension.address],
+          [operator.address],
+          [setV2Setup.usdc.address, setV2Setup.weth.address],
+          true
+        );
+
+        await setToken3.setManager(delegatedManager3.address);
+
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager3.address;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("StreamingFeeModule must be pending");
+      });
+    })
       
     describe("when initializeModuleAndExtension completes successfully", async () => {
       beforeEach(async () => {
@@ -289,10 +364,10 @@ describe("StreamingFeeSplitExtension", () => {
       it("should correctly initialize the StreamingFeeModule on the SetToken", async () => {
         const txTimestamp = await getTransactionTimestamp(subject());
 
-        const isModuleInitialized: Boolean = await setToken.isInitializedModule(streamingFeeModule.address);
+        const isModuleInitialized: Boolean = await setToken.isInitializedModule(setV2Setup.streamingFeeModule.address);
         expect(isModuleInitialized).to.eq(true);
 
-        const storedFeeState: StreamingFeeState = await streamingFeeModule.feeStates(setToken.address);
+        const storedFeeState: StreamingFeeState = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
         expect(storedFeeState.feeRecipient).to.eq(feeRecipient);
         expect(storedFeeState.maxStreamingFeePercentage).to.eq(maxStreamingFeePercentage);
         expect(storedFeeState.streamingFeePercentage).to.eq(streamingFeePercentage);

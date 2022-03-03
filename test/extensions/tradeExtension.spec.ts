@@ -17,7 +17,7 @@ import { ContractTransaction } from "ethers";
 
 const expect = getWaffleExpect();
 
-describe("TradeExtension", () => {
+describe.only("TradeExtension", () => {
   let owner: Account;
   let methodologist: Account;
   let operator: Account;
@@ -258,6 +258,38 @@ describe("TradeExtension", () => {
       });
     });
 
+    describe("when the module is not pending or initialized", async () => {
+      let setToken2: SetToken;
+      let delegatedManager2: DelegatedManager;
+
+      beforeEach(async () => {
+        setToken2 = await setV2Setup.createSetToken(
+          [setV2Setup.dai.address],
+          [ether(1)],
+          [setV2Setup.issuanceModule.address]
+        );
+
+        delegatedManager2 = await deployer.manager.deployDelegatedManager(
+          setToken2.address,
+          factory.address,
+          methodologist.address,
+          [tradeExtension.address],
+          [operator.address],
+          [setV2Setup.usdc.address, setV2Setup.weth.address],
+          true
+        );
+
+        await setToken2.setManager(delegatedManager2.address);
+
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager2.address;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("TradeModule must be pending");
+      });
+    });
+
     describe("when the module is pending", async () => {
       beforeEach(async () => {
         subjectCaller = owner;
@@ -271,6 +303,40 @@ describe("TradeExtension", () => {
         await subject();
       });
     });
+
+    describe("when the module is already initialized", async () => {
+      let setToken3: SetToken;
+      let delegatedManager3: DelegatedManager;
+
+      beforeEach(async () => {
+        setToken3 = await setV2Setup.createSetToken(
+          [setV2Setup.dai.address],
+          [ether(1)],
+          [setV2Setup.issuanceModule.address, tradeModule.address]
+        );
+
+        await tradeModule.initialize(setToken3.address);
+
+        delegatedManager3 = await deployer.manager.deployDelegatedManager(
+          setToken3.address,
+          factory.address,
+          methodologist.address,
+          [tradeExtension.address],
+          [operator.address],
+          [setV2Setup.usdc.address, setV2Setup.weth.address],
+          true
+        );
+
+        await setToken3.setManager(delegatedManager3.address);
+
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager3.address;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("TradeModule must be pending");
+      });
+    })
 
     describe("when initializeModuleAndExtension completes successfully", async () => {
       beforeEach(async () => {

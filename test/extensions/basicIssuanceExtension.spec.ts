@@ -214,7 +214,7 @@ describe.only("BasicIssuanceExtension", () => {
         subjectCaller = owner;
         subjectDelegatedManager = delegatedManager.address;
       
-        // Put StreamingFeeSplitExtension in PENDING state on DelegatedManager
+        // Put BasicIssuanceExtension in PENDING state on DelegatedManager
         await delegatedManager.addExtensions([basicIssuanceExtension.address]);
       });
       
@@ -278,6 +278,93 @@ describe.only("BasicIssuanceExtension", () => {
         await expect(subject()).to.be.revertedWith("Extension must be pending");
       });
     });
+
+    describe("when the module is not pending or initialized", async () => {
+      let setToken2: SetToken;
+      let delegatedManager2: DelegatedManager;
+
+      beforeEach(async () => {
+        setToken2 = await setV2Setup.createSetToken(
+          [setV2Setup.dai.address],
+          [ether(1)],
+          [setV2Setup.streamingFeeModule.address]
+        );
+
+        delegatedManager2 = await deployer.manager.deployDelegatedManager(
+          setToken2.address,
+          factory.address,
+          methodologist.address,
+          [basicIssuanceExtension.address],
+          [operator.address],
+          [setV2Setup.usdc.address, setV2Setup.weth.address],
+          true
+        );
+
+        await setToken2.setManager(delegatedManager2.address);
+
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager2.address;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("BasicIssuanceModule must be pending");
+      });
+    });
+
+    describe("when the module is pending", async () => {
+      beforeEach(async () => {
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager.address;
+
+        // Put BasicIssuanceExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([basicIssuanceExtension.address]);
+      });
+
+      it("should succeed without revert", async () => {
+        await subject();
+      });
+    });
+
+    describe("when the module is already initialized", async () => {
+      let setToken3: SetToken;
+      let delegatedManager3: DelegatedManager;
+
+      beforeEach(async () => {
+        setToken3 = await setV2Setup.createSetToken(
+          [setV2Setup.dai.address],
+          [ether(1)],
+          [debtIssuanceModule.address]
+        );
+
+        await debtIssuanceModule.initialize(
+          setToken3.address,
+          maxManagerFee,
+          managerIssueFee,
+          managerRedeemFee,
+          feeRecipient,
+          managerIssuanceHook
+        );
+
+        delegatedManager3 = await deployer.manager.deployDelegatedManager(
+          setToken3.address,
+          factory.address,
+          methodologist.address,
+          [basicIssuanceExtension.address],
+          [operator.address],
+          [setV2Setup.usdc.address, setV2Setup.weth.address],
+          true
+        );
+
+        await setToken3.setManager(delegatedManager3.address);
+
+        subjectCaller = owner;
+        subjectDelegatedManager = delegatedManager3.address;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("BasicIssuanceModule must be pending");
+      });
+    })
       
     describe("when initializeModuleAndExtension completes successfully", async () => {
       beforeEach(async () => {
@@ -288,7 +375,7 @@ describe.only("BasicIssuanceExtension", () => {
         await delegatedManager.addExtensions([basicIssuanceExtension.address]);
       });
 
-      it("should correctly initialize the StreamingFeeModule on the SetToken", async () => {
+      it("should correctly initialize the BasicIssuanceModule on the SetToken", async () => {
         const txTimestamp = await getTransactionTimestamp(subject());
 
         const isModuleInitialized: Boolean = await setToken.isInitializedModule(debtIssuanceModule.address);
@@ -303,7 +390,7 @@ describe.only("BasicIssuanceExtension", () => {
         expect(storedSettings.managerIssuanceHook).to.eq(managerIssuanceHook);
       });
       
-      it("should store the correct SetToken and DelegatedManager on the StreamingFeeSplitExtension", async () => {
+      it("should store the correct SetToken and DelegatedManager on the BasicIssuanceExtension", async () => {
         await subject();
       
         const storedDelegatedManager: Address = await basicIssuanceExtension.setManagers(setToken.address);
