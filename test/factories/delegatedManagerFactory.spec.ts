@@ -267,8 +267,6 @@ describe("DelegatedManagerFactory", () => {
       });
     });
 
-    // This test exists to cover the condition on the branch which validates components are assets
-    // Just verifying that creation state is pending
     describe("when the assets array is empty", async() => {
       beforeEach(() => {
         subjectAssets = [];
@@ -281,6 +279,16 @@ describe("DelegatedManagerFactory", () => {
         const initializeParams = await delegatedManagerFactory.initializeState(setTokenAddress);
 
         expect(initializeParams.isPending).eq(true);
+      });
+
+      it("should set the DelegatedManager's useAssetAllowlist to false", async () => {
+        const tx = await subject();
+
+        const setTokenAddress = await protocolUtils.getCreatedSetTokenAddress(tx.hash);
+        const initializeParams = await delegatedManagerFactory.initializeState(setTokenAddress);
+        const delegatedManager = await deployer.manager.getDelegatedManager(initializeParams.manager);
+
+        expect(await delegatedManager.useAssetAllowlist()).eq(false);
       });
     });
   });
@@ -418,8 +426,6 @@ describe("DelegatedManagerFactory", () => {
       });
     });
 
-    // This test exists to cover the condition on the branch which validates components are assets
-    // Just verifying that creation state is pending
     describe("when the assets array is empty", async() => {
       beforeEach(() => {
         subjectAssets = [];
@@ -431,6 +437,15 @@ describe("DelegatedManagerFactory", () => {
         const initializeParams = await delegatedManagerFactory.initializeState(subjectSetToken);
 
         expect(initializeParams.isPending).eq(true);
+      });
+
+      it("should set the DelegatedManager's useAssetAllowlist to false", async () => {
+        await subject();
+
+        const initializeParams = await delegatedManagerFactory.initializeState(subjectSetToken);
+        const delegatedManager = await deployer.manager.getDelegatedManager(initializeParams.manager);
+
+        expect(await delegatedManager.useAssetAllowlist()).eq(false);
       });
     });
   });
