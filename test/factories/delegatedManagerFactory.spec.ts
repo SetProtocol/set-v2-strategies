@@ -291,6 +291,16 @@ describe("DelegatedManagerFactory", () => {
         expect(await delegatedManager.useAssetAllowlist()).eq(false);
       });
     });
+
+    describe("when the extensions array is empty", async() => {
+      beforeEach(async() => {
+        subjectExtensions = [];
+      });
+
+      it("should revert", async() => {
+        await expect(subject()).to.be.revertedWith("Must have at least 1 extension");
+      });
+    });
   });
 
   describe("#createManager", () => {
@@ -446,6 +456,16 @@ describe("DelegatedManagerFactory", () => {
         const delegatedManager = await deployer.manager.getDelegatedManager(initializeParams.manager);
 
         expect(await delegatedManager.useAssetAllowlist()).eq(false);
+      });
+    });
+
+    describe("when the extensions array is empty", async() => {
+      beforeEach(async() => {
+        subjectExtensions = [];
+      });
+
+      it("should revert", async() => {
+        await expect(subject()).to.be.revertedWith("Must have at least 1 extension");
       });
     });
   });

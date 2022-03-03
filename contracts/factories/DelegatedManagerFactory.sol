@@ -134,6 +134,8 @@ contract DelegatedManagerFactory {
         external
         returns (ISetToken, address)
     {
+        require(_extensions.length > 0, "Must have at least 1 extension");
+
         if (_assets.length != 0) {
             _validateComponentsIncludedInAssetsList(_components, _assets);
         }
@@ -188,6 +190,8 @@ contract DelegatedManagerFactory {
         external
         returns (address)
     {
+        require(_extensions.length > 0, "Must have at least 1 extension");
+
         if (_assets.length != 0) {
             _validateComponentsIncludedInAssetsList(_setToken.getComponents(), _assets);
         }
