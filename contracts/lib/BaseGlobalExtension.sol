@@ -87,14 +87,14 @@ abstract contract BaseGlobalExtension {
      * @param _module           Module to interact with
      * @param _encoded          Encoded byte data
      */
-    function invokeManager(ISetToken _setToken, address _module, bytes memory _encoded) internal {
+    function _invokeManager(ISetToken _setToken, address _module, bytes memory _encoded) internal {
         _manager(_setToken).interactManager(_module, _encoded);
     }
 
     /**
      * Internal function to grab manager of passed SetToken from extensions data structure.
      *
-     * @param _setToken         SetToken who's manager is needed 
+     * @param _setToken         SetToken who's manager is needed
      */
     function _manager(ISetToken _setToken) internal virtual view returns (IDelegatedManager);
 }

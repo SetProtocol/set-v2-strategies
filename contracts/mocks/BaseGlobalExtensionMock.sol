@@ -41,7 +41,7 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
     }
 
     function testInvokeManager(ISetToken _setToken, address _module, bytes calldata _encoded) external {
-        invokeManager(_setToken, _module, _encoded);
+        _invokeManager(_setToken, _module, _encoded);
     }
 
     function testOnlyOwner(ISetToken _setToken)
