@@ -17,7 +17,7 @@ import { ContractTransaction } from "ethers";
 
 const expect = getWaffleExpect();
 
-describe.only("TradeExtension", () => {
+describe("TradeExtension", () => {
   let owner: Account;
   let methodologist: Account;
   let operator: Account;

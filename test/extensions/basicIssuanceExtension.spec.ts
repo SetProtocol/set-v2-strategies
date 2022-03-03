@@ -1,10 +1,10 @@
 import "module-alias/register";
 
 import { BigNumber } from "ethers";
-import { Address, Account, StreamingFeeState } from "@utils/types";
+import { Address, Account } from "@utils/types";
 import { ADDRESS_ZERO } from "@utils/constants";
-import { DelegatedManager, StreamingFeeSplitExtension } from "@utils/contracts/index";
-import { SetToken, StreamingFeeModule } from "@setprotocol/set-protocol-v2/utils/contracts";
+import { DelegatedManager, BasicIssuanceExtension } from "@utils/contracts/index";
+import { SetToken, DebtIssuanceModule } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "@utils/deploys";
 import {
   addSnapshotBeforeRestoreAfterEach,
@@ -20,26 +20,27 @@ import { ZERO } from "@setprotocol/set-protocol-v2/utils/constants";
 
 const expect = getWaffleExpect();
 
-describe("StreamingFeeSplitExtension", () => {
+describe.only("BasicIssuanceExtension", () => {
   let owner: Account;
   let methodologist: Account;
   let operator: Account;
   let factory: Account;
-  
+    
   let deployer: DeployHelper;
   let setToken: SetToken;
   let setV2Setup: SystemFixture;
-  
-  let streamingFeeModule: StreamingFeeModule;
-  
+    
+  let debtIssuanceModule: DebtIssuanceModule;
+    
   let delegatedManager: DelegatedManager;
-  let streamingFeeSplitExtension: StreamingFeeSplitExtension;
+  let basicIssuanceExtension: BasicIssuanceExtension;
 
+  let maxManagerFee: BigNumber;
+  let managerIssueFee: BigNumber;
+  let managerRedeemFee: BigNumber;
   let feeRecipient: Address;
-  let maxStreamingFeePercentage: BigNumber;
-  let streamingFeePercentage: BigNumber;
-  let feeSettings: StreamingFeeState;
-  
+  let managerIssuanceHook: Address;
+    
   before(async () => {
     [
       owner,
@@ -47,25 +48,24 @@ describe("StreamingFeeSplitExtension", () => {
       operator,
       factory
     ] = await getAccounts();
-  
+    
     deployer = new DeployHelper(owner.wallet);
-  
+    
     setV2Setup = getSystemFixture(owner.address);
     await setV2Setup.initialize();
-  
-    streamingFeeModule = await deployer.setDeployer.modules.deployStreamingFeeModule(setV2Setup.controller.address);
-    await setV2Setup.controller.addModule(streamingFeeModule.address);
-  
-    streamingFeeSplitExtension = await deployer.globalExtensions.deployStreamingFeeSplitExtension(streamingFeeModule.address);
-  
+
+    
+    debtIssuanceModule = await deployer.setV2.deployDebtIssuanceModule(setV2Setup.controller.address);
+    await setV2Setup.controller.addModule(debtIssuanceModule.address);
+    
+    basicIssuanceExtension = await deployer.globalExtensions.deployBasicIssuanceExtension(debtIssuanceModule.address);
+    
     setToken = await setV2Setup.createSetToken(
       [setV2Setup.dai.address],
       [ether(1)],
-      [setV2Setup.issuanceModule.address, streamingFeeModule.address]
+      [debtIssuanceModule.address]
     );
-  
-    await setV2Setup.issuanceModule.initialize(setToken.address, ADDRESS_ZERO);
-  
+        
     delegatedManager = await deployer.manager.deployDelegatedManager(
       setToken.address,
       factory.address,
@@ -75,21 +75,16 @@ describe("StreamingFeeSplitExtension", () => {
       [setV2Setup.usdc.address, setV2Setup.weth.address],
       true
     );
-  
+    
     await setToken.setManager(delegatedManager.address);
-
-    feeRecipient = delegatedManager.address;
-    maxStreamingFeePercentage = ether(.1);
-    streamingFeePercentage = ether(.02);
-
-    feeSettings = {
-      feeRecipient,
-      maxStreamingFeePercentage,
-      streamingFeePercentage,
-      lastStreamingFeeTimestamp: ZERO,
-    } as StreamingFeeState;
-  });
   
+    maxManagerFee = ether(.1);
+    managerIssueFee = ether(.02);
+    managerRedeemFee = ether(.02);
+    feeRecipient = delegatedManager.address;
+    managerIssuanceHook = owner.address;
+  });
+    
   addSnapshotBeforeRestoreAfterEach();
 
   describe("#testInitializeExtension", async () => {
@@ -97,7 +92,7 @@ describe("StreamingFeeSplitExtension", () => {
     let subjectCaller: Account;
     
     async function subject(): Promise<ContractTransaction> {
-      return streamingFeeSplitExtension.connect(subjectCaller.wallet).initializeExtension(subjectDelegatedManager);
+      return basicIssuanceExtension.connect(subjectCaller.wallet).initializeExtension(subjectDelegatedManager);
     }
     
     describe("when the sender is the owner", async () => {
@@ -105,8 +100,8 @@ describe("StreamingFeeSplitExtension", () => {
         subjectCaller = owner;
         subjectDelegatedManager = delegatedManager.address;
     
-        // Put StreamingFeeSplitExtension in PENDING state on DelegatedManager
-        await delegatedManager.addExtensions([streamingFeeSplitExtension.address]);
+        // Put BasicIssuanceExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([basicIssuanceExtension.address]);
       });
     
       it("should succeed without revert", async () => {
@@ -119,8 +114,8 @@ describe("StreamingFeeSplitExtension", () => {
         subjectCaller = await getRandomAccount();
         subjectDelegatedManager = delegatedManager.address;
     
-        // Put StreamingFeeSplitExtension in PENDING state on DelegatedManager
-        await delegatedManager.addExtensions([streamingFeeSplitExtension.address]);
+        // Put BasicIssuanceExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([basicIssuanceExtension.address]);
       });
     
       it("should revert", async () => {
@@ -144,8 +139,8 @@ describe("StreamingFeeSplitExtension", () => {
         subjectCaller = owner;
         subjectDelegatedManager = delegatedManager.address;
     
-        // Put StreamingFeeSplitExtension in PENDING state on DelegatedManager
-        await delegatedManager.addExtensions([streamingFeeSplitExtension.address]);
+        // Put BasicIssuanceExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([basicIssuanceExtension.address]);
       });
     
       it("should succeed without revert", async () => {
@@ -158,11 +153,11 @@ describe("StreamingFeeSplitExtension", () => {
         subjectCaller = owner;
         subjectDelegatedManager = delegatedManager.address;
     
-        // Put StreamingFeeSplitExtension in PENDING state on DelegatedManager
-        await delegatedManager.addExtensions([streamingFeeSplitExtension.address]);
+        // Put BasicIssuanceExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([basicIssuanceExtension.address]);
     
-        // Initialize StreamingFeeSplitExtension
-        streamingFeeSplitExtension.initializeExtension(subjectDelegatedManager)
+        // Initialize BasicIssuanceExtension
+        basicIssuanceExtension.initializeExtension(subjectDelegatedManager)
       });
     
       it("should revert", async () => {
@@ -175,26 +170,26 @@ describe("StreamingFeeSplitExtension", () => {
         subjectCaller = owner;
         subjectDelegatedManager = delegatedManager.address;
     
-        // Put StreamingFeeSplitExtension in PENDING state on DelegatedManager
-        await delegatedManager.addExtensions([streamingFeeSplitExtension.address]);
+        // Put BasicIssuanceExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([basicIssuanceExtension.address]);
       });
     
-      it("should store the correct SetToken and DelegatedManager on the StreamingFeeSplitExtension", async () => {
+      it("should store the correct SetToken and DelegatedManager on the BasicIssuanceExtension", async () => {
         await subject();
     
-        const storedDelegatedManager: Address = await streamingFeeSplitExtension.setManagers(setToken.address);
+        const storedDelegatedManager: Address = await basicIssuanceExtension.setManagers(setToken.address);
         expect(storedDelegatedManager).to.eq(delegatedManager.address);
       });
     
       it("should initialize the extension on the DelegatedManager", async () => {
         await subject();
     
-        const isExtensionInitialized: Boolean = await delegatedManager.isInitializedExtension(streamingFeeSplitExtension.address);
+        const isExtensionInitialized: Boolean = await delegatedManager.isInitializedExtension(basicIssuanceExtension.address);
         expect(isExtensionInitialized).to.eq(true);
       });
     
       it("should emit the correct ExtensionInitialized event", async () => {
-        await expect(subject()).to.emit(streamingFeeSplitExtension, "ExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
+        await expect(subject()).to.emit(basicIssuanceExtension, "ExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
       });
     })
   });
@@ -204,7 +199,14 @@ describe("StreamingFeeSplitExtension", () => {
     let subjectCaller: Account;
       
     async function subject(): Promise<ContractTransaction> {
-      return streamingFeeSplitExtension.connect(subjectCaller.wallet).initializeModuleAndExtension(subjectDelegatedManager, feeSettings);
+      return basicIssuanceExtension.connect(subjectCaller.wallet).initializeModuleAndExtension(
+          subjectDelegatedManager, 
+          maxManagerFee,
+          managerIssueFee,
+          managerRedeemFee,
+          feeRecipient,
+          managerIssuanceHook
+        );
     }
       
     describe("when the sender is the owner", async () => {
@@ -213,7 +215,7 @@ describe("StreamingFeeSplitExtension", () => {
         subjectDelegatedManager = delegatedManager.address;
       
         // Put StreamingFeeSplitExtension in PENDING state on DelegatedManager
-        await delegatedManager.addExtensions([streamingFeeSplitExtension.address]);
+        await delegatedManager.addExtensions([basicIssuanceExtension.address]);
       });
       
       it("should succeed without revert", async () => {
@@ -226,8 +228,8 @@ describe("StreamingFeeSplitExtension", () => {
         subjectCaller = await getRandomAccount();
         subjectDelegatedManager = delegatedManager.address;
       
-        // Put StreamingFeeSplitExtension in PENDING state on DelegatedManager
-        await delegatedManager.addExtensions([streamingFeeSplitExtension.address]);
+        // Put BasicIssuanceExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([basicIssuanceExtension.address]);
       });
       
       it("should revert", async () => {
@@ -251,8 +253,8 @@ describe("StreamingFeeSplitExtension", () => {
         subjectCaller = owner;
         subjectDelegatedManager = delegatedManager.address;
       
-        // Put StreamingFeeSplitExtension in PENDING state on DelegatedManager
-        await delegatedManager.addExtensions([streamingFeeSplitExtension.address]);
+        // Put BasicIssuanceExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([basicIssuanceExtension.address]);
       });
       
       it("should succeed without revert", async () => {
@@ -265,11 +267,11 @@ describe("StreamingFeeSplitExtension", () => {
         subjectCaller = owner;
         subjectDelegatedManager = delegatedManager.address;
       
-        // Put StreamingFeeSplitExtension in PENDING state on DelegatedManager
-        await delegatedManager.addExtensions([streamingFeeSplitExtension.address]);
+        // Put BasicIssuanceExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([basicIssuanceExtension.address]);
       
-        // Initialize StreamingFeeSplitExtension
-        streamingFeeSplitExtension.initializeExtension(subjectDelegatedManager);
+        // Initialize BasicIssuanceExtension
+        basicIssuanceExtension.initializeExtension(subjectDelegatedManager);
       });
       
       it("should revert", async () => {
@@ -282,39 +284,41 @@ describe("StreamingFeeSplitExtension", () => {
         subjectCaller = owner;
         subjectDelegatedManager = delegatedManager.address;
       
-        // Put StreamingFeeSplitExtension in PENDING state on DelegatedManager
-        await delegatedManager.addExtensions([streamingFeeSplitExtension.address]);
+        // Put BasicIssuanceExtension in PENDING state on DelegatedManager
+        await delegatedManager.addExtensions([basicIssuanceExtension.address]);
       });
 
       it("should correctly initialize the StreamingFeeModule on the SetToken", async () => {
         const txTimestamp = await getTransactionTimestamp(subject());
 
-        const isModuleInitialized: Boolean = await setToken.isInitializedModule(streamingFeeModule.address);
+        const isModuleInitialized: Boolean = await setToken.isInitializedModule(debtIssuanceModule.address);
         expect(isModuleInitialized).to.eq(true);
 
-        const storedFeeState: StreamingFeeState = await streamingFeeModule.feeStates(setToken.address);
-        expect(storedFeeState.feeRecipient).to.eq(feeRecipient);
-        expect(storedFeeState.maxStreamingFeePercentage).to.eq(maxStreamingFeePercentage);
-        expect(storedFeeState.streamingFeePercentage).to.eq(streamingFeePercentage);
-        expect(storedFeeState.lastStreamingFeeTimestamp).to.eq(txTimestamp);
+        const storedSettings: any = await debtIssuanceModule.issuanceSettings(setToken.address);
+
+        expect(storedSettings.maxManagerFee).to.eq(maxManagerFee);
+        expect(storedSettings.managerIssueFee).to.eq(managerIssueFee);
+        expect(storedSettings.managerRedeemFee).to.eq(managerRedeemFee);
+        expect(storedSettings.feeRecipient).to.eq(feeRecipient);
+        expect(storedSettings.managerIssuanceHook).to.eq(managerIssuanceHook);
       });
       
       it("should store the correct SetToken and DelegatedManager on the StreamingFeeSplitExtension", async () => {
         await subject();
       
-        const storedDelegatedManager: Address = await streamingFeeSplitExtension.setManagers(setToken.address);
+        const storedDelegatedManager: Address = await basicIssuanceExtension.setManagers(setToken.address);
         expect(storedDelegatedManager).to.eq(delegatedManager.address);
       });
       
       it("should initialize the extension on the DelegatedManager", async () => {
         await subject();
       
-        const isExtensionInitialized: Boolean = await delegatedManager.isInitializedExtension(streamingFeeSplitExtension.address);
+        const isExtensionInitialized: Boolean = await delegatedManager.isInitializedExtension(basicIssuanceExtension.address);
         expect(isExtensionInitialized).to.eq(true);
       });
       
       it("should emit the correct ExtensionInitialized event", async () => {
-        await expect(subject()).to.emit(streamingFeeSplitExtension, "ExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
+        await expect(subject()).to.emit(basicIssuanceExtension, "ExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
       });
     })
   });

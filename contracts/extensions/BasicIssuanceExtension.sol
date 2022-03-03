@@ -101,7 +101,7 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
      *
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
-    function initializeExtension(IDelegatedManager _delegatedManager) public {
+    function initializeExtension(IDelegatedManager _delegatedManager) external {
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
@@ -136,11 +136,12 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
         require(_delegatedManager.setToken().isPendingModule(address(issuanceModule)), "BasicIssuanceModule must be pending");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        initializeExtension(_delegatedManager);
+        setManagers[_delegatedManager.setToken()] = _delegatedManager;
 
         _delegatedManager.initializeExtension();
 
-        issuanceModule.initialize(
+        bytes memory callData = abi.encodeWithSignature(
+            "initialize(address,uint256,uint256,uint256,address,address)", 
             _delegatedManager.setToken(),
             _maxManagerFee,
             _managerIssueFee,
@@ -148,6 +149,7 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
             _feeRecipient,
             _managerIssuanceHook
         );
+        invokeManager(_delegatedManager.setToken(), address(issuanceModule), callData);
 
         ExtensionInitialized(address(_delegatedManager.setToken()), address(_delegatedManager));
     }
