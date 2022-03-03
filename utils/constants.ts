@@ -3,7 +3,7 @@ import { BigNumber } from "ethers";
 
 const { AddressZero, MaxUint256, One, Two, Zero } = constants;
 
-export const MODULE_STATE = {
+export const EXTENSION_STATE = {
   "NONE": 0,
   "PENDING": 1,
   "INITIALIZED": 2,

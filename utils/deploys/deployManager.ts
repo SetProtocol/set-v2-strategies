@@ -1,8 +1,12 @@
 import { Signer } from "ethers";
 import { Address } from "../types";
-import { BaseManager } from "../contracts/index";
+import {
+  BaseManager,
+  DelegatedManager
+} from "../contracts/index";
 
 import { BaseManager__factory } from "../../typechain/factories/BaseManager__factory";
+import { DelegatedManager__factory } from "../../typechain/factories/DelegatedManager__factory";
 
 export default class DeployToken {
   private _deployerSigner: Signer;
@@ -21,5 +25,31 @@ export default class DeployToken {
       operator,
       methodologist
     );
+  }
+
+  public async deployDelegatedManager(
+    setToken: Address,
+    factory: Address,
+    methodologist: Address,
+    extensions: Address[],
+    operators: Address[],
+    allowedAssets: Address[],
+    useAssetAllowlist: boolean
+  ): Promise<DelegatedManager> {
+    return await new DelegatedManager__factory(this._deployerSigner).deploy(
+      setToken,
+      factory,
+      methodologist,
+      extensions,
+      operators,
+      allowedAssets,
+      useAssetAllowlist
+    );
+  }
+
+  /* GETTERS */
+
+  public async getDelegatedManager(managerAddress: Address): Promise<DelegatedManager> {
+    return await new DelegatedManager__factory(this._deployerSigner).attach(managerAddress);
   }
 }
