@@ -53,7 +53,7 @@ contract DelegatedManagerFactory {
 
     /**
      * @dev Emitted on DelegatedManager creation
-     * @param _setToken             Instance of the SetToken being levered
+     * @param _setToken             Instance of the SetToken being created
      * @param _manager              Address of the DelegatedManager
      * @param _deployer             Address of the deployer
     */
@@ -65,7 +65,7 @@ contract DelegatedManagerFactory {
 
     /**
      * @dev Emitted on DelegatedManager initialization
-     * @param _setToken             Instance of the SetToken being levered
+     * @param _setToken             Instance of the SetToken being initialized
      * @param _manager              Address of the DelegatedManager owner
     */
     event DelegatedManagerInitialized(
@@ -81,10 +81,12 @@ contract DelegatedManagerFactory {
     // Mapping which stores manager creation metadata between creation and initialization steps
     mapping(ISetToken=>InitializeParams) public initializeState;
 
-    // Mapping of all sets that have succesfully initialized
+    // Mapping of all Sets that have been created by this factory
+    // NOTE: these may be pending initialization
     mapping(ISetToken=>bool) public isValidSet;
 
-    // Address array of all sets that have succesfully initialized
+    // Address array of all Sets that have been created by this factory.
+    // NOTE: these may be pending initialization
     address[] internal validSets;
 
     /* ============ Constructor ============ */
@@ -170,7 +172,7 @@ contract DelegatedManagerFactory {
      * @param  _owner            Address to set as the DelegateManager's `owner` role
      * @param  _methodologist    Address to set as the DelegateManager's methodologist role
      * @param  _operators        List of operators authorized for the DelegateManager
-     * @param  _assets           List of assets DelegateManager can trade. When empty, manager can trade any asset
+     * @param  _assets           List of assets DelegateManager can trade. When empty, asset allow list is not enforced
      * @param  _extensions       List of extensions authorized for the DelegateManager
      *
      * @return (address) Address of the created DelegatedManager
@@ -209,9 +211,13 @@ contract DelegatedManagerFactory {
      * ONLY DEPLOYER: Wires SetToken, DelegatedManager, global manager extensions, and modules together
      * into a functioning package.
      *
+     * NOTE: When migrating to this manager system from an existing SetToken, the SetToken's current manager address
+     * must be reset to point at the newly deployed DelegatedManager contract in a separate, final transaction.
+     *
+     *
      * @param  _setToken                Instance of the SetToken
      * @param  _ownerFeeSplit           Percent of fees in precise units (10^16 = 1%) sent to operator, rest to methodologist
-     * @param  _ownerFeeRecipient       Address which receives operator's share of fees when they're distributed
+     * @param  _ownerFeeRecipient       Address which receives owner's share of fees when they're distributed
      * @param  _initializeTargets       List of addresses of any extensions or modules which need to be initialized
      * @param  _initializeBytecode      List of bytecode encoded calls to relevant target's initialize function
      */
@@ -236,6 +242,8 @@ contract DelegatedManagerFactory {
             _initializeTargets[i].functionCallWithValue(_initializeBytecode[i], 0);
         }
 
+        // If the SetToken was factory-deployed & factory is its current `manager`, transfer
+        // managership to the new DelegatedManager
         if (_setToken.manager() == address(this)) {
             _setToken.setManager(address(manager));
         }
@@ -301,7 +309,7 @@ contract DelegatedManagerFactory {
      * @param  _methodologist    Address to set as the DelegateManager's methodologist role
      * @param  _extensions       List of extensions authorized for the DelegateManager
      * @param  _operators        List of operators authorized for the DelegateManager
-     * @param  _assets           List of assets DelegateManager can trade. When empty, manager can trade any asset
+     * @param  _assets           List of assets DelegateManager can trade. When empty, asset allow list is not enforced
      *
      * @return Address of created DelegatedManager
      */
@@ -315,7 +323,10 @@ contract DelegatedManagerFactory {
         internal
         returns (DelegatedManager)
     {
+        // If asset array is empty, manager's useAssetAllowList will be set to false
+        // and the asset allow list is not enforced
         bool useAssetAllowlist = _assets.length > 0;
+
         DelegatedManager newManager = new DelegatedManager(
             _setToken,
             address(this),
