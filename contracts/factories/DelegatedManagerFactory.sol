@@ -81,14 +81,6 @@ contract DelegatedManagerFactory {
     // Mapping which stores manager creation metadata between creation and initialization steps
     mapping(ISetToken=>InitializeParams) public initializeState;
 
-    // Mapping of all Sets that have been created by this factory
-    // NOTE: these may be pending initialization
-    mapping(ISetToken=>bool) public isValidSet;
-
-    // Address array of all Sets that have been created by this factory.
-    // NOTE: these may be pending initialization
-    address[] internal validSets;
-
     /* ============ Constructor ============ */
 
     /**
@@ -255,18 +247,8 @@ contract DelegatedManagerFactory {
         initializeState[_setToken].manager.transferOwnership(initializeState[_setToken].owner);
 
         delete initializeState[_setToken];
+
         emit DelegatedManagerInitialized(_setToken, manager);
-    }
-
-    /* ============ External View Functions ============ */
-
-    /**
-     * Returns list of sets that have been successfully initialized by this factory
-     *
-     * @return address[] List of valid sets
-     */
-    function getValidSets() external view returns (address[] memory) {
-        return validSets;
     }
 
     /* ============ Internal Functions ============ */
@@ -369,9 +351,6 @@ contract DelegatedManagerFactory {
             manager: IDelegatedManager(_manager),
             isPending: true
         });
-
-        isValidSet[_setToken] = true;
-        validSets.push(address(_setToken));
     }
 
 

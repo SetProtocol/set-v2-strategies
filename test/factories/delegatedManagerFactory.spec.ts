@@ -558,7 +558,7 @@ describe("DelegatedManagerFactory", () => {
         expect(newManager).eq(initializeParams.manager);
       });
 
-      it("should transfer ownership of DelegateManager to the `owner` specified initializeState", async () => {
+      it("should transfer ownership of DelegatedManager to the `owner` specified initializeState", async () => {
         const oldOwner = await manager.owner();
 
         await subject();
@@ -697,41 +697,6 @@ describe("DelegatedManagerFactory", () => {
       it("should revert", async() => {
         await expect(subject()).to.be.revertedWith("Array length must be > 0");
       });
-    });
-  });
-
-  describe("#getValidSets", () => {
-    let setTokenAddress: Address;
-
-    beforeEach(async() => {
-      const module = setV2Setup.issuanceModule.address;
-      const extension = mockIssuanceExtension.address;
-      const tx = await create(module, extension);
-
-      setTokenAddress = await protocolUtils.getCreatedSetTokenAddress(tx.hash);
-
-      const initializeParams = await delegatedManagerFactory.initializeState(setTokenAddress);
-      const initializeTargets = [module, extension];
-      const initializeBytecode = await generateBytecode(setTokenAddress, initializeParams.manager);
-
-      await delegatedManagerFactory.initialize(
-        setTokenAddress,
-        ether(.5),
-        await getRandomAddress(),
-        initializeTargets,
-        initializeBytecode
-      );
-    });
-
-    async function subject(): Promise<string[]> {
-      return await delegatedManagerFactory.getValidSets();
-    }
-
-    it("should return valid sets", async() => {
-      const validSets = await subject();
-
-      expect(validSets.length).eq(1);
-      expect(validSets.includes(setTokenAddress)).eq(true);
     });
   });
 });
