@@ -898,7 +898,7 @@ describe("DelegatedManager", () => {
     });
   });
 
-  describe.only("#setManager", async () => {
+  describe("#setManager", async () => {
     let subjectNewManager: Address;
     let subjectCaller: Account;
 
