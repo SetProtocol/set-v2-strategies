@@ -60,7 +60,7 @@ contract TradeExtension is BaseGlobalExtension {
      *
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
-    function initializeExtension(IDelegatedManager _delegatedManager) public {
+    function initializeExtension(IDelegatedManager _delegatedManager) external {
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
@@ -77,15 +77,18 @@ contract TradeExtension is BaseGlobalExtension {
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
     function initializeModuleAndExtension(IDelegatedManager _delegatedManager) external {
+        require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.setToken().isPendingModule(address(tradeModule)), "TradeModule must be pending");
+        require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        initializeExtension(_delegatedManager);
+        bytes memory callData = abi.encodeWithSignature("initialize(address)", _delegatedManager.setToken());
+        invokeManager(_delegatedManager.setToken(), address(tradeModule), callData);
 
-        bytes memory callData = abi.encodeWithSignature(
-            "initialize(ISetToken)", 
-            _delegatedManager.setToken()
-        );
-        address(_delegatedManager).call(callData);
+        setManagers[_delegatedManager.setToken()] = _delegatedManager;
+
+        _delegatedManager.initializeExtension();
+
+        ExtensionInitialized(address(_delegatedManager.setToken()), address(_delegatedManager));
     }
 
     /**
