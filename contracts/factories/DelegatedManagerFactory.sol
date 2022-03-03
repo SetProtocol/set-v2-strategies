@@ -126,11 +126,7 @@ contract DelegatedManagerFactory {
         external
         returns (ISetToken, address)
     {
-        require(_extensions.length > 0, "Must have at least 1 extension");
-
-        if (_assets.length != 0) {
-            _validateComponentsIncludedInAssetsList(_components, _assets);
-        }
+        _validateManagerParameters(_components, _extensions, _assets);
 
         ISetToken setToken = _deploySet(
             _components,
@@ -182,13 +178,9 @@ contract DelegatedManagerFactory {
         external
         returns (address)
     {
-        require(_extensions.length > 0, "Must have at least 1 extension");
-
-        if (_assets.length != 0) {
-            _validateComponentsIncludedInAssetsList(_setToken.getComponents(), _assets);
-        }
-
         require(msg.sender == _setToken.manager(), "Must be manager");
+
+        _validateManagerParameters(_setToken.getComponents(), _extensions, _assets);
 
         DelegatedManager manager = _deployManager(
             _setToken,
@@ -235,6 +227,8 @@ contract DelegatedManagerFactory {
         manager.updateOwnerFeeRecipient(_ownerFeeRecipient);
 
         for (uint256 i = 0; i < _initializeTargets.length; i++) {
+            // Because we validate uniqueness of _initializeTargets only one transaction can be sent to each module or extension during this
+            // transaction. Due to this no modules/extension can be used for any SetToken transactions other than initializing these contracts
             _initializeTargets[i].functionCallWithValue(_initializeBytecode[i], 0);
         }
 
@@ -244,7 +238,7 @@ contract DelegatedManagerFactory {
             _setToken.setManager(address(manager));
         }
 
-        initializeState[_setToken].manager.transferOwnership(initializeState[_setToken].owner);
+        manager.transferOwnership(initializeState[_setToken].owner);
 
         delete initializeState[_setToken];
 
@@ -286,7 +280,6 @@ contract DelegatedManagerFactory {
 
         return ISetToken(setToken);
     }
-
 
     /**
      * Deploys a DelegatedManager
@@ -353,6 +346,28 @@ contract DelegatedManagerFactory {
         });
     }
 
+    /**
+     * Validates that all components currently held by the Set are on the asset allow list. Validate that the manager is
+     * deployed with at least one extension in the PENDING state.
+     *
+     * @param  _components       List of addresses of components for initial/current Set positions
+     * @param  _extensions       List of extensions authorized for the DelegateManager
+     * @param  _assets           List of assets DelegateManager can trade. When empty, asset allow list is not enforced
+     */
+    function _validateManagerParameters(
+        address[] memory _components,
+        address[] memory _extensions,
+        address[] memory _assets
+    )
+        internal
+        pure
+    {
+        require(_extensions.length > 0, "Must have at least 1 extension");
+
+        if (_assets.length != 0) {
+            _validateComponentsIncludedInAssetsList(_components, _assets);
+        }
+    }
 
     /**
      * Validates that all SetToken components are included in the assets whitelist. This prevents the
