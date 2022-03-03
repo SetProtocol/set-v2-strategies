@@ -1,5 +1,5 @@
 /*
-    Copyright 2021 Set Labs Inc.
+    Copyright 2022 Set Labs Inc.
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -27,9 +27,20 @@ import { DelegatedManager } from "../manager/DelegatedManager.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { ISetTokenCreator } from "../interfaces/ISetTokenCreator.sol";
 
+/**
+ * @title DelegatedManagerFactory
+ * @author Set Protocol
+ *
+ * Factory smart contract which gives asset managers the ability to:
+ * > create a Set Token managed with a DelegatedManager contract
+ * > create a DelegatedManager contract for an existing Set Token to migrate to
+ * > initialize extensions and modules for SetTokens using the DelegatedManager system
+ */
 contract DelegatedManagerFactory {
     using AddressArrayUtils for address[];
     using Address for address;
+
+    /* ============ Structs ============ */
 
     struct InitializeParams{
         address deployer;
@@ -37,20 +48,75 @@ contract DelegatedManagerFactory {
         IDelegatedManager manager;
         bool isPending;
     }
-    
-    ISetTokenCreator public setTokenFactory;
-    mapping(ISetToken=>InitializeParams) public initializeState;
-    mapping(ISetToken=>bool) public isValidSet;
-    address[] internal validSets; 
 
-    constructor(
-        ISetTokenCreator _setTokenFactory
-    ) public {
+    /* ============ Events ============ */
+
+    /**
+     * @dev Emitted on DelegatedManager creation
+     * @param _setToken             Instance of the SetToken being levered
+     * @param _manager              Address of the DelegatedManager
+     * @param _deployer             Address of the deployer
+    */
+    event DelegatedManagerCreated(
+        ISetToken indexed _setToken,
+        DelegatedManager indexed _manager,
+        address _deployer
+    );
+
+    /**
+     * @dev Emitted on DelegatedManager initialization
+     * @param _setToken             Instance of the SetToken being levered
+     * @param _manager              Address of the DelegatedManager owner
+    */
+    event DelegatedManagerInitialized(
+        ISetToken indexed _setToken,
+        IDelegatedManager indexed _manager
+    );
+
+    /* ============ State Variables ============ */
+
+    // SetTokenFactory address
+    ISetTokenCreator public setTokenFactory;
+
+    // Mapping which stores manager creation metadata between creation and initialization steps
+    mapping(ISetToken=>InitializeParams) public initializeState;
+
+    // Mapping of all sets that have succesfully initialized
+    mapping(ISetToken=>bool) public isValidSet;
+
+    // Address array of all sets that have succesfully initialized
+    address[] internal validSets;
+
+    /* ============ Constructor ============ */
+
+    /**
+     * @dev Sets setTokenFactory address.
+     * @param _setTokenFactory                  Address of SetTokenFactory protocol contract
+     */
+    constructor(ISetTokenCreator _setTokenFactory) public {
         setTokenFactory = _setTokenFactory;
     }
 
     /* ============ External Functions ============ */
 
+    /**
+     * ANYONE CAN CALL: Deploys a new SetToken and DelegatedManager. Sets some temporary metadata about
+     * the deployment which will be read during a subsequent intialization step which wires everything
+     * together.
+     *
+     * @param _components       List of addresses of components for initial Positions
+     * @param _units            List of units. Each unit is the # of components per 10^18 of a SetToken
+     * @param _name             Name of the SetToken
+     * @param _symbol           Symbol of the SetToken
+     * @param _owner            Address to set as the DelegateManager's `owner` role
+     * @param _methodologist    Address to set as the DelegateManager's methodologist role
+     * @param _modules          List of modules to enable. All modules must be approved by the Controller
+     * @param _operators        List of operators authorized for the DelegateManager
+     * @param _assets           List of assets DelegateManager can trade. When empty, manager can trade any asset
+     * @param _extensions       List of extensions authorized for the DelegateManager
+     *
+     * @return (ISetToken, address) The created SetToken and DelegatedManager addresses, respectively
+     */
     function createSetAndManager(
         address[] memory _components,
         int256[] memory _units,
@@ -66,9 +132,9 @@ contract DelegatedManagerFactory {
         external
         returns (ISetToken, address)
     {
-        require(_extensions.length > 0, "Must have at least 1 extension");
-        // Require that components of Set are contained in the _assets array
-        // Require there be at least one operator?
+        if (_assets.length != 0) {
+            _validateComponentsIncludedInAssetsList(_components, _assets);
+        }
 
         ISetToken setToken = _deploySet(
             _components,
@@ -91,6 +157,24 @@ contract DelegatedManagerFactory {
         return (setToken, address(manager));
     }
 
+    /**
+     * ONLY SETTOKEN MANAGER: Deploys a DelegatedManager and sets some temporary metadata about the
+     * deployment which will be read during a subsequent intialization step which wires everything together.
+     * This method is used when migrating an existing SetToken to the DelegatedManager system.
+     *
+     * (Note: This flow should work well for SetTokens managed by an EOA. However, existing
+     * contract-managed Sets may need to have their ownership temporarily transferred to an EOA when
+     * migrating. We don't anticipate high demand for this migration case though.)
+     *
+     * @param  _setToken         Instance of SetToken to migrate to the DelegatedManager system
+     * @param  _owner            Address to set as the DelegateManager's `owner` role
+     * @param  _methodologist    Address to set as the DelegateManager's methodologist role
+     * @param  _operators        List of operators authorized for the DelegateManager
+     * @param  _assets           List of assets DelegateManager can trade. When empty, manager can trade any asset
+     * @param  _extensions       List of extensions authorized for the DelegateManager
+     *
+     * @return (address) Address of the created DelegatedManager
+     */
     function createManager(
         ISetToken _setToken,
         address _owner,
@@ -102,6 +186,10 @@ contract DelegatedManagerFactory {
         external
         returns (address)
     {
+        if (_assets.length != 0) {
+            _validateComponentsIncludedInAssetsList(_setToken.getComponents(), _assets);
+        }
+
         require(msg.sender == _setToken.manager(), "Must be manager");
 
         DelegatedManager manager = _deployManager(
@@ -117,6 +205,16 @@ contract DelegatedManagerFactory {
         return address(manager);
     }
 
+    /**
+     * ONLY DEPLOYER: Wires SetToken, DelegatedManager, global manager extensions, and modules together
+     * into a functioning package.
+     *
+     * @param  _setToken                Instance of the SetToken
+     * @param  _ownerFeeSplit           Percent of fees in precise units (10^16 = 1%) sent to operator, rest to methodologist
+     * @param  _ownerFeeRecipient       Address which receives operator's share of fees when they're distributed
+     * @param  _initializeTargets       List of addresses of any extensions or modules which need to be initialized
+     * @param  _initializeBytecode      List of bytecode encoded calls to relevant target's initialize function
+     */
     function initialize(
         ISetToken _setToken,
         uint256 _ownerFeeSplit,
@@ -138,20 +236,41 @@ contract DelegatedManagerFactory {
             _initializeTargets[i].functionCallWithValue(_initializeBytecode[i], 0);
         }
 
-        _setToken.setManager(address(manager));
+        if (_setToken.manager() == address(this)) {
+            _setToken.setManager(address(manager));
+        }
+
         initializeState[_setToken].manager.transferOwnership(initializeState[_setToken].owner);
 
         delete initializeState[_setToken];
+        emit DelegatedManagerInitialized(_setToken, manager);
     }
 
     /* ============ External View Functions ============ */
 
+    /**
+     * Returns list of sets that have been successfully initialized by this factory
+     *
+     * @return address[] List of valid sets
+     */
     function getValidSets() external view returns (address[] memory) {
         return validSets;
     }
 
     /* ============ Internal Functions ============ */
 
+    /**
+     * Deploys a SetToken, setting this factory as its manager temporarily, pending initialization.
+     * Managership is transferred to a newly created DelegatedManager during `initialize`
+     *
+     * @param _components       List of addresses of components for initial Positions
+     * @param _units            List of units. Each unit is the # of components per 10^18 of a SetToken
+     * @param _modules          List of modules to enable. All modules must be approved by the Controller
+     * @param _name             Name of the SetToken
+     * @param _symbol           Symbol of the SetToken
+     *
+     * @return Address of created SetToken;
+     */
     function _deploySet(
         address[] memory _components,
         int256[] memory _units,
@@ -166,7 +285,7 @@ contract DelegatedManagerFactory {
             _components,
             _units,
             _modules,
-            address(this),      // Set Manager to this address so can xfer to manager deployed in next step
+            address(this),
             _name,
             _symbol
         );
@@ -174,6 +293,18 @@ contract DelegatedManagerFactory {
         return ISetToken(setToken);
     }
 
+
+    /**
+     * Deploys a DelegatedManager
+     *
+     * @param  _setToken         Instance of SetToken to migrate to the DelegatedManager system
+     * @param  _methodologist    Address to set as the DelegateManager's methodologist role
+     * @param  _extensions       List of extensions authorized for the DelegateManager
+     * @param  _operators        List of operators authorized for the DelegateManager
+     * @param  _assets           List of assets DelegateManager can trade. When empty, manager can trade any asset
+     *
+     * @return Address of created DelegatedManager
+     */
     function _deployManager(
         ISetToken _setToken,
         address _methodologist,
@@ -194,10 +325,24 @@ contract DelegatedManagerFactory {
             _assets,
             useAssetAllowlist
         );
-        // emit ManagerCreated(address(setToken), _manager, _name, _symbol);
+
+        emit DelegatedManagerCreated(
+            _setToken,
+            newManager,
+            msg.sender
+        );
+
         return newManager;
     }
 
+    /**
+     * Stores temporary creation metadata during the contract creation step. Data is retrieved, read and
+     * finally deleted during `initialize`.
+     *
+     * @param  _setToken         Instance of SetToken
+     * @param  _manager          Address of DelegatedManager created for SetToken
+     * @param  _owner            Address that will be given the `owner` DelegatedManager's role on initialization
+     */
     function _setInitializationState(
         ISetToken _setToken,
         address _manager,
@@ -212,5 +357,22 @@ contract DelegatedManagerFactory {
 
         isValidSet[_setToken] = true;
         validSets.push(address(_setToken));
+    }
+
+
+    /**
+     * Validates that all SetToken components are included in the assets whitelist. This prevents the
+     * DelegatedManager from being initialized with some components in an untrade-able state.
+     *
+     * @param _components       List of addresses of components for initial Positions
+     * @param  _assets          List of assets DelegateManager can trade.
+     */
+    function _validateComponentsIncludedInAssetsList(
+        address[] memory _components,
+        address[] memory _assets
+    ) internal pure {
+        for (uint256 i = 0; i < _components.length; i++) {
+            require(_assets.contains(_components[i]), "Asset list must include all components");
+        }
     }
 }

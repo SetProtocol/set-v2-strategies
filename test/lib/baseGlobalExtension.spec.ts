@@ -237,7 +237,7 @@ describe("BaseGlobalExtension", () => {
 
     describe("when the asset is not an approved asset", async () => {
       beforeEach(async () => {
-        subjectAsset = setV2Setup.wbtc.address
+        subjectAsset = setV2Setup.wbtc.address;
       });
 
       it("should revert", async () => {
