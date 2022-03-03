@@ -318,7 +318,7 @@ contract DelegatedManagerFactory {
         address[] memory _assets
     ) internal pure {
         for (uint256 i = 0; i < _components.length; i++) {
-            require(_assets.contains(_components[i]));
+            require(_assets.contains(_components[i]), "Asset list must include all components");
         }
     }
 }

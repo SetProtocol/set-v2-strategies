@@ -69,6 +69,58 @@ describe("DelegatedManagerFactory", () => {
     );
   });
 
+  // Helper function to run a setup execution either `createSetAndManager` or `createManager`
+  async function create(module: Address, extension: Address, existingSetToken?: Address): Promise<ContractTransaction> {
+    const tokens = [setV2Setup.dai.address, setV2Setup.wbtc.address];
+    const operators = [operatorOne.address, operatorTwo.address];
+    const otherAccountAddress = otherAccount.address;
+    const methodologistAddress = methodologist.address;
+
+    if (existingSetToken === undefined) {
+      return await delegatedManagerFactory.createSetAndManager(
+        tokens,
+        [ether(1), ether(.1)],
+        "TestToken",
+        "TT",
+        otherAccountAddress,
+        methodologistAddress,
+        [module],
+        operators,
+        tokens,
+        [extension]
+      );
+    }
+
+    return await delegatedManagerFactory.createManager(
+      existingSetToken as string,
+      otherAccountAddress,
+      methodologistAddress,
+      operators,
+      tokens,
+      [extension]
+    );
+  }
+
+  // Helper function to generateBytecode packets for factory initialization call
+  async function generateBytecode(setToken: Address, manager: Address): Promise<string[]> {
+    const iFace = new ethersUtils.Interface([
+      "function initialize(address,address)",
+      "function initializeExtension(address,address)"
+    ]);
+
+    const moduleBytecode = iFace.encodeFunctionData("initialize", [
+      setToken,
+      await getRandomAddress()
+    ]);
+
+    const extensionBytecode = iFace.encodeFunctionData("initializeExtension", [
+      setToken,
+      manager
+    ]);
+
+    return [moduleBytecode, extensionBytecode];
+  }
+
   describe("#constructor", async () => {
     let subjectSetTokenFactory: Address;
 
@@ -165,6 +217,19 @@ describe("DelegatedManagerFactory", () => {
     });
 
     it("should set the intialization state correctly", async() => {
+      const createdContracts = await delegatedManagerFactory.callStatic.createSetAndManager(
+        subjectComponents,
+        subjectUnits,
+        subjectName,
+        subjectSymbol,
+        subjectOwner,
+        subjectMethodologist,
+        subjectModules,
+        subjectOperators,
+        subjectAssets,
+        subjectExtensions
+      );
+
       const tx = await subject();
 
       const setTokenAddress = await protocolUtils.getCreatedSetTokenAddress(tx.hash);
@@ -173,22 +238,37 @@ describe("DelegatedManagerFactory", () => {
       expect(initializeParams.deployer).eq(owner.address);
       expect(initializeParams.owner).eq(subjectOwner);
       expect(initializeParams.isPending).eq(true);
-
-      // Need a method similar to getCreatedSetTokenAddress here...
-      // expect(initializeParams.manager).eq()
+      expect(initializeParams.manager).eq(createdContracts[1]);
     });
 
     it("should emit a DelegatedManagerDeployed event", async() => {
+      const createdContracts = await delegatedManagerFactory.callStatic.createSetAndManager(
+        subjectComponents,
+        subjectUnits,
+        subjectName,
+        subjectSymbol,
+        subjectOwner,
+        subjectMethodologist,
+        subjectModules,
+        subjectOperators,
+        subjectAssets,
+        subjectExtensions
+      );
 
+      await expect(subject()).to.emit(delegatedManagerFactory, "DelegatedManagerCreated").withArgs(
+        createdContracts[0], // SetToken
+        createdContracts[1], // DelegatedManager
+        owner.address
+      );
     });
 
     describe("when the assets array in non-empty but missing some component elements", async() => {
       beforeEach(async() => {
-
+        subjectAssets = [setV2Setup.dai.address];
       });
 
       it("should revert", async() => {
-
+        await expect(subject()).to.be.revertedWith("Asset list must include all components");
       });
     });
   });
@@ -242,7 +322,7 @@ describe("DelegatedManagerFactory", () => {
     });
 
     async function subject(): Promise<ContractTransaction> {
-      return await delegatedManagerFactory.createManager(
+      return delegatedManagerFactory.createManager(
         subjectSetToken,
         subjectOwner,
         subjectMethodologist,
@@ -265,6 +345,15 @@ describe("DelegatedManagerFactory", () => {
     });
 
     it("should set the intialization state correctly", async() => {
+      const newManagerAddress = await delegatedManagerFactory.callStatic.createManager(
+        subjectSetToken,
+        subjectOwner,
+        subjectMethodologist,
+        subjectOperators,
+        subjectAssets,
+        subjectExtensions
+      );
+
       await subject();
 
       const initializeParams = await delegatedManagerFactory.initializeState(subjectSetToken);
@@ -272,22 +361,33 @@ describe("DelegatedManagerFactory", () => {
       expect(initializeParams.deployer).eq(owner.address);
       expect(initializeParams.owner).eq(subjectOwner);
       expect(initializeParams.isPending).eq(true);
-
-      // Need a method similar to getCreatedSetTokenAddress here...
-      // expect(initializeParams.manager).eq()
+      expect(initializeParams.manager).eq(newManagerAddress);
     });
 
     it("should emit a DelegatedManagerDeployed event", async() => {
+      const managerAddress = await delegatedManagerFactory.callStatic.createManager(
+        subjectSetToken,
+        subjectOwner,
+        subjectMethodologist,
+        subjectOperators,
+        subjectAssets,
+        subjectExtensions
+      );
 
+      await expect(subject()).to.emit(delegatedManagerFactory, "DelegatedManagerCreated").withArgs(
+        subjectSetToken,
+        managerAddress,
+        owner.address
+      );
     });
 
     describe("when the assets array in non-empty but missing some component elements", async() => {
       beforeEach(async() => {
-
+        subjectAssets = [setV2Setup.wbtc.address];
       });
 
       it("should revert", async() => {
-
+        await expect(subject()).to.be.revertedWith("Asset list must include all components");
       });
     });
   });
@@ -306,56 +406,6 @@ describe("DelegatedManagerFactory", () => {
     let subjectOwnerFeeRecipient: Address;
     let subjectInitializeTargets: Address[];
     let subjectInitializeBytecode: string[];
-
-    async function create(module: Address, extension: Address, existingSetToken?: Address): Promise<ContractTransaction> {
-      const tokens = [setV2Setup.dai.address, setV2Setup.wbtc.address];
-      const operators = [operatorOne.address, operatorTwo.address];
-      const otherAccountAddress = otherAccount.address;
-      const methodologistAddress = methodologist.address;
-
-      if (existingSetToken === undefined) {
-        return await delegatedManagerFactory.createSetAndManager(
-          tokens,
-          [ether(1), ether(.1)],
-          "TestToken",
-          "TT",
-          otherAccountAddress,
-          methodologistAddress,
-          [module],
-          operators,
-          tokens,
-          [extension]
-        );
-      }
-
-      return await delegatedManagerFactory.createManager(
-        existingSetToken as string,
-        otherAccountAddress,
-        methodologistAddress,
-        operators,
-        tokens,
-        [extension]
-      );
-    }
-
-    async function generateBytecode(setToken: Address, manager: Address): Promise<string[]> {
-      const iFace = new ethersUtils.Interface([
-        "function initialize(address,address)",
-        "function initializeExtension(address,address)"
-      ]);
-
-      const moduleBytecode = iFace.encodeFunctionData("initialize", [
-        setToken,
-        await getRandomAddress()
-      ]);
-
-      const extensionBytecode = iFace.encodeFunctionData("initializeExtension", [
-        setToken,
-        manager
-      ]);
-
-      return [moduleBytecode, extensionBytecode];
-    }
 
     beforeEach(() => {
       subjectCaller = owner;
@@ -453,7 +503,10 @@ describe("DelegatedManagerFactory", () => {
       });
 
       it("should emit a DelegatedManagerInitialized event", async() => {
-
+        await expect(subject()).to.emit(delegatedManagerFactory, "DelegatedManagerInitialized").withArgs(
+          subjectSetToken,
+          initializeParams.manager
+        );
       });
     });
 
@@ -570,9 +623,26 @@ describe("DelegatedManagerFactory", () => {
   });
 
   describe("#getValidSets", () => {
+    let setTokenAddress: Address;
 
     beforeEach(async() => {
+      const module = setV2Setup.issuanceModule.address;
+      const extension = mockIssuanceExtension.address;
+      const tx = await create(module, extension);
 
+      setTokenAddress = await protocolUtils.getCreatedSetTokenAddress(tx.hash);
+
+      const initializeParams = await delegatedManagerFactory.initializeState(setTokenAddress);
+      const initializeTargets = [module, extension];
+      const initializeBytecode = await generateBytecode(setTokenAddress, initializeParams.manager);
+
+      await delegatedManagerFactory.initialize(
+        setTokenAddress,
+        ether(.5),
+        await getRandomAddress(),
+        initializeTargets,
+        initializeBytecode
+      );
     });
 
     async function subject(): Promise<string[]> {
@@ -580,7 +650,10 @@ describe("DelegatedManagerFactory", () => {
     }
 
     it("should return valid sets", async() => {
-      await subject();
+      const validSets = await subject();
+
+      expect(validSets.length).eq(1);
+      expect(validSets.includes(setTokenAddress)).eq(true);
     });
   });
 });
