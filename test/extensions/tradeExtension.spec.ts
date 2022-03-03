@@ -368,6 +368,10 @@ describe.only("TradeExtension", () => {
         expect(isExtensionInitialized).to.eq(true);
       });
 
+      it("should emit the correct ModuleInitialized event", async () => {
+        await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(tradeModule.address);
+      });
+
       it("should emit the correct ExtensionInitialized event", async () => {
         await expect(subject()).to.emit(tradeExtension, "ExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
       });

@@ -387,6 +387,10 @@ describe.only("StreamingFeeSplitExtension", () => {
         const isExtensionInitialized: Boolean = await delegatedManager.isInitializedExtension(streamingFeeSplitExtension.address);
         expect(isExtensionInitialized).to.eq(true);
       });
+
+      it("should emit the correct ModuleInitialized event", async () => {
+        await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(setV2Setup.streamingFeeModule.address);
+      });
       
       it("should emit the correct ExtensionInitialized event", async () => {
         await expect(subject()).to.emit(streamingFeeSplitExtension, "ExtensionInitialized").withArgs(setToken.address, delegatedManager.address);

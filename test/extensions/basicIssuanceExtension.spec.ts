@@ -403,6 +403,10 @@ describe.only("BasicIssuanceExtension", () => {
         const isExtensionInitialized: Boolean = await delegatedManager.isInitializedExtension(basicIssuanceExtension.address);
         expect(isExtensionInitialized).to.eq(true);
       });
+
+      it("should emit the correct ModuleInitialized event", async () => {
+        await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(debtIssuanceModule.address);
+      });
       
       it("should emit the correct ExtensionInitialized event", async () => {
         await expect(subject()).to.emit(basicIssuanceExtension, "ExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
