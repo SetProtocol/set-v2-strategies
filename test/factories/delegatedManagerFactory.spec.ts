@@ -1,6 +1,6 @@
 import "module-alias/register";
 
-import { BigNumber, ContractTransaction, utils as ethersUtils } from "ethers";
+import { BigNumber, ContractTransaction } from "ethers";
 import { Address, Account } from "@utils/types";
 import { ADDRESS_ZERO, ZERO } from "@utils/constants";
 import {
@@ -103,17 +103,12 @@ describe("DelegatedManagerFactory", () => {
 
   // Helper function to generate bytecode packets for factory initialization call
   async function generateBytecode(setToken: Address, manager: Address): Promise<string[]> {
-    const iFace = new ethersUtils.Interface([
-      "function initialize(address,address)",
-      "function initializeExtension(address,address)"
-    ]);
-
-    const moduleBytecode = iFace.encodeFunctionData("initialize", [
+    const moduleBytecode = setV2Setup.issuanceModule.interface.encodeFunctionData("initialize", [
       setToken,
       await getRandomAddress()
     ]);
 
-    const extensionBytecode = iFace.encodeFunctionData("initializeExtension", [
+    const extensionBytecode = mockIssuanceExtension.interface.encodeFunctionData("initializeExtension", [
       setToken,
       manager
     ]);
