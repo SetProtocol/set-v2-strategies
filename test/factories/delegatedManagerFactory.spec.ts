@@ -29,7 +29,7 @@ import { SetToken } from "@setprotocol/set-protocol-v2/utils/contracts";
 
 const expect = getWaffleExpect();
 
-describe.only("DelegatedManagerFactory", () => {
+describe("DelegatedManagerFactory", () => {
   let owner: Account;
   let methodologist: Account;
   let otherAccount: Account;
