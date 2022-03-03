@@ -104,7 +104,7 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
      *
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
-    function initializeExtension(IDelegatedManager _delegatedManager) public {
+    function initializeExtension(IDelegatedManager _delegatedManager) external {
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
@@ -131,11 +131,15 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
         require(_delegatedManager.setToken().isPendingModule(address(streamingFeeModule)), "StreamingFeeModule must be pending");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        initializeExtension(_delegatedManager);
+        setManagers[_delegatedManager.setToken()] = _delegatedManager;
 
         _delegatedManager.initializeExtension();
 
-        streamingFeeModule.initialize(_delegatedManager.setToken(), _settings);
+        bytes memory callData = abi.encodeWithSignature(
+            "initialize(address,(address,uint256,uint256,uint256))", 
+            _delegatedManager.setToken(),
+            _settings);
+        invokeManager(_delegatedManager.setToken(), address(streamingFeeModule), callData);
 
         ExtensionInitialized(address(_delegatedManager.setToken()), address(_delegatedManager));
     }

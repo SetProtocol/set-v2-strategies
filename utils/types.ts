@@ -68,3 +68,10 @@ export interface PerpV2IncentiveSettings {
   etherReward: BigNumber;
   incentivizedLeverageRatio: BigNumber;
 }
+
+export interface StreamingFeeState {
+  feeRecipient: Address;
+  streamingFeePercentage: BigNumber;
+  maxStreamingFeePercentage: BigNumber;
+  lastStreamingFeeTimestamp: BigNumber;
+}
