@@ -77,17 +77,15 @@ contract TradeExtension is BaseGlobalExtension {
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
     function initializeModuleAndExtension(IDelegatedManager _delegatedManager) external {
-        require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.setToken().isPendingModule(address(tradeModule)), "TradeModule must be pending");
-        require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
         initializeExtension(_delegatedManager);
 
-        _delegatedManager.initializeExtension();
-
-        tradeModule.initialize(_delegatedManager.setToken());
-
-        ExtensionInitialized(address(_delegatedManager.setToken()), address(_delegatedManager));
+        bytes memory callData = abi.encodeWithSignature(
+            "initialize(ISetToken)", 
+            _delegatedManager.setToken()
+        );
+        address(_delegatedManager).call(callData);
     }
 
     /**
