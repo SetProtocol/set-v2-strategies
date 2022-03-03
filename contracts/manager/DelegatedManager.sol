@@ -58,39 +58,39 @@ contract DelegatedManager is Ownable {
     /* ============ Events ============ */
 
     event MethodologistChanged(
-        address _newMethodologist
+        address indexed _newMethodologist
     );
 
     event ExtensionAdded(
-        address _extension
+        address indexed _extension
     );
 
     event ExtensionRemoved(
-        address _extension
+        address indexed _extension
     );
 
     event ExtensionInitialized(
-        address _extension
+        address indexed _extension
     );
 
     event OperatorAdded(
-        address _operator
+        address indexed _operator
     );
 
     event OperatorRemoved(
-        address _operator
+        address indexed _operator
     );
 
     event AllowedAssetAdded(
-        address _asset
+        address indexed _asset
     );
 
     event AllowedAssetRemoved(
-        address _asset
+        address indexed _asset
     );
 
     event UseAssetAllowlistUpdated(
-        bool indexed _status
+        bool _status
     );
 
     event OwnerFeeSplitUpdated(
@@ -98,7 +98,7 @@ contract DelegatedManager is Ownable {
     );
 
     event OwnerFeeRecipientUpdated(
-        address _newFeeRecipient
+        address indexed _newFeeRecipient
     );
 
     /* ============ Modifiers ============ */
@@ -209,7 +209,7 @@ contract DelegatedManager is Ownable {
     }
 
     /**
-     * Initializes an added extension from PENDING to INITIALIZED state and adds to extension array. An 
+     * Initializes an added extension from PENDING to INITIALIZED state and adds to extension array. An
      * address can only enter a PENDING state if it is an enabled extension added by the manager. Only
      * callable by the extension itself, hence msg.sender is the subject of update.
      */
