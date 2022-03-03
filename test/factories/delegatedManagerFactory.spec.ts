@@ -69,7 +69,7 @@ describe("DelegatedManagerFactory", () => {
     );
   });
 
-  // Helper function to run a setup execution either `createSetAndManager` or `createManager`
+  // Helper function to run a setup execution of either `createSetAndManager` or `createManager`
   async function create(module: Address, extension: Address, existingSetToken?: Address): Promise<ContractTransaction> {
     const tokens = [setV2Setup.dai.address, setV2Setup.wbtc.address];
     const operators = [operatorOne.address, operatorTwo.address];
@@ -101,7 +101,7 @@ describe("DelegatedManagerFactory", () => {
     );
   }
 
-  // Helper function to generateBytecode packets for factory initialization call
+  // Helper function to generate bytecode packets for factory initialization call
   async function generateBytecode(setToken: Address, manager: Address): Promise<string[]> {
     const iFace = new ethersUtils.Interface([
       "function initialize(address,address)",
@@ -262,7 +262,7 @@ describe("DelegatedManagerFactory", () => {
       );
     });
 
-    describe("when the assets array in non-empty but missing some component elements", async() => {
+    describe("when the assets array is non-empty but missing some component elements", async() => {
       beforeEach(async() => {
         subjectAssets = [setV2Setup.dai.address];
       });
@@ -413,7 +413,7 @@ describe("DelegatedManagerFactory", () => {
       });
     });
 
-    describe("when the assets array in non-empty but missing some component elements", async() => {
+    describe("when the assets array is non-empty but missing some component elements", async() => {
       beforeEach(async() => {
         subjectAssets = [setV2Setup.wbtc.address];
       });

@@ -316,14 +316,14 @@ describe("DelegatedManager", () => {
     });
 
     describe("when the caller is not an extension", async () => {
-        beforeEach(async () => {
-          subjectCaller = operatorOne;
-        });
-
-        it("should revert", async () => {
-          await expect(subject()).to.be.revertedWith("Must be initialized extension");
-        });
+      beforeEach(async () => {
+        subjectCaller = operatorOne;
       });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be initialized extension");
+      });
+    });
   });
 
   describe("#addExtensions", async () => {
