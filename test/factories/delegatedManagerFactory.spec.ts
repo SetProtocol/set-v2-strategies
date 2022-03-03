@@ -29,7 +29,7 @@ import { SetToken } from "@setprotocol/set-protocol-v2/utils/contracts";
 
 const expect = getWaffleExpect();
 
-describe("DelegatedManagerFactory", () => {
+describe.only("DelegatedManagerFactory", () => {
   let owner: Account;
   let methodologist: Account;
   let otherAccount: Account;
@@ -271,9 +271,27 @@ describe("DelegatedManagerFactory", () => {
         await expect(subject()).to.be.revertedWith("Asset list must include all components");
       });
     });
+
+    // This test exists to cover the condition on the branch which validates components are assets
+    // Just verifying that creation state is pending
+    describe("when the assets array is empty", async() => {
+      beforeEach(() => {
+        subjectAssets = [];
+      });
+
+      it("should set the intialization state correctly", async() => {
+        const tx = await subject();
+
+        const setTokenAddress = await protocolUtils.getCreatedSetTokenAddress(tx.hash);
+        const initializeParams = await delegatedManagerFactory.initializeState(setTokenAddress);
+
+        expect(initializeParams.isPending).eq(true);
+      });
+    });
   });
 
   describe("#createManager", () => {
+    let subjectCaller: Account;
     let subjectSetToken: Address;
     let subjectOwner: Address;
     let subjectMethodologist: Address;
@@ -321,8 +339,12 @@ describe("DelegatedManagerFactory", () => {
       subjectExtensions = [mockIssuanceExtension.address, mockFeeExtension.address];
     });
 
+    beforeEach(() => {
+      subjectCaller = owner;
+    });
+
     async function subject(): Promise<ContractTransaction> {
-      return delegatedManagerFactory.createManager(
+      return delegatedManagerFactory.connect(subjectCaller.wallet).createManager(
         subjectSetToken,
         subjectOwner,
         subjectMethodologist,
@@ -381,6 +403,16 @@ describe("DelegatedManagerFactory", () => {
       );
     });
 
+    describe("when the caller is not the SetToken manager", async () => {
+      beforeEach(() => {
+        subjectCaller = otherAccount;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be manager");
+      });
+    });
+
     describe("when the assets array in non-empty but missing some component elements", async() => {
       beforeEach(async() => {
         subjectAssets = [setV2Setup.wbtc.address];
@@ -388,6 +420,22 @@ describe("DelegatedManagerFactory", () => {
 
       it("should revert", async() => {
         await expect(subject()).to.be.revertedWith("Asset list must include all components");
+      });
+    });
+
+    // This test exists to cover the condition on the branch which validates components are assets
+    // Just verifying that creation state is pending
+    describe("when the assets array is empty", async() => {
+      beforeEach(() => {
+        subjectAssets = [];
+      });
+
+      it("should set the intialization state correctly", async() => {
+        await subject();
+
+        const initializeParams = await delegatedManagerFactory.initializeState(subjectSetToken);
+
+        expect(initializeParams.isPending).eq(true);
       });
     });
   });
