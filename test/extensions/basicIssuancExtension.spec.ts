@@ -255,4 +255,130 @@ describe("BasicIssuanceExtension", () => {
       });
     });
   });
+
+  describe("#updateIssueFee", async () => {
+    let subjectNewFee: BigNumber;
+    let subjectSetToken: Address;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      await basicIssuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
+        delegatedManager.address,
+        maxManagerFee,
+        managerIssueFee,
+        managerRedeemFee,
+        feeRecipient,
+        managerIssuanceHook
+      );
+
+      subjectNewFee = ether(.03);
+      subjectSetToken = setToken.address;
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return await basicIssuanceExtension.connect(subjectCaller.wallet).updateIssueFee(subjectSetToken, subjectNewFee);
+    }
+
+    it("should update the issue fee on the BasicIssuanceModule", async () => {
+      await subject();
+
+      const issueState: any = await debtIssuanceModule.issuanceSettings(setToken.address);
+      expect(issueState.managerIssueFee).to.eq(subjectNewFee);
+    });
+
+    describe("when the sender is not the owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be owner");
+      });
+    });
+  });
+
+  describe("#updateRedeemFee", async () => {
+    let subjectNewFee: BigNumber;
+    let subjectSetToken: Address;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      await basicIssuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
+        delegatedManager.address,
+        maxManagerFee,
+        managerIssueFee,
+        managerRedeemFee,
+        feeRecipient,
+        managerIssuanceHook
+      );
+
+      subjectNewFee = ether(.03);
+      subjectSetToken = setToken.address;
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return await basicIssuanceExtension.connect(subjectCaller.wallet).updateRedeemFee(subjectSetToken, subjectNewFee);
+    }
+
+    it("should update the issue fee on the BasicIssuanceModule", async () => {
+      await subject();
+
+      const issueState: any = await debtIssuanceModule.issuanceSettings(setToken.address);
+      expect(issueState.managerRedeemFee).to.eq(subjectNewFee);
+    });
+
+    describe("when the sender is not the owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be owner");
+      });
+    });
+  });
+
+  describe("#updateFeeRecipient", async () => {
+    let subjectNewFeeRecipient: Address;
+    let subjectSetToken: Address;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      await basicIssuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
+        delegatedManager.address,
+        maxManagerFee,
+        managerIssueFee,
+        managerRedeemFee,
+        feeRecipient,
+        managerIssuanceHook
+      );
+
+      subjectNewFeeRecipient = factory.address;
+      subjectSetToken = setToken.address;
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return await basicIssuanceExtension.connect(subjectCaller.wallet).updateFeeRecipient(subjectSetToken, subjectNewFeeRecipient);
+    }
+
+    it("should update the fee recipient on the BasicIssuanceModule", async () => {
+      await subject();
+
+      const issueState: any = await debtIssuanceModule.issuanceSettings(setToken.address);
+      expect(issueState.feeRecipient).to.eq(subjectNewFeeRecipient);
+    });
+
+    describe("when the sender is not the owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be owner");
+      });
+    });
+  });
 });

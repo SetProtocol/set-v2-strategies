@@ -2,7 +2,7 @@ import "module-alias/register";
 
 import { BigNumber } from "ethers";
 import { Address, Account, StreamingFeeState } from "@utils/types";
-import { ADDRESS_ZERO } from "@utils/constants";
+import { ADDRESS_ZERO, ONE_YEAR_IN_SECONDS } from "@utils/constants";
 import { DelegatedManager, StreamingFeeSplitExtension } from "@utils/contracts/index";
 import { SetToken } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "@utils/deploys";
@@ -11,8 +11,10 @@ import {
   ether,
   getAccounts,
   getWaffleExpect,
+  increaseTimeAsync,
   getTransactionTimestamp
 } from "@utils/index";
+import { getStreamingFee, getStreamingFeeInflationAmount } from "@utils/common";
 import { SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
 import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2/utils/test";
 import { ContractTransaction } from "ethers";
@@ -247,6 +249,107 @@ describe("StreamingFeeSplitExtension", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Extension must be pending");
+      });
+    });
+  });
+
+  describe("#updateStreamingFee", async () => {
+    let mintedTokens: BigNumber;
+    const timeFastForward: BigNumber = ONE_YEAR_IN_SECONDS;
+
+    let subjectNewFee: BigNumber;
+
+    let subjectSetToken: Address;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      mintedTokens = ether(2);
+      await setV2Setup.dai.approve(setV2Setup.issuanceModule.address, ether(3));
+      await setV2Setup.issuanceModule.issue(setToken.address, mintedTokens, owner.address);
+
+      await increaseTimeAsync(timeFastForward);
+
+      await streamingFeeSplitExtension.connect(owner.wallet).initializeModuleAndExtension(delegatedManager.address, feeSettings);
+
+      subjectNewFee = ether(.01);
+      subjectSetToken = setToken.address;
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return await streamingFeeSplitExtension.connect(subjectCaller.wallet).updateStreamingFee(subjectSetToken, subjectNewFee);
+    }
+
+    it("should update the streaming fee on the StreamingFeeModule", async () => {
+      await subject();
+
+      const storedFeeState: StreamingFeeState = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
+      expect(storedFeeState.streamingFeePercentage).to.eq(subjectNewFee);
+    });
+
+    it("should send correct amount of fees to the DelegatedManager", async () => {
+      const preManagerBalance = await setToken.balanceOf(delegatedManager.address);
+      const feeState: any = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
+      const totalSupply = await setToken.totalSupply();
+      const txnTimestamp = await getTransactionTimestamp(subject());
+
+      const expectedFeeInflation = await getStreamingFee(
+        setV2Setup.streamingFeeModule,
+        setToken.address,
+        feeState.lastStreamingFeeTimestamp,
+        txnTimestamp,
+        ether(.02)
+      );
+
+      const feeInflation = getStreamingFeeInflationAmount(expectedFeeInflation, totalSupply);
+
+      const postManagerBalance = await setToken.balanceOf(delegatedManager.address);
+
+      expect(postManagerBalance.sub(preManagerBalance)).to.eq(feeInflation);
+    });
+
+    describe("when the sender is not the owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be owner");
+      });
+    });
+  });
+
+  describe("#updateFeeRecipient", async () => {
+    let subjectNewFeeRecipient: Address;
+    let subjectSetToken: Address;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      await streamingFeeSplitExtension.connect(owner.wallet).initializeModuleAndExtension(delegatedManager.address, feeSettings);
+
+      subjectNewFeeRecipient = factory.address;
+      subjectSetToken = setToken.address;
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return await streamingFeeSplitExtension.connect(subjectCaller.wallet).updateFeeRecipient(subjectSetToken, subjectNewFeeRecipient);
+    }
+
+    it("should update the fee recipient on the StreamingFeeModule", async () => {
+      await subject();
+
+      const storedFeeState: StreamingFeeState = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
+      expect(storedFeeState.feeRecipient).to.eq(subjectNewFeeRecipient);
+    });
+
+    describe("when the sender is not the owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be owner");
       });
     });
   });
