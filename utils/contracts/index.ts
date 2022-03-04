@@ -12,3 +12,6 @@ export { PerpV2PriceFeedMock } from "../../typechain/PerpV2PriceFeedMock";
 export { StandardTokenMock } from "../../typechain/StandardTokenMock";
 export { StringArrayUtilsMock } from "../../typechain/StringArrayUtilsMock";
 export { SupplyCapIssuanceHook } from "../../typechain/SupplyCapIssuanceHook";
+export { TradeExtension } from "../../typechain/TradeExtension";
+export { BasicIssuanceExtension } from "../../typechain/BasicIssuanceExtension";
+export { StreamingFeeSplitExtension } from "../../typechain/StreamingFeeSplitExtension";
