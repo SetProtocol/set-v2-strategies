@@ -22,5 +22,5 @@ pragma experimental "ABIEncoderV2";
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 interface IGlobalExtension {
-    function removeExtension(ISetToken _setToken) external;
+    function removeExtension() external;
 }

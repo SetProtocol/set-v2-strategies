@@ -165,13 +165,12 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY OWNER: Remove an existing SetToken and DelegatedManager tracked by the BasicIssuanceExtension 
-     *
-     * @param _setToken     Instance of the SetToken to remove
+     * ONLY OWNER: Remove an existing SetToken and DelegatedManager tracked by the TradeExtension 
      */
-    function removeExtension(ISetToken _setToken) external override onlyOwner(_setToken) {
-        require(address(setManagers[_setToken]) != address(0), "Must be existing Set Token");
-        delete setManagers[_setToken];
+    function removeExtension() external override {
+        ISetToken setToken = IDelegatedManager(msg.sender).setToken();
+        require(msg.sender == address(_manager(setToken)), "Must be Manager");
+        delete setManagers[setToken];
     }
 
     /**

@@ -77,7 +77,7 @@ abstract contract BaseGlobalExtension {
     /**
      * ONLY MANAGER: Deletes SetToken/Manager state from extension. Must only be callable by manager!
      */
-    function removeExtension(ISetToken _setToken) external virtual;
+    function removeExtension() external virtual;
 
     /* ============ Internal Functions ============ */
 

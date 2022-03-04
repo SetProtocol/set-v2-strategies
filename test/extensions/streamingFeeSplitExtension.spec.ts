@@ -161,7 +161,7 @@ describe("StreamingFeeSplitExtension", () => {
     describe("when the extension is not pending or initialized", async () => {
       beforeEach(async () => {
         await streamingFeeSplitExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
-        await streamingFeeSplitExtension.connect(owner.wallet).removeExtension(setToken.address);
+        await delegatedManager.connect(owner.wallet).removeExtensions([streamingFeeSplitExtension.address]);
       });
 
       it("should revert", async () => {
@@ -262,7 +262,7 @@ describe("StreamingFeeSplitExtension", () => {
     describe("when the extension is not pending or initialized", async () => {
       beforeEach(async () => {
         await streamingFeeSplitExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
-        await streamingFeeSplitExtension.connect(owner.wallet).removeExtension(setToken.address);
+        await delegatedManager.connect(owner.wallet).removeExtensions([streamingFeeSplitExtension.address]);
       });
 
       it("should revert", async () => {

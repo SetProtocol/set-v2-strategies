@@ -156,7 +156,7 @@ describe("BasicIssuanceExtension", () => {
     describe("when the extension is not pending or initialized", async () => {
       beforeEach(async () => {
         await basicIssuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
-        await basicIssuanceExtension.connect(owner.wallet).removeExtension(setToken.address);
+        await delegatedManager.connect(owner.wallet).removeExtensions([basicIssuanceExtension.address]);
       });
 
       it("should revert", async () => {
@@ -266,7 +266,7 @@ describe("BasicIssuanceExtension", () => {
     describe("when the extension is not pending or initialized", async () => {
       beforeEach(async () => {
         await basicIssuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
-        await basicIssuanceExtension.connect(owner.wallet).removeExtension(setToken.address);
+        await delegatedManager.connect(owner.wallet).removeExtensions([basicIssuanceExtension.address]);
       });
 
       it("should revert", async () => {

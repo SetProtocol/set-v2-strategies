@@ -69,8 +69,10 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
         onlyAllowedAsset(_setToken, _asset)
     {}
 
-    function removeExtension(ISetToken _setToken) external override onlyManager(_setToken) {
-        delete initializeInfo[_setToken];
+    function removeExtension() external override {
+        ISetToken setToken = IDelegatedManager(msg.sender).setToken();
+        require(msg.sender == address(_manager(setToken)), "Must be Manager");
+        delete initializeInfo[setToken];
     }
 
     /* ============ Internal Functions ============ */

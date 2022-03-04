@@ -136,7 +136,7 @@ describe("TradeExtension", () => {
     describe("when the extension is not pending or initialized", async () => {
       beforeEach(async () => {
         await tradeExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
-        await tradeExtension.connect(owner.wallet).removeExtension(setToken.address);
+        await delegatedManager.connect(owner.wallet).removeExtensions([tradeExtension.address]);
       });
 
       it("should revert", async () => {
@@ -231,7 +231,7 @@ describe("TradeExtension", () => {
     describe("when the extension is not pending or initialized", async () => {
       beforeEach(async () => {
         await tradeExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
-        await tradeExtension.connect(owner.wallet).removeExtension(setToken.address);
+        await delegatedManager.connect(owner.wallet).removeExtensions([tradeExtension.address]);
       });
 
       it("should revert", async () => {
