@@ -12,6 +12,7 @@ import {
   getAccounts,
   getWaffleExpect,
   increaseTimeAsync,
+  preciseMul,
   getTransactionTimestamp
 } from "@utils/index";
 import { getStreamingFee, getStreamingFeeInflationAmount } from "@utils/common";
@@ -39,6 +40,9 @@ describe("StreamingFeeSplitExtension", () => {
   let maxStreamingFeePercentage: BigNumber;
   let streamingFeePercentage: BigNumber;
   let feeSettings: StreamingFeeState;
+
+  let ownerFeeSplit: BigNumber;
+  let ownerFeeRecipient: Address;
 
   before(async () => {
     [
@@ -72,6 +76,11 @@ describe("StreamingFeeSplitExtension", () => {
       [setV2Setup.usdc.address, setV2Setup.weth.address],
       true
     );
+
+    ownerFeeSplit = ether(0.1);
+    await delegatedManager.updateOwnerFeeSplit(ownerFeeSplit);
+    ownerFeeRecipient = owner.address;
+    await delegatedManager.updateOwnerFeeRecipient(ownerFeeRecipient);
 
     await setToken.setManager(delegatedManager.address);
 
@@ -369,6 +378,87 @@ describe("StreamingFeeSplitExtension", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Must be owner");
+      });
+    });
+  });
+
+  describe("#accrueFeesAndDistribute", async () => {
+    let mintedTokens: BigNumber;
+    const timeFastForward: BigNumber = ONE_YEAR_IN_SECONDS;
+    let subjectSetToken: Address;
+
+    beforeEach(async () => {
+      await streamingFeeSplitExtension.connect(owner.wallet).initializeModuleAndExtension(delegatedManager.address, feeSettings);
+
+      mintedTokens = ether(2);
+      await setV2Setup.dai.approve(setV2Setup.issuanceModule.address, ether(3));
+      await setV2Setup.issuanceModule.issue(setToken.address, mintedTokens, factory.address);
+
+      await increaseTimeAsync(timeFastForward);
+
+      subjectSetToken = setToken.address;
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return await streamingFeeSplitExtension.accrueFeesAndDistribute(subjectSetToken);
+    }
+
+    it("should send correct amount of fees to owner fee recipient and methodologist", async () => {
+      const feeState: any = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
+      const totalSupply = await setToken.totalSupply();
+
+      const txnTimestamp = await getTransactionTimestamp(subject());
+
+      const expectedFeeInflation = await getStreamingFee(
+        setV2Setup.streamingFeeModule,
+        setToken.address,
+        feeState.lastStreamingFeeTimestamp,
+        txnTimestamp
+      );
+
+      const feeInflation = getStreamingFeeInflationAmount(expectedFeeInflation, totalSupply);
+
+      const expectedOwnerTake = preciseMul(feeInflation, ownerFeeSplit);
+      const expectedMethodologistTake = feeInflation.sub(expectedOwnerTake);
+
+      const ownerFeeRecipientBalance = await setToken.balanceOf(ownerFeeRecipient);
+      const methodologistBalance = await setToken.balanceOf(methodologist.address);
+
+      expect(ownerFeeRecipientBalance).to.eq(expectedOwnerTake);
+      expect(methodologistBalance).to.eq(expectedMethodologistTake);
+    });
+
+    it("should emit a FeesDistributed event", async () => {
+      await expect(subject()).to.emit(streamingFeeSplitExtension, "FeesDistributed");
+    });
+
+    describe("when methodologist fees are 0", async () => {
+      beforeEach(async () => {
+        await delegatedManager.connect(owner.wallet).updateOwnerFeeSplit(ether(1));
+      });
+
+      it("should not send fees to methodologist", async () => {
+        const preMethodologistBalance = await setToken.balanceOf(methodologist.address);
+
+        await subject();
+
+        const postMethodologistBalance = await setToken.balanceOf(methodologist.address);
+        expect(postMethodologistBalance.sub(preMethodologistBalance)).to.eq(ZERO);
+      });
+    });
+
+    describe("when owner fees are 0", async () => {
+      beforeEach(async () => {
+        await delegatedManager.connect(owner.wallet).updateOwnerFeeSplit(ZERO);
+      });
+
+      it("should not send fees to owner fee recipient", async () => {
+        const preOwnerFeeRecipientBalance = await setToken.balanceOf(ownerFeeRecipient);
+
+        await subject();
+
+        const postOwnerFeeRecipientBalance = await setToken.balanceOf(ownerFeeRecipient);
+        expect(postOwnerFeeRecipientBalance.sub(preOwnerFeeRecipientBalance)).to.eq(ZERO);
       });
     });
   });

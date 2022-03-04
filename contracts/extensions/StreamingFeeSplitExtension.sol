@@ -94,11 +94,11 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
         uint256 methodologistTake = totalFees.sub(ownerTake);
 
         if (ownerTake > 0) {
-            _setToken.transfer(ownerFeeRecipient, ownerTake);
+            _manager(_setToken).transferTokens(address(_setToken), ownerFeeRecipient, ownerTake);
         }
 
         if (methodologistTake > 0) {
-            _setToken.transfer(methodologist, methodologistTake);
+            _manager(_setToken).transferTokens(address(_setToken), methodologist, methodologistTake);
         }
 
         emit FeesDistributed(address(_setToken), ownerFeeRecipient, methodologist, ownerTake, methodologistTake);

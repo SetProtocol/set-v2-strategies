@@ -2,6 +2,7 @@ import "module-alias/register";
 
 import { BigNumber } from "ethers";
 import { Address, Account } from "@utils/types";
+import { ADDRESS_ZERO, ZERO } from "@utils/constants";
 import { DelegatedManager, BasicIssuanceExtension } from "@utils/contracts/index";
 import { SetToken, DebtIssuanceModule } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "@utils/deploys";
@@ -9,7 +10,8 @@ import {
   addSnapshotBeforeRestoreAfterEach,
   ether,
   getAccounts,
-  getWaffleExpect
+  getWaffleExpect,
+  preciseMul
 } from "@utils/index";
 import { SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
 import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2/utils/test";
@@ -37,6 +39,9 @@ describe("BasicIssuanceExtension", () => {
   let managerRedeemFee: BigNumber;
   let feeRecipient: Address;
   let managerIssuanceHook: Address;
+
+  let ownerFeeSplit: BigNumber;
+  let ownerFeeRecipient: Address;
 
   before(async () => {
     [
@@ -72,13 +77,18 @@ describe("BasicIssuanceExtension", () => {
       true
     );
 
+    ownerFeeSplit = ether(0.1);
+    await delegatedManager.updateOwnerFeeSplit(ownerFeeSplit);
+    ownerFeeRecipient = owner.address;
+    await delegatedManager.updateOwnerFeeRecipient(ownerFeeRecipient);
+
     await setToken.setManager(delegatedManager.address);
 
     maxManagerFee = ether(.1);
     managerIssueFee = ether(.02);
-    managerRedeemFee = ether(.02);
+    managerRedeemFee = ether(.03);
     feeRecipient = delegatedManager.address;
-    managerIssuanceHook = owner.address;
+    managerIssuanceHook = ADDRESS_ZERO;
   });
 
   addSnapshotBeforeRestoreAfterEach();
@@ -332,7 +342,7 @@ describe("BasicIssuanceExtension", () => {
         managerIssuanceHook
       );
 
-      subjectNewFee = ether(.03);
+      subjectNewFee = ether(.02);
       subjectSetToken = setToken.address;
       subjectCaller = owner;
     });
@@ -341,7 +351,7 @@ describe("BasicIssuanceExtension", () => {
       return await basicIssuanceExtension.connect(subjectCaller.wallet).updateRedeemFee(subjectSetToken, subjectNewFee);
     }
 
-    it("should update the issue fee on the BasicIssuanceModule", async () => {
+    it("should update the redeem fee on the BasicIssuanceModule", async () => {
       await subject();
 
       const issueState: any = await debtIssuanceModule.issuanceSettings(setToken.address);
@@ -397,6 +407,88 @@ describe("BasicIssuanceExtension", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Must be owner");
+      });
+    });
+  });
+
+  describe("#distributeFees", async () => {
+    let mintedTokens: BigNumber;
+    let redeemedTokens: BigNumber;
+    let subjectSetToken: Address;
+
+    beforeEach(async () => {
+      await basicIssuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
+        delegatedManager.address,
+        maxManagerFee,
+        managerIssueFee,
+        managerRedeemFee,
+        feeRecipient,
+        managerIssuanceHook
+      );
+
+      mintedTokens = ether(2);
+      await setV2Setup.dai.approve(debtIssuanceModule.address, ether(3));
+      await debtIssuanceModule.issue(setToken.address, mintedTokens, factory.address);
+
+      redeemedTokens = ether(1);
+      await setToken.approve(debtIssuanceModule.address, ether(2));
+      await debtIssuanceModule.connect(factory.wallet).redeem(setToken.address, redeemedTokens, factory.address);
+
+      subjectSetToken = setToken.address;
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return await basicIssuanceExtension.distributeFees(subjectSetToken);
+    }
+
+    it("should send correct amount of fees to owner fee recipient and methodologist", async () => {
+      subject();
+
+      const expectedMintFees = preciseMul(mintedTokens, managerIssueFee);
+      const expectedRedeemFees = preciseMul(redeemedTokens, managerRedeemFee);
+      const expectedMintRedeemFees = expectedMintFees.add(expectedRedeemFees);
+
+      const expectedOwnerTake = preciseMul(expectedMintRedeemFees, ownerFeeSplit);
+      const expectedMethodologistTake = expectedMintRedeemFees.sub(expectedOwnerTake);
+
+      const ownerFeeRecipientBalance = await setToken.balanceOf(ownerFeeRecipient);
+      const methodologistBalance = await setToken.balanceOf(methodologist.address);
+
+      expect(ownerFeeRecipientBalance).to.eq(expectedOwnerTake);
+      expect(methodologistBalance).to.eq(expectedMethodologistTake);
+    });
+
+    it("should emit a FeesDistributed event", async () => {
+      await expect(subject()).to.emit(basicIssuanceExtension, "FeesDistributed");
+    });
+
+    describe("when methodologist fees are 0", async () => {
+      beforeEach(async () => {
+        await delegatedManager.connect(owner.wallet).updateOwnerFeeSplit(ether(1));
+      });
+
+      it("should not send fees to methodologist", async () => {
+        const preMethodologistBalance = await setToken.balanceOf(methodologist.address);
+
+        await subject();
+
+        const postMethodologistBalance = await setToken.balanceOf(methodologist.address);
+        expect(postMethodologistBalance.sub(preMethodologistBalance)).to.eq(ZERO);
+      });
+    });
+
+    describe("when owner fees are 0", async () => {
+      beforeEach(async () => {
+        await delegatedManager.connect(owner.wallet).updateOwnerFeeSplit(ZERO);
+      });
+
+      it("should not send fees to owner fee recipient", async () => {
+        const preOwnerFeeRecipientBalance = await setToken.balanceOf(ownerFeeRecipient);
+
+        await subject();
+
+        const postOwnerFeeRecipientBalance = await setToken.balanceOf(ownerFeeRecipient);
+        expect(postOwnerFeeRecipientBalance.sub(preOwnerFeeRecipientBalance)).to.eq(ZERO);
       });
     });
   });
