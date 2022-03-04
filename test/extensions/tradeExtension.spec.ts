@@ -73,6 +73,25 @@ describe("TradeExtension", () => {
 
   addSnapshotBeforeRestoreAfterEach();
 
+  describe("#constructor", async () => {
+    let subjectTradeModule: Address;
+
+    beforeEach(async () => {
+      subjectTradeModule = tradeModule.address;
+    });
+
+    async function subject(): Promise<TradeExtension> {
+      return await deployer.globalExtensions.deployTradeExtension(subjectTradeModule);
+    }
+
+    it("should set the correct TradeModule address", async () => {
+      const tradeExtension = await subject();
+
+      const storedModule = await tradeExtension.tradeModule();
+      expect(storedModule).to.eq(subjectTradeModule);
+    });
+  });
+
   describe("#initializeExtension", async () => {
     let subjectDelegatedManager: Address;
     let subjectCaller: Account;

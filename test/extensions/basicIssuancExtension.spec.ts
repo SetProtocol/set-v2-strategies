@@ -83,6 +83,25 @@ describe("BasicIssuanceExtension", () => {
 
   addSnapshotBeforeRestoreAfterEach();
 
+  describe("#constructor", async () => {
+    let subjectBasicIssuanceModule: Address;
+
+    beforeEach(async () => {
+      subjectBasicIssuanceModule = debtIssuanceModule.address;
+    });
+
+    async function subject(): Promise<BasicIssuanceExtension> {
+      return await deployer.globalExtensions.deployBasicIssuanceExtension(subjectBasicIssuanceModule);
+    }
+
+    it("should set the correct BasicIssuanceModule address", async () => {
+      const BasicIssuanceExtension = await subject();
+
+      const storedModule = await BasicIssuanceExtension.issuanceModule();
+      expect(storedModule).to.eq(subjectBasicIssuanceModule);
+    });
+  });
+
   describe("#initializeExtension", async () => {
     let subjectDelegatedManager: Address;
     let subjectCaller: Account;

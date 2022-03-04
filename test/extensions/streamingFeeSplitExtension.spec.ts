@@ -89,6 +89,25 @@ describe("StreamingFeeSplitExtension", () => {
 
   addSnapshotBeforeRestoreAfterEach();
 
+  describe("#constructor", async () => {
+    let subjectStreamingFeeModule: Address;
+
+    beforeEach(async () => {
+      subjectStreamingFeeModule = setV2Setup.streamingFeeModule.address;
+    });
+
+    async function subject(): Promise<StreamingFeeSplitExtension> {
+      return await deployer.globalExtensions.deployStreamingFeeSplitExtension(subjectStreamingFeeModule);
+    }
+
+    it("should set the correct StreamingFeeModule address", async () => {
+      const streamingFeeSplitExtension = await subject();
+
+      const storedModule = await streamingFeeSplitExtension.streamingFeeModule();
+      expect(storedModule).to.eq(subjectStreamingFeeModule);
+    });
+  });
+
   describe("#initializeExtension", async () => {
     let subjectDelegatedManager: Address;
     let subjectCaller: Account;
