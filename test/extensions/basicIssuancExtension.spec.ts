@@ -242,26 +242,46 @@ describe("BasicIssuanceExtension", () => {
       });
     });
 
-    // describe("when the BasicIssuanceModule is not pending or initialized", async () => {
-    //   beforeEach(async () => {
-    //     // initialize module
-    //     // remove module
-    //   });
+    describe("when the BasicIssuanceModule is not pending or initialized", async () => {
+      beforeEach(async () => {
+        await basicIssuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
+          subjectDelegatedManager,
+          maxManagerFee,
+          managerIssueFee,
+          managerRedeemFee,
+          feeRecipient,
+          managerIssuanceHook
+        );
+        await delegatedManager.connect(owner.wallet).removeExtensions([basicIssuanceExtension.address]);
+        await delegatedManager.connect(owner.wallet).setManager(owner.address);
+        await setToken.connect(owner.wallet).removeModule(debtIssuanceModule.address);
+        await setToken.connect(owner.wallet).setManager(delegatedManager.address);
+        await delegatedManager.connect(owner.wallet).addExtensions([basicIssuanceExtension.address]);
+      });
 
-    //   it("should revert", async () => {
-    //     await expect(subject()).to.be.revertedWith("BasicIssuanceModule must be pending");
-    //   });
-    // });
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("BasicIssuanceModule must be pending");
+      });
+    });
 
-    // describe("when the BasicIssuanceModule is already initialized", async () => {
-    //   beforeEach(async () => {
-    //     // initialize module
-    //   });
+    describe("when the BasicIssuanceModule is already initialized", async () => {
+      beforeEach(async () => {
+        await basicIssuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
+          subjectDelegatedManager,
+          maxManagerFee,
+          managerIssueFee,
+          managerRedeemFee,
+          feeRecipient,
+          managerIssuanceHook
+        );
+        await delegatedManager.connect(owner.wallet).removeExtensions([basicIssuanceExtension.address]);
+        await delegatedManager.connect(owner.wallet).addExtensions([basicIssuanceExtension.address]);
+      });
 
-    //   it("should revert", async () => {
-    //     await expect(subject()).to.be.revertedWith("BasicIssuanceModule must be pending");
-    //   });
-    // });
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("BasicIssuanceModule must be pending");
+      });
+    });
 
     describe("when the extension is not pending or initialized", async () => {
       beforeEach(async () => {

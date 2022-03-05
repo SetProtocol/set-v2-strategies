@@ -207,26 +207,33 @@ describe("TradeExtension", () => {
       });
     });
 
-    // describe("when the module is not pending or initialized", async () => {
-    //   beforeEach(async () => {
-    //     // initialize module
-    //     // remove module
-    //   });
+    describe("when the module is not pending or initialized", async () => {
+      beforeEach(async () => {
+        await tradeExtension.connect(owner.wallet).initializeModuleAndExtension(delegatedManager.address);
+        await delegatedManager.connect(owner.wallet).removeExtensions([tradeExtension.address]);
+        await delegatedManager.connect(owner.wallet).setManager(owner.address);
+        await setToken.connect(owner.wallet).removeModule(tradeModule.address);
+        await setToken.connect(owner.wallet).setManager(delegatedManager.address);
+        await delegatedManager.connect(owner.wallet).addExtensions([tradeExtension.address]);
+      });
 
-    //   it("should revert", async () => {
-    //     await expect(subject()).to.be.revertedWith("TradeModule must be pending");
-    //   });
-    // });
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("TradeModule must be pending");
+      });
+    });
 
-    // describe("when the module is already initialized", async () => {
-    //   beforeEach(async () => {
-    //     // initialize module
-    //   });
+    describe("when the module is already initialized", async () => {
+      beforeEach(async () => {
+        // initialize module
+        await tradeExtension.connect(owner.wallet).initializeModuleAndExtension(delegatedManager.address);
+        await delegatedManager.connect(owner.wallet).removeExtensions([tradeExtension.address]);
+        await delegatedManager.connect(owner.wallet).addExtensions([tradeExtension.address]);
+      });
 
-    //   it("should revert", async () => {
-    //     await expect(subject()).to.be.revertedWith("TradeModule must be pending");
-    //   });
-    // });
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("TradeModule must be pending");
+      });
+    });
 
     describe("when the extension is not pending or initialized", async () => {
       beforeEach(async () => {

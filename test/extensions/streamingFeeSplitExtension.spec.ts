@@ -238,26 +238,32 @@ describe("StreamingFeeSplitExtension", () => {
       });
     });
 
-    // describe("when the StreamingFeeModule is not pending or initialized", async () => {
-    //   beforeEach(async () => {
-    //     // initialize module
-    //     // remove module
-    //   });
+    describe("when the StreamingFeeModule is not pending or initialized", async () => {
+      beforeEach(async () => {
+        await streamingFeeSplitExtension.connect(owner.wallet).initializeModuleAndExtension(subjectDelegatedManager, feeSettings);
+        await delegatedManager.connect(owner.wallet).removeExtensions([streamingFeeSplitExtension.address]);
+        await delegatedManager.connect(owner.wallet).setManager(owner.address);
+        await setToken.connect(owner.wallet).removeModule(setV2Setup.streamingFeeModule.address);
+        await setToken.connect(owner.wallet).setManager(delegatedManager.address);
+        await delegatedManager.connect(owner.wallet).addExtensions([streamingFeeSplitExtension.address]);
+      });
 
-    //   it("should revert", async () => {
-    //     await expect(subject()).to.be.revertedWith("StreamingFeeModule must be pending");
-    //   });
-    // });
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("StreamingFeeModule must be pending");
+      });
+    });
 
-    // describe("when the StreamingFeeModule is already initialized", async () => {
-    //   beforeEach(async () => {
-    //     // initialize module
-    //   });
+    describe("when the StreamingFeeModule is already initialized", async () => {
+      beforeEach(async () => {
+        await streamingFeeSplitExtension.connect(owner.wallet).initializeModuleAndExtension(subjectDelegatedManager, feeSettings);
+        await delegatedManager.connect(owner.wallet).removeExtensions([streamingFeeSplitExtension.address]);
+        await delegatedManager.connect(owner.wallet).addExtensions([streamingFeeSplitExtension.address]);
+      });
 
-    //   it("should revert", async () => {
-    //     await expect(subject()).to.be.revertedWith("StreamingFeeModule must be pending");
-    //   });
-    // });
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("StreamingFeeModule must be pending");
+      });
+    });
 
     describe("when the extension is not pending or initialized", async () => {
       beforeEach(async () => {
