@@ -130,8 +130,10 @@ contract TradeExtension is BaseGlobalExtension {
     )
         external
         onlyOperator(_setToken)
+        onlyAllowedAsset(_setToken, _receiveToken)
     {
-        tradeModule.trade(
+        bytes memory callData = abi.encodeWithSignature(
+            "trade(address,string,address,uint256,address,uint256,bytes)", 
             _setToken,
             _exchangeName,
             _sendToken,
@@ -140,6 +142,7 @@ contract TradeExtension is BaseGlobalExtension {
             _minReceiveQuantity,
             _data
         );
+        _invokeManager(_setToken, address(tradeModule), callData);
     }
 
     /* ============ Internal Functions ============ */

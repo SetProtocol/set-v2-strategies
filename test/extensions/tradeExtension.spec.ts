@@ -1,9 +1,10 @@
 import "module-alias/register";
 
+import { BigNumber } from "ethers";
 import { Address, Account } from "@utils/types";
-import { ADDRESS_ZERO } from "@utils/constants";
+import { ADDRESS_ZERO, EMPTY_BYTES } from "@utils/constants";
 import { DelegatedManager, TradeExtension } from "@utils/contracts/index";
-import { SetToken, TradeModule } from "@setprotocol/set-protocol-v2/utils/contracts";
+import { SetToken, TradeModule, TradeAdapterMock } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "@utils/deploys";
 import {
   addSnapshotBeforeRestoreAfterEach,
@@ -32,6 +33,9 @@ describe("TradeExtension", () => {
   let delegatedManager: DelegatedManager;
   let tradeExtension: TradeExtension;
 
+  const tradeAdapterName = "TRADEMOCK";
+  let tradeMock: TradeAdapterMock;
+
   before(async () => {
     [
       owner,
@@ -47,6 +51,14 @@ describe("TradeExtension", () => {
 
     tradeModule = await deployer.setDeployer.modules.deployTradeModule(setV2Setup.controller.address);
     await setV2Setup.controller.addModule(tradeModule.address);
+
+    tradeMock = await deployer.setDeployer.mocks.deployTradeAdapterMock();
+
+    await setV2Setup.integrationRegistry.addIntegration(
+      tradeModule.address,
+      tradeAdapterName,
+      tradeMock.address
+    );
 
     tradeExtension = await deployer.globalExtensions.deployTradeExtension(tradeModule.address);
 
@@ -64,7 +76,7 @@ describe("TradeExtension", () => {
       methodologist.address,
       [tradeExtension.address],
       [operator.address],
-      [setV2Setup.usdc.address, setV2Setup.weth.address],
+      [setV2Setup.dai.address, setV2Setup.weth.address],
       true
     );
 
@@ -224,7 +236,6 @@ describe("TradeExtension", () => {
 
     describe("when the module is already initialized", async () => {
       beforeEach(async () => {
-        // initialize module
         await tradeExtension.connect(owner.wallet).initializeModuleAndExtension(delegatedManager.address);
         await delegatedManager.connect(owner.wallet).removeExtensions([tradeExtension.address]);
         await delegatedManager.connect(owner.wallet).addExtensions([tradeExtension.address]);
@@ -253,6 +264,82 @@ describe("TradeExtension", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Extension must be pending");
+      });
+    });
+  });
+
+  describe("#trade", async () => {
+    let mintedTokens: BigNumber;
+    let subjectSetToken: Address;
+    let subjectSendToken: Address;
+    let subjectSendAmount: BigNumber;
+    let subjectReceiveToken: Address;
+    let subjectMinReceiveAmount: BigNumber;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      await tradeExtension.connect(owner.wallet).initializeModuleAndExtension(delegatedManager.address);
+
+      mintedTokens = ether(1);
+      await setV2Setup.dai.approve(setV2Setup.issuanceModule.address, ether(1));
+      await setV2Setup.issuanceModule.issue(setToken.address, mintedTokens, owner.address);
+
+      // Fund TradeAdapter with destinationToken WETH and DAI
+      await setV2Setup.weth.transfer(tradeMock.address, ether(10));
+      await setV2Setup.dai.transfer(tradeMock.address, ether(10));
+
+      subjectSetToken = setToken.address;
+      subjectCaller = operator;
+      subjectSendToken = setV2Setup.dai.address;
+      subjectSendAmount = ether(0.5);
+      subjectReceiveToken = setV2Setup.weth.address;
+      subjectMinReceiveAmount = ether(0);
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return tradeExtension.connect(subjectCaller.wallet).trade(
+        subjectSetToken,
+        tradeAdapterName,
+        subjectSendToken,
+        subjectSendAmount,
+        subjectReceiveToken,
+        subjectMinReceiveAmount,
+        EMPTY_BYTES
+      );
+    }
+
+    it("should successfully execute the trade", async () => {
+      const oldSendTokenBalance = await setV2Setup.dai.balanceOf(setToken.address);
+      const oldReceiveTokenBalance = await setV2Setup.weth.balanceOf(setToken.address);
+
+      await subject();
+
+      const expectedNewSendTokenBalance = oldSendTokenBalance.sub(ether(0.5));
+      const actualNewSendTokenBalance = await setV2Setup.dai.balanceOf(setToken.address);
+      const expectedNewReceiveTokenBalance = oldReceiveTokenBalance.add(ether(10));
+      const actualNewReceiveTokenBalance = await setV2Setup.weth.balanceOf(setToken.address);
+
+      expect(expectedNewSendTokenBalance).to.eq(actualNewSendTokenBalance);
+      expect(expectedNewReceiveTokenBalance).to.eq(actualNewReceiveTokenBalance);
+    });
+
+    describe("when the sender is not an operator", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be approved operator");
+      });
+    });
+
+    describe("when the receiveToken is not an allowed asset", async () => {
+      beforeEach(async () => {
+        subjectReceiveToken = setV2Setup.wbtc.address;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be allowed asset");
       });
     });
   });
