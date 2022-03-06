@@ -165,7 +165,7 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY OWNER: Remove an existing SetToken and DelegatedManager tracked by the TradeExtension 
+     * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the TradeExtension 
      */
     function removeExtension() external override {
         ISetToken setToken = IDelegatedManager(msg.sender).setToken();
