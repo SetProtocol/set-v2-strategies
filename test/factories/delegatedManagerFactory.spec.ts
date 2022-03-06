@@ -197,7 +197,7 @@ describe("DelegatedManagerFactory", () => {
       expect(await setToken.manager()).eq(delegatedManagerFactory.address);
     });
 
-    it("should configure the DelegatedBaseManager correctly", async () => {
+    it("should configure the DelegatedManager correctly", async () => {
       const tx = await subject();
 
       const setTokenAddress = await protocolUtils.getCreatedSetTokenAddress(tx.hash);
@@ -367,7 +367,7 @@ describe("DelegatedManagerFactory", () => {
       );
     }
 
-    it("should configure the DelegatedBaseManager correctly", async () => {
+    it("should configure the DelegatedManager correctly", async () => {
       await subject();
 
       const initializeParams = await delegatedManagerFactory.initializeState(subjectSetToken);

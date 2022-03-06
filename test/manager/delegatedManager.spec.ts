@@ -200,7 +200,7 @@ describe("DelegatedManager", () => {
       return delegatedManager.connect(subjectCaller.wallet).initializeExtension();
     }
 
-    it("should mark the module as initialized", async () => {
+    it("should mark the extension as initialized", async () => {
       await subject();
 
       const isInitializedExternsion = await delegatedManager.extensionAllowlist(otherAccount.address);
@@ -857,7 +857,7 @@ describe("DelegatedManager", () => {
       expect(isModule).to.eq(true);
     });
 
-    describe("when the caller is not the operator", async () => {
+    describe("when the caller is not the owner", async () => {
       beforeEach(async () => {
         subjectCaller = await getRandomAccount();
       });
@@ -887,7 +887,7 @@ describe("DelegatedManager", () => {
       expect(isModule).to.eq(false);
     });
 
-    describe("when the caller is not the operator", async () => {
+    describe("when the caller is not the owner", async () => {
       beforeEach(async () => {
         subjectCaller = await getRandomAccount();
       });
@@ -938,7 +938,7 @@ describe("DelegatedManager", () => {
       });
     });
 
-    describe("when the caller is not the operator", async () => {
+    describe("when the caller is not the owner", async () => {
       beforeEach(async () => {
         subjectCaller = methodologist;
       });
