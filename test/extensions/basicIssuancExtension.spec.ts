@@ -305,6 +305,29 @@ describe("BasicIssuanceExtension", () => {
     });
   });
 
+  describe("#removeExtension", async () => {
+    let subjectBasicIssuanceExtension: Address;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      await basicIssuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+
+      subjectBasicIssuanceExtension = basicIssuanceExtension.address;
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<any> {
+      await delegatedManager.connect(subjectCaller.wallet).removeExtensions([subjectBasicIssuanceExtension]);
+    }
+
+    it("should clear SetToken and DelegatedManager from BasicIssuanceExtension state", async () => {
+      await subject();
+
+      const storedDelegatedManager: Address = await basicIssuanceExtension.setManagers(setToken.address);
+      expect(storedDelegatedManager).to.eq(ADDRESS_ZERO);
+    });
+  });
+
   describe("#updateIssueFee", async () => {
     let subjectNewFee: BigNumber;
     let subjectSetToken: Address;

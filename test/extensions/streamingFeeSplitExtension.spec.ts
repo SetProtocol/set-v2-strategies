@@ -287,6 +287,29 @@ describe("StreamingFeeSplitExtension", () => {
     });
   });
 
+  describe("#removeExtension", async () => {
+    let subjectStreamingFeeSplitExtension: Address;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      await streamingFeeSplitExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+
+      subjectStreamingFeeSplitExtension = streamingFeeSplitExtension.address;
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<any> {
+      await delegatedManager.connect(subjectCaller.wallet).removeExtensions([subjectStreamingFeeSplitExtension]);
+    }
+
+    it("should clear SetToken and DelegatedManager from StreamingFeeSplitExtension state", async () => {
+      await subject();
+
+      const storedDelegatedManager: Address = await streamingFeeSplitExtension.setManagers(setToken.address);
+      expect(storedDelegatedManager).to.eq(ADDRESS_ZERO);
+    });
+  });
+
   describe("#updateStreamingFee", async () => {
     let mintedTokens: BigNumber;
     const timeFastForward: BigNumber = ONE_YEAR_IN_SECONDS;

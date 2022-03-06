@@ -268,6 +268,29 @@ describe("TradeExtension", () => {
     });
   });
 
+  describe("#removeExtension", async () => {
+    let subjectTradeExtension: Address;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      await tradeExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+
+      subjectTradeExtension = tradeExtension.address;
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<any> {
+      await delegatedManager.connect(subjectCaller.wallet).removeExtensions([subjectTradeExtension]);
+    }
+
+    it("should clear SetToken and DelegatedManager from TradeExtension state", async () => {
+      await subject();
+
+      const storedDelegatedManager: Address = await tradeExtension.setManagers(setToken.address);
+      expect(storedDelegatedManager).to.eq(ADDRESS_ZERO);
+    });
+  });
+
   describe("#trade", async () => {
     let mintedTokens: BigNumber;
     let subjectSetToken: Address;
