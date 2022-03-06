@@ -181,16 +181,18 @@ describe("StreamingFeeSplitExtension", () => {
   });
 
   describe("#initializeModuleAndExtension", async () => {
+    let subjectFeeSettings: StreamingFeeState;
     let subjectDelegatedManager: Address;
     let subjectCaller: Account;
 
     beforeEach(async () => {
+      subjectFeeSettings = feeSettings;
       subjectDelegatedManager = delegatedManager.address;
       subjectCaller = owner;
     });
 
     async function subject(): Promise<ContractTransaction> {
-      return streamingFeeSplitExtension.connect(subjectCaller.wallet).initializeModuleAndExtension(subjectDelegatedManager, feeSettings);
+      return streamingFeeSplitExtension.connect(subjectCaller.wallet).initializeModuleAndExtension(subjectDelegatedManager, subjectFeeSettings);
     }
 
     it("should correctly initialize the StreamingFeeModule on the SetToken", async () => {
@@ -288,18 +290,18 @@ describe("StreamingFeeSplitExtension", () => {
   });
 
   describe("#removeExtension", async () => {
-    let subjectStreamingFeeSplitExtension: Address;
+    let subjectStreamingFeeSplitExtension: Address[];
     let subjectCaller: Account;
 
     beforeEach(async () => {
       await streamingFeeSplitExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
 
-      subjectStreamingFeeSplitExtension = streamingFeeSplitExtension.address;
+      subjectStreamingFeeSplitExtension = [streamingFeeSplitExtension.address];
       subjectCaller = owner;
     });
 
     async function subject(): Promise<any> {
-      await delegatedManager.connect(subjectCaller.wallet).removeExtensions([subjectStreamingFeeSplitExtension]);
+      await delegatedManager.connect(subjectCaller.wallet).removeExtensions(subjectStreamingFeeSplitExtension);
     }
 
     it("should clear SetToken and DelegatedManager from StreamingFeeSplitExtension state", async () => {

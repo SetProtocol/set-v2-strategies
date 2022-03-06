@@ -178,20 +178,30 @@ describe("BasicIssuanceExtension", () => {
   describe("#initializeModuleAndExtension", async () => {
     let subjectDelegatedManager: Address;
     let subjectCaller: Account;
+    let subjectMaxManagerFee: BigNumber;
+    let subjectManagerIssueFee: BigNumber;
+    let subjectManagerRedeemFee: BigNumber;
+    let subjectFeeRecipient: Address;
+    let subjectManagerIssuanceHook: Address;
 
     beforeEach(async () => {
       subjectDelegatedManager = delegatedManager.address;
       subjectCaller = owner;
+      subjectMaxManagerFee = maxManagerFee;
+      subjectManagerIssueFee = managerIssueFee;
+      subjectManagerRedeemFee = managerRedeemFee;
+      subjectFeeRecipient = feeRecipient;
+      subjectManagerIssuanceHook = managerIssuanceHook;
     });
 
     async function subject(): Promise<ContractTransaction> {
       return basicIssuanceExtension.connect(subjectCaller.wallet).initializeModuleAndExtension(
         subjectDelegatedManager,
-        maxManagerFee,
-        managerIssueFee,
-        managerRedeemFee,
-        feeRecipient,
-        managerIssuanceHook
+        subjectMaxManagerFee,
+        subjectManagerIssueFee,
+        subjectManagerRedeemFee,
+        subjectFeeRecipient,
+        subjectManagerIssuanceHook
       );
     }
 
@@ -306,18 +316,18 @@ describe("BasicIssuanceExtension", () => {
   });
 
   describe("#removeExtension", async () => {
-    let subjectBasicIssuanceExtension: Address;
+    let subjectBasicIssuanceExtension: Address[];
     let subjectCaller: Account;
 
     beforeEach(async () => {
       await basicIssuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
 
-      subjectBasicIssuanceExtension = basicIssuanceExtension.address;
+      subjectBasicIssuanceExtension = [basicIssuanceExtension.address];
       subjectCaller = owner;
     });
 
     async function subject(): Promise<any> {
-      await delegatedManager.connect(subjectCaller.wallet).removeExtensions([subjectBasicIssuanceExtension]);
+      await delegatedManager.connect(subjectCaller.wallet).removeExtensions(subjectBasicIssuanceExtension);
     }
 
     it("should clear SetToken and DelegatedManager from BasicIssuanceExtension state", async () => {

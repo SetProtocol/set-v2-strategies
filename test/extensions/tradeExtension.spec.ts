@@ -269,18 +269,18 @@ describe("TradeExtension", () => {
   });
 
   describe("#removeExtension", async () => {
-    let subjectTradeExtension: Address;
+    let subjectTradeExtension: Address[];
     let subjectCaller: Account;
 
     beforeEach(async () => {
       await tradeExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
 
-      subjectTradeExtension = tradeExtension.address;
+      subjectTradeExtension = [tradeExtension.address];
       subjectCaller = owner;
     });
 
     async function subject(): Promise<any> {
-      await delegatedManager.connect(subjectCaller.wallet).removeExtensions([subjectTradeExtension]);
+      await delegatedManager.connect(subjectCaller.wallet).removeExtensions(subjectTradeExtension);
     }
 
     it("should clear SetToken and DelegatedManager from TradeExtension state", async () => {
@@ -294,10 +294,12 @@ describe("TradeExtension", () => {
   describe("#trade", async () => {
     let mintedTokens: BigNumber;
     let subjectSetToken: Address;
+    let subjectAdapterName: string;
     let subjectSendToken: Address;
     let subjectSendAmount: BigNumber;
     let subjectReceiveToken: Address;
     let subjectMinReceiveAmount: BigNumber;
+    let subjectBytes: string;
     let subjectCaller: Account;
 
     beforeEach(async () => {
@@ -313,21 +315,23 @@ describe("TradeExtension", () => {
 
       subjectSetToken = setToken.address;
       subjectCaller = operator;
+      subjectAdapterName = tradeAdapterName;
       subjectSendToken = setV2Setup.dai.address;
       subjectSendAmount = ether(0.5);
       subjectReceiveToken = setV2Setup.weth.address;
       subjectMinReceiveAmount = ether(0);
+      subjectBytes = EMPTY_BYTES;
     });
 
     async function subject(): Promise<ContractTransaction> {
       return tradeExtension.connect(subjectCaller.wallet).trade(
         subjectSetToken,
-        tradeAdapterName,
+        subjectAdapterName,
         subjectSendToken,
         subjectSendAmount,
         subjectReceiveToken,
         subjectMinReceiveAmount,
-        EMPTY_BYTES
+        subjectBytes
       );
     }
 
