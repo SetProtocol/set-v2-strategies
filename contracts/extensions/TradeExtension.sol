@@ -17,6 +17,7 @@ pragma solidity 0.6.10;
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
+import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { ITradeModule } from "../interfaces/ITradeModule.sol";
 
@@ -52,9 +53,11 @@ contract TradeExtension is BaseGlobalExtension {
     /* ============ Constructor ============ */
 
     constructor(
+        IManagerCore _managerCore,
         ITradeModule _tradeModule
     )
         public
+        BaseGlobalExtension(_managerCore)
     {
         tradeModule = _tradeModule;
     }
@@ -67,10 +70,15 @@ contract TradeExtension is BaseGlobalExtension {
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
     function initializeExtension(IDelegatedManager _delegatedManager) external {
+        ISetToken setToken = _delegatedManager.setToken();
+
+        require(
+            managerCore.isFactory(msg.sender) || 
+            address(_delegatedManager) == setToken.manager(),
+            "Must be factory or input must be SetToken manager"
+        );
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
-
-        ISetToken setToken = _delegatedManager.setToken();
 
         setManagers[setToken] = _delegatedManager;
 

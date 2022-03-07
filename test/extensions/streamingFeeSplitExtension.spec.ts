@@ -3,7 +3,7 @@ import "module-alias/register";
 import { BigNumber } from "ethers";
 import { Address, Account, StreamingFeeState } from "@utils/types";
 import { ADDRESS_ZERO, ONE_YEAR_IN_SECONDS } from "@utils/constants";
-import { DelegatedManager, StreamingFeeSplitExtension } from "@utils/contracts/index";
+import { DelegatedManager, StreamingFeeSplitExtension, ManagerCore } from "@utils/contracts/index";
 import { SetToken } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "@utils/deploys";
 import {
@@ -33,6 +33,7 @@ describe("StreamingFeeSplitExtension", () => {
   let setToken: SetToken;
   let setV2Setup: SystemFixture;
 
+  let managerCore: ManagerCore;
   let delegatedManager: DelegatedManager;
   let streamingFeeSplitExtension: StreamingFeeSplitExtension;
 
@@ -57,7 +58,12 @@ describe("StreamingFeeSplitExtension", () => {
     setV2Setup = getSystemFixture(owner.address);
     await setV2Setup.initialize();
 
-    streamingFeeSplitExtension = await deployer.globalExtensions.deployStreamingFeeSplitExtension(setV2Setup.streamingFeeModule.address);
+    managerCore = await deployer.managerCore.deployManagerCore();
+
+    streamingFeeSplitExtension = await deployer.globalExtensions.deployStreamingFeeSplitExtension(
+      managerCore.address,
+      setV2Setup.streamingFeeModule.address
+    );
 
     setToken = await setV2Setup.createSetToken(
       [setV2Setup.dai.address],
@@ -84,6 +90,8 @@ describe("StreamingFeeSplitExtension", () => {
 
     await setToken.setManager(delegatedManager.address);
 
+    await managerCore.initialize([factory.address]);
+
     feeRecipient = delegatedManager.address;
     maxStreamingFeePercentage = ether(.1);
     streamingFeePercentage = ether(.02);
@@ -99,14 +107,19 @@ describe("StreamingFeeSplitExtension", () => {
   addSnapshotBeforeRestoreAfterEach();
 
   describe("#constructor", async () => {
+    let subjectManagerCore: Address;
     let subjectStreamingFeeModule: Address;
 
     beforeEach(async () => {
+      subjectManagerCore = managerCore.address;
       subjectStreamingFeeModule = setV2Setup.streamingFeeModule.address;
     });
 
     async function subject(): Promise<StreamingFeeSplitExtension> {
-      return await deployer.globalExtensions.deployStreamingFeeSplitExtension(subjectStreamingFeeModule);
+      return await deployer.globalExtensions.deployStreamingFeeSplitExtension(
+        subjectManagerCore,
+        subjectStreamingFeeModule
+      );
     }
 
     it("should set the correct StreamingFeeModule address", async () => {

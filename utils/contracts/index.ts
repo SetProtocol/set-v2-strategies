@@ -5,6 +5,7 @@ export { BaseManager } from "../..//typechain/BaseManager";
 export { ChainlinkAggregatorMock } from "../../typechain/ChainlinkAggregatorMock";
 export { DelegatedManager } from "../../typechain/DelegatedManager";
 export { DelegatedManagerFactory } from "../../typechain/DelegatedManagerFactory";
+export { ManagerCore } from "../../typechain/ManagerCore";
 export { MutualUpgradeMock } from "../../typechain/MutualUpgradeMock";
 export { PerpV2LeverageStrategyExtension } from "../../typechain/PerpV2LeverageStrategyExtension";
 export { FeeSplitExtension } from "../../typechain/FeeSplitExtension";

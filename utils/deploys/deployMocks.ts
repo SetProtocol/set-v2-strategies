@@ -36,8 +36,8 @@ export default class DeployMocks {
     return await new BaseExtensionMock__factory(this._deployerSigner).deploy(manager);
   }
 
-  public async deployBaseGlobalExtensionMock(): Promise<BaseGlobalExtensionMock> {
-    return await new BaseGlobalExtensionMock__factory(this._deployerSigner).deploy();
+  public async deployBaseGlobalExtensionMock(managerCore: Address): Promise<BaseGlobalExtensionMock> {
+    return await new BaseGlobalExtensionMock__factory(this._deployerSigner).deploy(managerCore);
   }
 
   public async deployAddressArrayUtilsMock(): Promise<AddressArrayUtilsMock> {

@@ -6,7 +6,8 @@ import { ADDRESS_ZERO, ZERO } from "@utils/constants";
 import {
   DelegatedManagerFactory,
   DelegatedManager,
-  BaseGlobalExtensionMock
+  BaseGlobalExtensionMock,
+  ManagerCore
 } from "@utils/contracts/index";
 import DeployHelper from "@utils/deploys";
 import {
@@ -42,6 +43,7 @@ describe("DelegatedManagerFactory", () => {
   let deployer: DeployHelper;
   let protocolUtils: ProtocolUtils;
 
+  let managerCore: ManagerCore;
   let delegatedManagerFactory: DelegatedManagerFactory;
   let mockFeeExtension: BaseGlobalExtensionMock;
   let mockIssuanceExtension: BaseGlobalExtensionMock;
@@ -61,12 +63,16 @@ describe("DelegatedManagerFactory", () => {
     setV2Setup = getSystemFixture(owner.address);
     await setV2Setup.initialize();
 
-    mockFeeExtension = await deployer.mocks.deployBaseGlobalExtensionMock();
-    mockIssuanceExtension = await deployer.mocks.deployBaseGlobalExtensionMock();
+    managerCore = await deployer.managerCore.deployManagerCore();
+
+    mockFeeExtension = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address);
+    mockIssuanceExtension = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address);
 
     delegatedManagerFactory = await deployer.factories.deployDelegatedManagerFactory(
       setV2Setup.factory.address
     );
+
+    await managerCore.initialize([delegatedManagerFactory.address]);
   });
 
   // Helper function to run a setup execution of either `createSetAndManager` or `createManager`

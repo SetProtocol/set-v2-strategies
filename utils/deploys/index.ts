@@ -5,6 +5,7 @@ import SetDeployHelper from "@setprotocol/set-protocol-v2/utils/deploys";
 import DeployManager from "./deployManager";
 import DeployMocks from "./deployMocks";
 import DeployExtensions from "./deployExtensions";
+import DeployManagerCore from "./deployManagerCore";
 import DeployGlobalExtensions from "./deployGlobalExtensions";
 import DeployFactories from "./deployFactories";
 import DeployHooks from "./deployHooks";
@@ -12,6 +13,7 @@ import DeploySetV2 from "./deploySetV2";
 
 export default class DeployHelper {
   public extensions: DeployExtensions;
+  public managerCore: DeployManagerCore;
   public globalExtensions: DeployGlobalExtensions;
   public factories: DeployFactories;
   public manager: DeployManager;
@@ -22,6 +24,7 @@ export default class DeployHelper {
 
   constructor(deployerSigner: Signer) {
     this.extensions = new DeployExtensions(deployerSigner);
+    this.managerCore = new DeployManagerCore(deployerSigner);
     this.globalExtensions = new DeployGlobalExtensions(deployerSigner);
     this.factories = new DeployFactories(deployerSigner);
     this.manager = new DeployManager(deployerSigner);

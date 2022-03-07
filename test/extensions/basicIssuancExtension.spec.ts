@@ -3,7 +3,7 @@ import "module-alias/register";
 import { BigNumber } from "ethers";
 import { Address, Account } from "@utils/types";
 import { ADDRESS_ZERO, ZERO } from "@utils/constants";
-import { DelegatedManager, BasicIssuanceExtension } from "@utils/contracts/index";
+import { DelegatedManager, BasicIssuanceExtension, ManagerCore } from "@utils/contracts/index";
 import { SetToken, DebtIssuanceModule } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "@utils/deploys";
 import {
@@ -31,6 +31,7 @@ describe("BasicIssuanceExtension", () => {
 
   let debtIssuanceModule: DebtIssuanceModule;
 
+  let managerCore: ManagerCore;
   let delegatedManager: DelegatedManager;
   let basicIssuanceExtension: BasicIssuanceExtension;
 
@@ -59,7 +60,12 @@ describe("BasicIssuanceExtension", () => {
     debtIssuanceModule = await deployer.setV2.deployDebtIssuanceModule(setV2Setup.controller.address);
     await setV2Setup.controller.addModule(debtIssuanceModule.address);
 
-    basicIssuanceExtension = await deployer.globalExtensions.deployBasicIssuanceExtension(debtIssuanceModule.address);
+    managerCore = await deployer.managerCore.deployManagerCore();
+
+    basicIssuanceExtension = await deployer.globalExtensions.deployBasicIssuanceExtension(
+      managerCore.address,
+      debtIssuanceModule.address
+    );
 
     setToken = await setV2Setup.createSetToken(
       [setV2Setup.dai.address],
@@ -84,6 +90,11 @@ describe("BasicIssuanceExtension", () => {
 
     await setToken.setManager(delegatedManager.address);
 
+    await managerCore.initialize([factory.address]);
+
+    const didItWork: Boolean = await managerCore.isFactory(factory.address);
+    console.log(didItWork);
+
     maxManagerFee = ether(.1);
     managerIssueFee = ether(.02);
     managerRedeemFee = ether(.03);
@@ -94,14 +105,19 @@ describe("BasicIssuanceExtension", () => {
   addSnapshotBeforeRestoreAfterEach();
 
   describe("#constructor", async () => {
+    let subjectManagerCore: Address;
     let subjectBasicIssuanceModule: Address;
 
     beforeEach(async () => {
+      subjectManagerCore = managerCore.address;
       subjectBasicIssuanceModule = debtIssuanceModule.address;
     });
 
     async function subject(): Promise<BasicIssuanceExtension> {
-      return await deployer.globalExtensions.deployBasicIssuanceExtension(subjectBasicIssuanceModule);
+      return await deployer.globalExtensions.deployBasicIssuanceExtension(
+        subjectManagerCore,
+        subjectBasicIssuanceModule
+      );
     }
 
     it("should set the correct BasicIssuanceModule address", async () => {

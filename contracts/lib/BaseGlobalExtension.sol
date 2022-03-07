@@ -19,6 +19,7 @@
 pragma solidity 0.6.10;
 
 import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
+import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
@@ -31,6 +32,11 @@ import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISe
  */
 abstract contract BaseGlobalExtension {
     using AddressArrayUtils for address[];
+
+    /* ============ State Variables ============ */
+
+    // Address of the ManagerCore
+    IManagerCore public managerCore;
 
     /* ============ Modifiers ============ */
 
@@ -73,6 +79,19 @@ abstract contract BaseGlobalExtension {
         require(_manager(_setToken).isAllowedAsset(_asset), "Must be allowed asset");
         _;
     }
+
+    /* ============ Constructor ============ */
+
+    /**
+     * Set state variables
+     *
+     * @param _managerCore             Address of managerCore contract
+     */
+    constructor(IManagerCore _managerCore) public {
+        managerCore = _managerCore;
+    }
+
+    /* ============ External Functions ============ */
 
     /**
      * ONLY MANAGER: Deletes SetToken/Manager state from extension. Must only be callable by manager!

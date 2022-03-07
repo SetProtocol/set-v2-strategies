@@ -19,12 +19,17 @@
 pragma solidity 0.6.10;
 
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
+import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 contract BaseGlobalExtensionMock is BaseGlobalExtension {
 
     mapping(ISetToken=>IDelegatedManager) public initializeInfo;
+
+    /* ============ Constructor ============ */
+
+    constructor(IManagerCore _managerCore) public BaseGlobalExtension(_managerCore) {}
 
     /* ============ External Functions ============ */
 
@@ -34,6 +39,11 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
     )
         external
     {
+        require(
+            managerCore.isFactory(msg.sender) || 
+            address(_manager) == _setToken.manager(),
+            "Must be factory or input must be SetToken manager"
+        );
         require(msg.sender == _manager.owner(), "Must be owner");
         initializeInfo[_setToken] = _manager;
 

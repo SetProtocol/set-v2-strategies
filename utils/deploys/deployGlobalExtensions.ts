@@ -18,25 +18,31 @@ export default class DeployGlobalExtensions {
   }
 
   public async deployBasicIssuanceExtension(
+    managerCore: Address,
     basicIssuanceModule: Address
   ): Promise<BasicIssuanceExtension> {
     return await new BasicIssuanceExtension__factory(this._deployerSigner).deploy(
+      managerCore,
       basicIssuanceModule,
     );
   }
 
   public async deployStreamingFeeSplitExtension(
+    managerCore: Address,
     streamingFeeModule: Address
   ): Promise<StreamingFeeSplitExtension> {
     return await new StreamingFeeSplitExtension__factory(this._deployerSigner).deploy(
+      managerCore,
       streamingFeeModule,
     );
   }
 
   public async deployTradeExtension(
+    managerCore: Address,
     tradeModule: Address
   ): Promise<TradeExtension> {
     return await new TradeExtension__factory(this._deployerSigner).deploy(
+      managerCore,
       tradeModule,
     );
   }

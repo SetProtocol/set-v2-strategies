@@ -3,7 +3,7 @@ import "module-alias/register";
 import { BigNumber } from "ethers";
 import { Address, Account } from "@utils/types";
 import { ADDRESS_ZERO, EMPTY_BYTES } from "@utils/constants";
-import { DelegatedManager, TradeExtension } from "@utils/contracts/index";
+import { DelegatedManager, TradeExtension, ManagerCore } from "@utils/contracts/index";
 import { SetToken, TradeModule, TradeAdapterMock } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "@utils/deploys";
 import {
@@ -30,6 +30,7 @@ describe("TradeExtension", () => {
 
   let tradeModule: TradeModule;
 
+  let managerCore: ManagerCore;
   let delegatedManager: DelegatedManager;
   let tradeExtension: TradeExtension;
 
@@ -60,7 +61,12 @@ describe("TradeExtension", () => {
       tradeMock.address
     );
 
-    tradeExtension = await deployer.globalExtensions.deployTradeExtension(tradeModule.address);
+    managerCore = await deployer.managerCore.deployManagerCore();
+
+    tradeExtension = await deployer.globalExtensions.deployTradeExtension(
+      managerCore.address,
+      tradeModule.address
+    );
 
     setToken = await setV2Setup.createSetToken(
       [setV2Setup.dai.address],
@@ -81,19 +87,26 @@ describe("TradeExtension", () => {
     );
 
     await setToken.setManager(delegatedManager.address);
+
+    await managerCore.initialize([factory.address]);
   });
 
   addSnapshotBeforeRestoreAfterEach();
 
   describe("#constructor", async () => {
+    let subjectManagerCore: Address;
     let subjectTradeModule: Address;
 
     beforeEach(async () => {
+      subjectManagerCore = managerCore.address;
       subjectTradeModule = tradeModule.address;
     });
 
     async function subject(): Promise<TradeExtension> {
-      return await deployer.globalExtensions.deployTradeExtension(subjectTradeModule);
+      return await deployer.globalExtensions.deployTradeExtension(
+        subjectManagerCore,
+        subjectTradeModule
+      );
     }
 
     it("should set the correct TradeModule address", async () => {

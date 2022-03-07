@@ -2,7 +2,7 @@ import "module-alias/register";
 
 import { Account, Address, Bytes } from "@utils/types";
 import { ZERO, ADDRESS_ZERO } from "@utils/constants";
-import { BaseGlobalExtensionMock, DelegatedManager } from "@utils/contracts/index";
+import { BaseGlobalExtensionMock, DelegatedManager, ManagerCore } from "@utils/contracts/index";
 
 import DeployHelper from "@utils/deploys";
 
@@ -38,6 +38,7 @@ describe("BaseGlobalExtension", () => {
   let setToken: SetToken;
   let setV2Setup: SystemFixture;
 
+  let managerCore: ManagerCore;
   let delegatedManager: DelegatedManager;
   let baseExtensionMock: BaseGlobalExtensionMock;
 
@@ -74,7 +75,9 @@ describe("BaseGlobalExtension", () => {
     };
     await setV2Setup.streamingFeeModule.initialize(setToken.address, streamingFeeSettings);
 
-    baseExtensionMock = await deployer.mocks.deployBaseGlobalExtensionMock();
+    managerCore = await deployer.managerCore.deployManagerCore();
+
+    baseExtensionMock = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address);
 
     // Deploy DelegatedManager
     delegatedManager = await deployer.manager.deployDelegatedManager(
@@ -89,6 +92,8 @@ describe("BaseGlobalExtension", () => {
 
     // Transfer ownership to DelegatedManager
     await setToken.setManager(delegatedManager.address);
+
+    await managerCore.initialize([factory.address]);
 
     await baseExtensionMock.initializeExtension(setToken.address, delegatedManager.address);
   });
