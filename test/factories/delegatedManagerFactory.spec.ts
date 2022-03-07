@@ -592,6 +592,16 @@ describe("DelegatedManagerFactory", () => {
           initializeParams.manager
         );
       });
+
+      describe("when the factory is not approved by the ManagerCore", async() => {
+        beforeEach(async () => {
+          await managerCore.removeFactory(delegatedManagerFactory.address);
+        });
+
+        it("should revert", async() => {
+          await expect(subject()).to.be.revertedWith("Must be factory or input must be SetToken manager");
+        });
+      });
     });
 
     describe("when a SetToken is being migrated to a DelegatedManager", async () => {
@@ -674,6 +684,16 @@ describe("DelegatedManagerFactory", () => {
         expect(finalInitializeParams.owner).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.manager).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.isPending).eq(false);
+      });
+
+      describe("when the factory is not approved by the ManagerCore", async() => {
+        beforeEach(async () => {
+          await managerCore.removeFactory(delegatedManagerFactory.address);
+        });
+
+        it("should revert", async() => {
+          await expect(subject()).to.be.revertedWith("Must be factory or input must be SetToken manager");
+        });
       });
     });
 

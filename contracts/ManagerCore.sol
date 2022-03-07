@@ -104,4 +104,10 @@ contract ManagerCore is Ownable {
 
         emit FactoryRemoved(_factory);
     }
+
+    /* ============ External Getter Functions ============ */
+
+    function getFactories() external view returns (address[] memory) {
+        return factories;
+    }
 }
