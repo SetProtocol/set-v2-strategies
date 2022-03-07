@@ -279,8 +279,8 @@ describe("TradeExtension", () => {
       subjectCaller = owner;
     });
 
-    async function subject(): Promise<any> {
-      await delegatedManager.connect(subjectCaller.wallet).removeExtensions(subjectTradeExtension);
+    async function subject(): Promise<ContractTransaction> {
+      return delegatedManager.connect(subjectCaller.wallet).removeExtensions(subjectTradeExtension);
     }
 
     it("should clear SetToken and DelegatedManager from TradeExtension state", async () => {
@@ -288,6 +288,10 @@ describe("TradeExtension", () => {
 
       const storedDelegatedManager: Address = await tradeExtension.setManagers(setToken.address);
       expect(storedDelegatedManager).to.eq(ADDRESS_ZERO);
+    });
+
+    it("should emit the correct ExtensionRemoved event", async () => {
+      await expect(subject()).to.emit(tradeExtension, "ExtensionRemoved").withArgs(setToken.address, delegatedManager.address);
     });
   });
 

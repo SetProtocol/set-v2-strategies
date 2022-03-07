@@ -300,8 +300,8 @@ describe("StreamingFeeSplitExtension", () => {
       subjectCaller = owner;
     });
 
-    async function subject(): Promise<any> {
-      await delegatedManager.connect(subjectCaller.wallet).removeExtensions(subjectStreamingFeeSplitExtension);
+    async function subject(): Promise<ContractTransaction> {
+      return delegatedManager.connect(subjectCaller.wallet).removeExtensions(subjectStreamingFeeSplitExtension);
     }
 
     it("should clear SetToken and DelegatedManager from StreamingFeeSplitExtension state", async () => {
@@ -309,6 +309,10 @@ describe("StreamingFeeSplitExtension", () => {
 
       const storedDelegatedManager: Address = await streamingFeeSplitExtension.setManagers(setToken.address);
       expect(storedDelegatedManager).to.eq(ADDRESS_ZERO);
+    });
+
+    it("should emit the correct ExtensionRemoved event", async () => {
+      await expect(subject()).to.emit(streamingFeeSplitExtension, "ExtensionRemoved").withArgs(setToken.address, delegatedManager.address);
     });
   });
 

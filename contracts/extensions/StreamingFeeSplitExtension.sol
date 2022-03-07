@@ -49,6 +49,11 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
         address _delegatedManager
     );
 
+    event ExtensionRemoved(
+        address _setToken,
+        address _delegatedManager
+    );
+
     event FeesDistributed(
         address _setToken,
         address indexed _ownerFeeRecipient,
@@ -85,20 +90,22 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
         // Emits a FeeActualized event
         streamingFeeModule.accrueFee(_setToken);
 
-        uint256 totalFees = _setToken.balanceOf(address(_manager(_setToken)));
+        IDelegatedManager delegatedManager = _manager(_setToken);
 
-        address methodologist = _manager(_setToken).methodologist();
-        address ownerFeeRecipient = _manager(_setToken).ownerFeeRecipient();
+        uint256 totalFees = _setToken.balanceOf(address(delegatedManager));
 
-        uint256 ownerTake = totalFees.preciseMul(_manager(_setToken).ownerFeeSplit());
+        address methodologist = delegatedManager.methodologist();
+        address ownerFeeRecipient = delegatedManager.ownerFeeRecipient();
+
+        uint256 ownerTake = totalFees.preciseMul(delegatedManager.ownerFeeSplit());
         uint256 methodologistTake = totalFees.sub(ownerTake);
 
         if (ownerTake > 0) {
-            _manager(_setToken).transferTokens(address(_setToken), ownerFeeRecipient, ownerTake);
+            delegatedManager.transferTokens(address(_setToken), ownerFeeRecipient, ownerTake);
         }
 
         if (methodologistTake > 0) {
-            _manager(_setToken).transferTokens(address(_setToken), methodologist, methodologistTake);
+            delegatedManager.transferTokens(address(_setToken), methodologist, methodologistTake);
         }
 
         emit FeesDistributed(address(_setToken), ownerFeeRecipient, methodologist, ownerTake, methodologistTake);
@@ -158,9 +165,14 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
      * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the TradeExtension 
      */
     function removeExtension() external override {
-        ISetToken setToken = IDelegatedManager(msg.sender).setToken();
+        IDelegatedManager delegatedManager = IDelegatedManager(msg.sender);
+        ISetToken setToken = delegatedManager.setToken();
+
         require(msg.sender == address(_manager(setToken)), "Must be Manager");
+
         delete setManagers[setToken];
+
+        ExtensionRemoved(address(setToken), address(delegatedManager));
     }
 
     /**
