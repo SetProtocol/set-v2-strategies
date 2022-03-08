@@ -1,9 +1,21 @@
 import "module-alias/register";
 
-import { BigNumber } from "ethers";
-import { Address, Account, StreamingFeeState } from "@utils/types";
+import {
+  BigNumber,
+  Contract,
+  ContractTransaction
+} from "ethers";
+import {
+  Address,
+  Account,
+  StreamingFeeState
+} from "@utils/types";
 import { ADDRESS_ZERO, ONE_YEAR_IN_SECONDS } from "@utils/constants";
-import { DelegatedManager, StreamingFeeSplitExtension, ManagerCore } from "@utils/contracts/index";
+import {
+  DelegatedManager,
+  StreamingFeeSplitExtension,
+  ManagerCore
+} from "@utils/contracts/index";
 import { SetToken } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "@utils/deploys";
 import {
@@ -18,7 +30,6 @@ import {
 import { getStreamingFee, getStreamingFeeInflationAmount } from "@utils/common";
 import { SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
 import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2/utils/test";
-import { ContractTransaction } from "ethers";
 import { ZERO } from "@setprotocol/set-protocol-v2/utils/constants";
 
 const expect = getWaffleExpect();
@@ -191,6 +202,42 @@ describe("StreamingFeeSplitExtension", () => {
         await expect(subject()).to.be.revertedWith("Extension must be pending");
       });
     });
+
+    describe("when the caller is not the SetToken manager", async () => {
+      let newDelegatedManager: DelegatedManager;
+      let subjectDeployer: DeployHelper;
+
+      beforeEach(async () => {
+        await delegatedManager.connect(owner.wallet).setManager(methodologist.address);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be factory or input must be SetToken manager");
+      });
+
+      describe("when the caller is an approved factory", async () => {
+        beforeEach(async () => {
+          subjectDeployer = new DeployHelper(factory.wallet);
+
+          newDelegatedManager = await subjectDeployer.manager.deployDelegatedManager(
+            setToken.address,
+            factory.address,
+            methodologist.address,
+            [streamingFeeSplitExtension.address],
+            [operator.address],
+            [setV2Setup.dai.address, setV2Setup.weth.address],
+            true
+          );
+
+          subjectDelegatedManager = newDelegatedManager.address;
+          subjectCaller = factory;
+        });
+
+        it("should successfully initialize", async () => {
+          await subject();
+        });
+      });
+    });
   });
 
   describe("#initializeModuleAndExtension", async () => {
@@ -303,18 +350,20 @@ describe("StreamingFeeSplitExtension", () => {
   });
 
   describe("#removeExtension", async () => {
+    let subjectManager: Contract;
     let subjectStreamingFeeSplitExtension: Address[];
     let subjectCaller: Account;
 
     beforeEach(async () => {
       await streamingFeeSplitExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
 
+      subjectManager = delegatedManager;
       subjectStreamingFeeSplitExtension = [streamingFeeSplitExtension.address];
       subjectCaller = owner;
     });
 
     async function subject(): Promise<ContractTransaction> {
-      return delegatedManager.connect(subjectCaller.wallet).removeExtensions(subjectStreamingFeeSplitExtension);
+      return subjectManager.connect(subjectCaller.wallet).removeExtensions(subjectStreamingFeeSplitExtension);
     }
 
     it("should clear SetToken and DelegatedManager from StreamingFeeSplitExtension state", async () => {
@@ -326,6 +375,16 @@ describe("StreamingFeeSplitExtension", () => {
 
     it("should emit the correct ExtensionRemoved event", async () => {
       await expect(subject()).to.emit(streamingFeeSplitExtension, "ExtensionRemoved").withArgs(setToken.address, delegatedManager.address);
+    });
+
+    describe("when the caller is not the SetToken manager", async () => {
+      beforeEach(async () => {
+        subjectManager = await deployer.mocks.deployManagerMock(setToken.address);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be Manager");
+      });
     });
   });
 

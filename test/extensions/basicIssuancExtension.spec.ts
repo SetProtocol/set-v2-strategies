@@ -1,9 +1,17 @@
 import "module-alias/register";
 
-import { BigNumber } from "ethers";
+import {
+  BigNumber,
+  Contract,
+  ContractTransaction
+} from "ethers";
 import { Address, Account } from "@utils/types";
 import { ADDRESS_ZERO, ZERO } from "@utils/constants";
-import { DelegatedManager, BasicIssuanceExtension, ManagerCore } from "@utils/contracts/index";
+import {
+  DelegatedManager,
+  BasicIssuanceExtension,
+  ManagerCore
+} from "@utils/contracts/index";
 import { SetToken, DebtIssuanceModule } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "@utils/deploys";
 import {
@@ -15,7 +23,6 @@ import {
 } from "@utils/index";
 import { SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
 import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2/utils/test";
-import { ContractTransaction } from "ethers";
 
 const expect = getWaffleExpect();
 
@@ -189,6 +196,42 @@ describe("BasicIssuanceExtension", () => {
         await expect(subject()).to.be.revertedWith("Extension must be pending");
       });
     });
+
+    describe("when the caller is not the SetToken manager", async () => {
+      let newDelegatedManager: DelegatedManager;
+      let subjectDeployer: DeployHelper;
+
+      beforeEach(async () => {
+        await delegatedManager.connect(owner.wallet).setManager(methodologist.address);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be factory or input must be SetToken manager");
+      });
+
+      describe("when the caller is an approved factory", async () => {
+        beforeEach(async () => {
+          subjectDeployer = new DeployHelper(factory.wallet);
+
+          newDelegatedManager = await subjectDeployer.manager.deployDelegatedManager(
+            setToken.address,
+            factory.address,
+            methodologist.address,
+            [basicIssuanceExtension.address],
+            [operator.address],
+            [setV2Setup.dai.address, setV2Setup.weth.address],
+            true
+          );
+
+          subjectDelegatedManager = newDelegatedManager.address;
+          subjectCaller = factory;
+        });
+
+        it("should successfully initialize", async () => {
+          await subject();
+        });
+      });
+    });
   });
 
   describe("#initializeModuleAndExtension", async () => {
@@ -332,18 +375,20 @@ describe("BasicIssuanceExtension", () => {
   });
 
   describe("#removeExtension", async () => {
+    let subjectManager: Contract;
     let subjectBasicIssuanceExtension: Address[];
     let subjectCaller: Account;
 
     beforeEach(async () => {
       await basicIssuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
 
+      subjectManager = delegatedManager;
       subjectBasicIssuanceExtension = [basicIssuanceExtension.address];
       subjectCaller = owner;
     });
 
     async function subject(): Promise<ContractTransaction> {
-      return delegatedManager.connect(subjectCaller.wallet).removeExtensions(subjectBasicIssuanceExtension);
+      return subjectManager.connect(subjectCaller.wallet).removeExtensions(subjectBasicIssuanceExtension);
     }
 
     it("should clear SetToken and DelegatedManager from BasicIssuanceExtension state", async () => {
@@ -355,6 +400,16 @@ describe("BasicIssuanceExtension", () => {
 
     it("should emit the correct ExtensionRemoved event", async () => {
       await expect(subject()).to.emit(basicIssuanceExtension, "ExtensionRemoved").withArgs(setToken.address, delegatedManager.address);
+    });
+
+    describe("when the caller is not the SetToken manager", async () => {
+      beforeEach(async () => {
+        subjectManager = await deployer.mocks.deployManagerMock(setToken.address);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be Manager");
+      });
     });
   });
 
