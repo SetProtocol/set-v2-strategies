@@ -65,14 +65,6 @@ abstract contract BaseGlobalExtension {
     }
 
     /**
-     * Throws if the sender is not the SetToken manager contract
-     */
-    modifier onlyManager(ISetToken _setToken) {
-        require(address(_manager(_setToken)) == msg.sender, "Must be manager");
-        _;
-    }
-
-    /**
      * Throws if asset is not allowed to be held by the Set
      */
     modifier onlyAllowedAsset(ISetToken _setToken, address _asset) {

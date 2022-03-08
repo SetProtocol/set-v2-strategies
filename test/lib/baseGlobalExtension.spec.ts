@@ -184,43 +184,6 @@ describe("BaseGlobalExtension", () => {
     });
   });
 
-  describe("#testOnlyManager", async () => {
-    let subjectRemoveExtensions: Address[];
-    let subjectCaller: Account;
-
-    beforeEach(async () => {
-      // Easiest way to test onlyManager is by calling removeExtensions on manager since that's the only
-      // fxn that calls back into extension
-      subjectRemoveExtensions = [baseExtensionMock.address];
-      subjectCaller = owner;
-    });
-
-    async function subject(): Promise<ContractTransaction> {
-      return delegatedManager.connect(subjectCaller.wallet).removeExtensions(subjectRemoveExtensions);
-    }
-
-    it("should succeed without revert", async () => {
-      await subject();
-    });
-
-    describe("when the sender is not the manager", async () => {
-      let subjectSetToken: Address;
-
-      beforeEach(async () => {
-        subjectSetToken = setToken.address;
-        subjectCaller = owner;
-      });
-
-      async function subject(): Promise<ContractTransaction> {
-        return baseExtensionMock.connect(subjectCaller.wallet).testOnlyManager(subjectSetToken);
-      }
-
-      it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("Must be manager");
-      });
-    });
-  });
-
   describe("#testOnlyAllowedAsset", async () => {
     let subjectSetToken: Address;
     let subjectAsset: Address;

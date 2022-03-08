@@ -69,11 +69,6 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
         onlyOperator(_setToken)
     {}
 
-    function testOnlyManager(ISetToken _setToken)
-        external
-        onlyManager(_setToken)
-    {}
-
     function testOnlyAllowedAsset(ISetToken _setToken, address _asset)
         external
         onlyAllowedAsset(_setToken, _asset)
