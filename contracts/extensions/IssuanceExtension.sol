@@ -31,21 +31,21 @@ import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { IIssuanceModule } from "../interfaces/IIssuanceModule.sol";
 
 /**
- * @title BasicIssuanceExtension
+ * @title IssuanceExtension
  * @author Set Protocol
  *
  * Smart contract global extension which provides DelegatedManager owner and 
  * methodologist the ability to accrue and split issuance and redemption fees.
  * Owner may configure the fee split percentages.
  */
-contract BasicIssuanceExtension is BaseGlobalExtension {
+contract IssuanceExtension is BaseGlobalExtension {
     using Address for address;
     using PreciseUnitMath for uint256;
     using SafeMath for uint256;
 
     /* ============ Events ============ */
 
-    event BasicIssuanceModuleInitialized(
+    event IssuanceModuleInitialized(
         address indexed _setToken,
         address indexed _delegatedManager
     );
@@ -60,7 +60,7 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
 
     /* ============ State Variables ============ */
 
-    // Instance of BasicIssuanceModule
+    // Instance of IssuanceModule
     IIssuanceModule public immutable issuanceModule;
 
     /* ============ Constructor ============ */
@@ -104,9 +104,9 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY OWNER: Initializes BasicIssuanceModule on the SetToken associated with the DelegatedManager.
+     * ONLY OWNER: Initializes IssuanceModule on the SetToken associated with the DelegatedManager.
      *
-     * @param _delegatedManager             Instance of the DelegatedManager to initialize the BasicIssuanceModule for
+     * @param _delegatedManager             Instance of the DelegatedManager to initialize the IssuanceModule for
      * @param _maxManagerFee                Maximum fee that can be charged on issue and redeem
      * @param _managerIssueFee              Fee to charge on issuance
      * @param _managerRedeemFee             Fee to charge on redemption
@@ -138,7 +138,7 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY OWNER: Initializes BasicIssuanceExtension to the DelegatedManager.
+     * ONLY OWNER: Initializes IssuanceExtension to the DelegatedManager.
      *
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
@@ -150,7 +150,7 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY OWNER: Initializes BasicIssuanceExtension to the DelegatedManager and BasicIssuanceModule to the SetToken
+     * ONLY OWNER: Initializes IssuanceExtension to the DelegatedManager and IssuanceModule to the SetToken
      *
      * @param _delegatedManager             Instance of the DelegatedManager to initialize
      * @param _maxManagerFee                Maximum fee that can be charged on issue and redeem
@@ -185,14 +185,14 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the BasicIssuanceExtension 
+     * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the IssuanceExtension 
      */
     function removeExtension() external override {
         _removeExtension();
     }
 
     /**
-     * ONLY OWNER: Updates issuance fee on BasicIssuanceModule.
+     * ONLY OWNER: Updates issuance fee on IssuanceModule.
      *
      * @param _setToken     Instance of the SetToken to update issue fee for
      * @param _newFee       New issue fee percentage in precise units (1% = 1e16, 100% = 1e18)
@@ -206,7 +206,7 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY OWNER: Updates redemption fee on BasicIssuanceModule.
+     * ONLY OWNER: Updates redemption fee on IssuanceModule.
      *
      * @param _setToken     Instance of the SetToken to update redeem fee for
      * @param _newFee       New redeem fee percentage in precise units (1% = 1e16, 100% = 1e18)
@@ -220,7 +220,7 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY OWNER: Updates fee recipient on BasicIssuanceModule
+     * ONLY OWNER: Updates fee recipient on IssuanceModule
      *
      * @param _setToken         Instance of the SetToken to update fee recipient for
      * @param _newFeeRecipient  Address of new fee recipient. This should be the address of the DelegatedManager
@@ -236,7 +236,7 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
     /* ============ Internal Functions ============ */
 
     /**
-     * Internal function to initialize BasicIssuanceModule on the SetToken associated with the DelegatedManager.
+     * Internal function to initialize IssuanceModule on the SetToken associated with the DelegatedManager.
      *
      * @param _delegatedManager     Instance of the DelegatedManager to initialize the TradeModule for
      * @param _maxManagerFee                Maximum fee that can be charged on issue and redeem
@@ -268,6 +268,6 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
         );
         _invokeManager(setToken, address(issuanceModule), callData);
 
-        BasicIssuanceModuleInitialized(address(setToken), address(_delegatedManager));
+        IssuanceModuleInitialized(address(setToken), address(_delegatedManager));
     }
 }

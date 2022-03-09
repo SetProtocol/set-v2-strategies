@@ -1,12 +1,12 @@
 import { Signer } from "ethers";
 import { Address } from "../types";
 import {
-  BasicIssuanceExtension,
+  IssuanceExtension,
   StreamingFeeSplitExtension,
   TradeExtension
 } from "../contracts/index";
 
-import { BasicIssuanceExtension__factory } from "../../typechain/factories/BasicIssuanceExtension__factory";
+import { IssuanceExtension__factory } from "../../typechain/factories/IssuanceExtension__factory";
 import { StreamingFeeSplitExtension__factory } from "../../typechain/factories/StreamingFeeSplitExtension__factory";
 import { TradeExtension__factory } from "../../typechain/factories/TradeExtension__factory";
 
@@ -17,11 +17,11 @@ export default class DeployGlobalExtensions {
     this._deployerSigner = deployerSigner;
   }
 
-  public async deployBasicIssuanceExtension(
+  public async deployIssuanceExtension(
     managerCore: Address,
     basicIssuanceModule: Address
-  ): Promise<BasicIssuanceExtension> {
-    return await new BasicIssuanceExtension__factory(this._deployerSigner).deploy(
+  ): Promise<IssuanceExtension> {
+    return await new IssuanceExtension__factory(this._deployerSigner).deploy(
       managerCore,
       basicIssuanceModule,
     );

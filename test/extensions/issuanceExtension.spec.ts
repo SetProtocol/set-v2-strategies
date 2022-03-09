@@ -9,7 +9,7 @@ import { Address, Account } from "@utils/types";
 import { ADDRESS_ZERO, ZERO } from "@utils/constants";
 import {
   DelegatedManager,
-  BasicIssuanceExtension,
+  IssuanceExtension,
   ManagerCore
 } from "@utils/contracts/index";
 import { SetToken, DebtIssuanceModuleV2 } from "@setprotocol/set-protocol-v2/utils/contracts";
@@ -26,7 +26,7 @@ import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2
 
 const expect = getWaffleExpect();
 
-describe("BasicIssuanceExtension", () => {
+describe("IssuanceExtension", () => {
   let owner: Account;
   let methodologist: Account;
   let operator: Account;
@@ -36,11 +36,11 @@ describe("BasicIssuanceExtension", () => {
   let setToken: SetToken;
   let setV2Setup: SystemFixture;
 
-  let debtIssuanceModule: DebtIssuanceModuleV2;
+  let issuanceModule: DebtIssuanceModuleV2;
 
   let managerCore: ManagerCore;
   let delegatedManager: DelegatedManager;
-  let basicIssuanceExtension: BasicIssuanceExtension;
+  let issuanceExtension: IssuanceExtension;
 
   let maxManagerFee: BigNumber;
   let managerIssueFee: BigNumber;
@@ -64,27 +64,27 @@ describe("BasicIssuanceExtension", () => {
     setV2Setup = getSystemFixture(owner.address);
     await setV2Setup.initialize();
 
-    debtIssuanceModule = await deployer.setV2.deployDebtIssuanceModuleV2(setV2Setup.controller.address);
-    await setV2Setup.controller.addModule(debtIssuanceModule.address);
+    issuanceModule = await deployer.setV2.deployDebtIssuanceModuleV2(setV2Setup.controller.address);
+    await setV2Setup.controller.addModule(issuanceModule.address);
 
     managerCore = await deployer.managerCore.deployManagerCore();
 
-    basicIssuanceExtension = await deployer.globalExtensions.deployBasicIssuanceExtension(
+    issuanceExtension = await deployer.globalExtensions.deployIssuanceExtension(
       managerCore.address,
-      debtIssuanceModule.address
+      issuanceModule.address
     );
 
     setToken = await setV2Setup.createSetToken(
       [setV2Setup.dai.address],
       [ether(1)],
-      [debtIssuanceModule.address]
+      [issuanceModule.address]
     );
 
     delegatedManager = await deployer.manager.deployDelegatedManager(
       setToken.address,
       factory.address,
       methodologist.address,
-      [basicIssuanceExtension.address],
+      [issuanceExtension.address],
       [operator.address],
       [setV2Setup.usdc.address, setV2Setup.weth.address],
       true
@@ -110,25 +110,25 @@ describe("BasicIssuanceExtension", () => {
 
   describe("#constructor", async () => {
     let subjectManagerCore: Address;
-    let subjectBasicIssuanceModule: Address;
+    let subjectIssuanceModule: Address;
 
     beforeEach(async () => {
       subjectManagerCore = managerCore.address;
-      subjectBasicIssuanceModule = debtIssuanceModule.address;
+      subjectIssuanceModule = issuanceModule.address;
     });
 
-    async function subject(): Promise<BasicIssuanceExtension> {
-      return await deployer.globalExtensions.deployBasicIssuanceExtension(
+    async function subject(): Promise<IssuanceExtension> {
+      return await deployer.globalExtensions.deployIssuanceExtension(
         subjectManagerCore,
-        subjectBasicIssuanceModule
+        subjectIssuanceModule
       );
     }
 
-    it("should set the correct BasicIssuanceModule address", async () => {
-      const BasicIssuanceExtension = await subject();
+    it("should set the correct IssuanceModule address", async () => {
+      const issuanceExtension = await subject();
 
-      const storedModule = await BasicIssuanceExtension.issuanceModule();
-      expect(storedModule).to.eq(subjectBasicIssuanceModule);
+      const storedModule = await issuanceExtension.issuanceModule();
+      expect(storedModule).to.eq(subjectIssuanceModule);
     });
   });
 
@@ -142,7 +142,7 @@ describe("BasicIssuanceExtension", () => {
     let subjectManagerIssuanceHook: Address;
 
     beforeEach(async () => {
-      await basicIssuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+      await issuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
 
       subjectDelegatedManager = delegatedManager.address;
       subjectCaller = owner;
@@ -154,7 +154,7 @@ describe("BasicIssuanceExtension", () => {
     });
 
     async function subject(): Promise<ContractTransaction> {
-      return basicIssuanceExtension.connect(subjectCaller.wallet).initializeModule(
+      return issuanceExtension.connect(subjectCaller.wallet).initializeModule(
         subjectDelegatedManager,
         subjectMaxManagerFee,
         subjectManagerIssueFee,
@@ -164,13 +164,13 @@ describe("BasicIssuanceExtension", () => {
       );
     }
 
-    it("should correctly initialize the BasicIssuanceModule on the SetToken", async () => {
+    it("should correctly initialize the IssuanceModule on the SetToken", async () => {
       await subject();
 
-      const isModuleInitialized: Boolean = await setToken.isInitializedModule(debtIssuanceModule.address);
+      const isModuleInitialized: Boolean = await setToken.isInitializedModule(issuanceModule.address);
       expect(isModuleInitialized).to.eq(true);
 
-      const storedSettings: any = await debtIssuanceModule.issuanceSettings(setToken.address);
+      const storedSettings: any = await issuanceModule.issuanceSettings(setToken.address);
 
       expect(storedSettings.maxManagerFee).to.eq(maxManagerFee);
       expect(storedSettings.managerIssueFee).to.eq(managerIssueFee);
@@ -180,13 +180,13 @@ describe("BasicIssuanceExtension", () => {
     });
 
     it("should emit the correct ModuleInitialized event", async () => {
-      await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(debtIssuanceModule.address);
+      await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(issuanceModule.address);
     });
 
-    it("should emit the correct BasicIssuanceModuleInitialized event", async () => {
+    it("should emit the correct IssuanceModuleInitialized event", async () => {
       await expect(subject()).to.emit(
-        basicIssuanceExtension,
-        "BasicIssuanceModuleInitialized"
+        issuanceExtension,
+        "IssuanceModuleInitialized"
       ).withArgs(setToken.address, delegatedManager.address);
     });
 
@@ -200,15 +200,15 @@ describe("BasicIssuanceExtension", () => {
       });
     });
 
-    describe("when the BasicIssuanceModule is not pending or initialized", async () => {
+    describe("when the IssuanceModule is not pending or initialized", async () => {
       beforeEach(async () => {
         await subject();
-        await delegatedManager.connect(owner.wallet).removeExtensions([basicIssuanceExtension.address]);
+        await delegatedManager.connect(owner.wallet).removeExtensions([issuanceExtension.address]);
         await delegatedManager.connect(owner.wallet).setManager(owner.address);
-        await setToken.connect(owner.wallet).removeModule(debtIssuanceModule.address);
+        await setToken.connect(owner.wallet).removeModule(issuanceModule.address);
         await setToken.connect(owner.wallet).setManager(delegatedManager.address);
-        await delegatedManager.connect(owner.wallet).addExtensions([basicIssuanceExtension.address]);
-        await basicIssuanceExtension.connect(subjectCaller.wallet).initializeExtension(delegatedManager.address);
+        await delegatedManager.connect(owner.wallet).addExtensions([issuanceExtension.address]);
+        await issuanceExtension.connect(subjectCaller.wallet).initializeExtension(delegatedManager.address);
       });
 
       it("should revert", async () => {
@@ -216,7 +216,7 @@ describe("BasicIssuanceExtension", () => {
       });
     });
 
-    describe("when the BasicIssuanceModule is already initialized", async () => {
+    describe("when the IssuanceModule is already initialized", async () => {
       beforeEach(async () => {
         await subject();
       });
@@ -228,7 +228,7 @@ describe("BasicIssuanceExtension", () => {
 
     describe("when the extension is not pending or initialized", async () => {
       beforeEach(async () => {
-        await delegatedManager.connect(owner.wallet).removeExtensions([basicIssuanceExtension.address]);
+        await delegatedManager.connect(owner.wallet).removeExtensions([issuanceExtension.address]);
       });
 
       it("should revert", async () => {
@@ -238,8 +238,8 @@ describe("BasicIssuanceExtension", () => {
 
     describe("when the extension is pending", async () => {
       beforeEach(async () => {
-        await delegatedManager.connect(owner.wallet).removeExtensions([basicIssuanceExtension.address]);
-        await delegatedManager.connect(owner.wallet).addExtensions([basicIssuanceExtension.address]);
+        await delegatedManager.connect(owner.wallet).removeExtensions([issuanceExtension.address]);
+        await delegatedManager.connect(owner.wallet).addExtensions([issuanceExtension.address]);
       });
 
       it("should revert", async () => {
@@ -268,28 +268,28 @@ describe("BasicIssuanceExtension", () => {
     });
 
     async function subject(): Promise<ContractTransaction> {
-      return basicIssuanceExtension.connect(subjectCaller.wallet).initializeExtension(subjectDelegatedManager);
+      return issuanceExtension.connect(subjectCaller.wallet).initializeExtension(subjectDelegatedManager);
     }
 
-    it("should store the correct SetToken and DelegatedManager on the BasicIssuanceExtension", async () => {
+    it("should store the correct SetToken and DelegatedManager on the IssuanceExtension", async () => {
       await subject();
 
-      const storedDelegatedManager: Address = await basicIssuanceExtension.setManagers(setToken.address);
+      const storedDelegatedManager: Address = await issuanceExtension.setManagers(setToken.address);
       expect(storedDelegatedManager).to.eq(delegatedManager.address);
     });
 
-    it("should initialize the BasicIssuanceExtension on the DelegatedManager", async () => {
+    it("should initialize the IssuanceExtension on the DelegatedManager", async () => {
       await subject();
 
-      const isExtensionInitialized: Boolean = await delegatedManager.isInitializedExtension(basicIssuanceExtension.address);
+      const isExtensionInitialized: Boolean = await delegatedManager.isInitializedExtension(issuanceExtension.address);
       expect(isExtensionInitialized).to.eq(true);
     });
 
     it("should emit the correct ExtensionInitialized event", async () => {
       await expect(subject()).to.emit(
-        basicIssuanceExtension,
+        issuanceExtension,
         "ExtensionInitialized"
-      ).withArgs(basicIssuanceExtension.address, setToken.address, delegatedManager.address);
+      ).withArgs(issuanceExtension.address, setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {
@@ -304,8 +304,8 @@ describe("BasicIssuanceExtension", () => {
 
     describe("when the extension is not pending or initialized", async () => {
       beforeEach(async () => {
-        await basicIssuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
-        await delegatedManager.connect(owner.wallet).removeExtensions([basicIssuanceExtension.address]);
+        await issuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+        await delegatedManager.connect(owner.wallet).removeExtensions([issuanceExtension.address]);
       });
 
       it("should revert", async () => {
@@ -315,7 +315,7 @@ describe("BasicIssuanceExtension", () => {
 
     describe("when the extension is already initialized", async () => {
       beforeEach(async () => {
-        await basicIssuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+        await issuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
       });
 
       it("should revert", async () => {
@@ -354,7 +354,7 @@ describe("BasicIssuanceExtension", () => {
     });
 
     async function subject(): Promise<ContractTransaction> {
-      return basicIssuanceExtension.connect(subjectCaller.wallet).initializeModuleAndExtension(
+      return issuanceExtension.connect(subjectCaller.wallet).initializeModuleAndExtension(
         subjectDelegatedManager,
         subjectMaxManagerFee,
         subjectManagerIssueFee,
@@ -364,13 +364,13 @@ describe("BasicIssuanceExtension", () => {
       );
     }
 
-    it("should correctly initialize the BasicIssuanceModule on the SetToken", async () => {
+    it("should correctly initialize the IssuanceModule on the SetToken", async () => {
       await subject();
 
-      const isModuleInitialized: Boolean = await setToken.isInitializedModule(debtIssuanceModule.address);
+      const isModuleInitialized: Boolean = await setToken.isInitializedModule(issuanceModule.address);
       expect(isModuleInitialized).to.eq(true);
 
-      const storedSettings: any = await debtIssuanceModule.issuanceSettings(setToken.address);
+      const storedSettings: any = await issuanceModule.issuanceSettings(setToken.address);
 
       expect(storedSettings.maxManagerFee).to.eq(maxManagerFee);
       expect(storedSettings.managerIssueFee).to.eq(managerIssueFee);
@@ -379,29 +379,29 @@ describe("BasicIssuanceExtension", () => {
       expect(storedSettings.managerIssuanceHook).to.eq(managerIssuanceHook);
     });
 
-    it("should store the correct SetToken and DelegatedManager on the BasicIssuanceExtension", async () => {
+    it("should store the correct SetToken and DelegatedManager on the IssuanceExtension", async () => {
       await subject();
 
-      const storedDelegatedManager: Address = await basicIssuanceExtension.setManagers(setToken.address);
+      const storedDelegatedManager: Address = await issuanceExtension.setManagers(setToken.address);
       expect(storedDelegatedManager).to.eq(delegatedManager.address);
     });
 
-    it("should initialize the BasicIssuanceExtension on the DelegatedManager", async () => {
+    it("should initialize the IssuanceExtension on the DelegatedManager", async () => {
       await subject();
 
-      const isExtensionInitialized: Boolean = await delegatedManager.isInitializedExtension(basicIssuanceExtension.address);
+      const isExtensionInitialized: Boolean = await delegatedManager.isInitializedExtension(issuanceExtension.address);
       expect(isExtensionInitialized).to.eq(true);
     });
 
     it("should emit the correct ModuleInitialized event", async () => {
-      await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(debtIssuanceModule.address);
+      await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(issuanceModule.address);
     });
 
     it("should emit the correct ExtensionInitialized event", async () => {
       await expect(subject()).to.emit(
-        basicIssuanceExtension,
+        issuanceExtension,
         "ExtensionInitialized"
-      ).withArgs(basicIssuanceExtension.address, setToken.address, delegatedManager.address);
+      ).withArgs(issuanceExtension.address, setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {
@@ -414,9 +414,9 @@ describe("BasicIssuanceExtension", () => {
       });
     });
 
-    describe("when the BasicIssuanceModule is not pending or initialized", async () => {
+    describe("when the IssuanceModule is not pending or initialized", async () => {
       beforeEach(async () => {
-        await basicIssuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
+        await issuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
           subjectDelegatedManager,
           maxManagerFee,
           managerIssueFee,
@@ -424,11 +424,11 @@ describe("BasicIssuanceExtension", () => {
           feeRecipient,
           managerIssuanceHook
         );
-        await delegatedManager.connect(owner.wallet).removeExtensions([basicIssuanceExtension.address]);
+        await delegatedManager.connect(owner.wallet).removeExtensions([issuanceExtension.address]);
         await delegatedManager.connect(owner.wallet).setManager(owner.address);
-        await setToken.connect(owner.wallet).removeModule(debtIssuanceModule.address);
+        await setToken.connect(owner.wallet).removeModule(issuanceModule.address);
         await setToken.connect(owner.wallet).setManager(delegatedManager.address);
-        await delegatedManager.connect(owner.wallet).addExtensions([basicIssuanceExtension.address]);
+        await delegatedManager.connect(owner.wallet).addExtensions([issuanceExtension.address]);
       });
 
       it("should revert", async () => {
@@ -436,9 +436,9 @@ describe("BasicIssuanceExtension", () => {
       });
     });
 
-    describe("when the BasicIssuanceModule is already initialized", async () => {
+    describe("when the IssuanceModule is already initialized", async () => {
       beforeEach(async () => {
-        await basicIssuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
+        await issuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
           subjectDelegatedManager,
           maxManagerFee,
           managerIssueFee,
@@ -446,8 +446,8 @@ describe("BasicIssuanceExtension", () => {
           feeRecipient,
           managerIssuanceHook
         );
-        await delegatedManager.connect(owner.wallet).removeExtensions([basicIssuanceExtension.address]);
-        await delegatedManager.connect(owner.wallet).addExtensions([basicIssuanceExtension.address]);
+        await delegatedManager.connect(owner.wallet).removeExtensions([issuanceExtension.address]);
+        await delegatedManager.connect(owner.wallet).addExtensions([issuanceExtension.address]);
       });
 
       it("should revert", async () => {
@@ -457,8 +457,8 @@ describe("BasicIssuanceExtension", () => {
 
     describe("when the extension is not pending or initialized", async () => {
       beforeEach(async () => {
-        await basicIssuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
-        await delegatedManager.connect(owner.wallet).removeExtensions([basicIssuanceExtension.address]);
+        await issuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+        await delegatedManager.connect(owner.wallet).removeExtensions([issuanceExtension.address]);
       });
 
       it("should revert", async () => {
@@ -468,7 +468,7 @@ describe("BasicIssuanceExtension", () => {
 
     describe("when the extension is already initialized", async () => {
       beforeEach(async () => {
-        await basicIssuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+        await issuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
       });
 
       it("should revert", async () => {
@@ -489,33 +489,33 @@ describe("BasicIssuanceExtension", () => {
 
   describe("#removeExtension", async () => {
     let subjectManager: Contract;
-    let subjectBasicIssuanceExtension: Address[];
+    let subjectIssuanceExtension: Address[];
     let subjectCaller: Account;
 
     beforeEach(async () => {
-      await basicIssuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+      await issuanceExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
 
       subjectManager = delegatedManager;
-      subjectBasicIssuanceExtension = [basicIssuanceExtension.address];
+      subjectIssuanceExtension = [issuanceExtension.address];
       subjectCaller = owner;
     });
 
     async function subject(): Promise<ContractTransaction> {
-      return subjectManager.connect(subjectCaller.wallet).removeExtensions(subjectBasicIssuanceExtension);
+      return subjectManager.connect(subjectCaller.wallet).removeExtensions(subjectIssuanceExtension);
     }
 
-    it("should clear SetToken and DelegatedManager from BasicIssuanceExtension state", async () => {
+    it("should clear SetToken and DelegatedManager from IssuanceExtension state", async () => {
       await subject();
 
-      const storedDelegatedManager: Address = await basicIssuanceExtension.setManagers(setToken.address);
+      const storedDelegatedManager: Address = await issuanceExtension.setManagers(setToken.address);
       expect(storedDelegatedManager).to.eq(ADDRESS_ZERO);
     });
 
     it("should emit the correct ExtensionRemoved event", async () => {
       await expect(subject()).to.emit(
-        basicIssuanceExtension,
+        issuanceExtension,
         "ExtensionRemoved"
-      ).withArgs(basicIssuanceExtension.address, setToken.address, delegatedManager.address);
+      ).withArgs(issuanceExtension.address, setToken.address, delegatedManager.address);
     });
 
     describe("when the caller is not the SetToken manager", async () => {
@@ -535,7 +535,7 @@ describe("BasicIssuanceExtension", () => {
     let subjectCaller: Account;
 
     beforeEach(async () => {
-      await basicIssuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
+      await issuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
         delegatedManager.address,
         maxManagerFee,
         managerIssueFee,
@@ -550,13 +550,13 @@ describe("BasicIssuanceExtension", () => {
     });
 
     async function subject(): Promise<ContractTransaction> {
-      return await basicIssuanceExtension.connect(subjectCaller.wallet).updateIssueFee(subjectSetToken, subjectNewFee);
+      return await issuanceExtension.connect(subjectCaller.wallet).updateIssueFee(subjectSetToken, subjectNewFee);
     }
 
-    it("should update the issue fee on the BasicIssuanceModule", async () => {
+    it("should update the issue fee on the IssuanceModule", async () => {
       await subject();
 
-      const issueState: any = await debtIssuanceModule.issuanceSettings(setToken.address);
+      const issueState: any = await issuanceModule.issuanceSettings(setToken.address);
       expect(issueState.managerIssueFee).to.eq(subjectNewFee);
     });
 
@@ -577,7 +577,7 @@ describe("BasicIssuanceExtension", () => {
     let subjectCaller: Account;
 
     beforeEach(async () => {
-      await basicIssuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
+      await issuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
         delegatedManager.address,
         maxManagerFee,
         managerIssueFee,
@@ -592,13 +592,13 @@ describe("BasicIssuanceExtension", () => {
     });
 
     async function subject(): Promise<ContractTransaction> {
-      return await basicIssuanceExtension.connect(subjectCaller.wallet).updateRedeemFee(subjectSetToken, subjectNewFee);
+      return await issuanceExtension.connect(subjectCaller.wallet).updateRedeemFee(subjectSetToken, subjectNewFee);
     }
 
-    it("should update the redeem fee on the BasicIssuanceModule", async () => {
+    it("should update the redeem fee on the IssuanceModule", async () => {
       await subject();
 
-      const issueState: any = await debtIssuanceModule.issuanceSettings(setToken.address);
+      const issueState: any = await issuanceModule.issuanceSettings(setToken.address);
       expect(issueState.managerRedeemFee).to.eq(subjectNewFee);
     });
 
@@ -619,7 +619,7 @@ describe("BasicIssuanceExtension", () => {
     let subjectCaller: Account;
 
     beforeEach(async () => {
-      await basicIssuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
+      await issuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
         delegatedManager.address,
         maxManagerFee,
         managerIssueFee,
@@ -634,13 +634,13 @@ describe("BasicIssuanceExtension", () => {
     });
 
     async function subject(): Promise<ContractTransaction> {
-      return await basicIssuanceExtension.connect(subjectCaller.wallet).updateFeeRecipient(subjectSetToken, subjectNewFeeRecipient);
+      return await issuanceExtension.connect(subjectCaller.wallet).updateFeeRecipient(subjectSetToken, subjectNewFeeRecipient);
     }
 
-    it("should update the fee recipient on the BasicIssuanceModule", async () => {
+    it("should update the fee recipient on the IssuanceModule", async () => {
       await subject();
 
-      const issueState: any = await debtIssuanceModule.issuanceSettings(setToken.address);
+      const issueState: any = await issuanceModule.issuanceSettings(setToken.address);
       expect(issueState.feeRecipient).to.eq(subjectNewFeeRecipient);
     });
 
@@ -661,7 +661,7 @@ describe("BasicIssuanceExtension", () => {
     let subjectSetToken: Address;
 
     beforeEach(async () => {
-      await basicIssuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
+      await issuanceExtension.connect(owner.wallet).initializeModuleAndExtension(
         delegatedManager.address,
         maxManagerFee,
         managerIssueFee,
@@ -671,18 +671,18 @@ describe("BasicIssuanceExtension", () => {
       );
 
       mintedTokens = ether(2);
-      await setV2Setup.dai.approve(debtIssuanceModule.address, ether(3));
-      await debtIssuanceModule.issue(setToken.address, mintedTokens, factory.address);
+      await setV2Setup.dai.approve(issuanceModule.address, ether(3));
+      await issuanceModule.issue(setToken.address, mintedTokens, factory.address);
 
       redeemedTokens = ether(1);
-      await setToken.approve(debtIssuanceModule.address, ether(2));
-      await debtIssuanceModule.connect(factory.wallet).redeem(setToken.address, redeemedTokens, factory.address);
+      await setToken.approve(issuanceModule.address, ether(2));
+      await issuanceModule.connect(factory.wallet).redeem(setToken.address, redeemedTokens, factory.address);
 
       subjectSetToken = setToken.address;
     });
 
     async function subject(): Promise<ContractTransaction> {
-      return await basicIssuanceExtension.distributeFees(subjectSetToken);
+      return await issuanceExtension.distributeFees(subjectSetToken);
     }
 
     it("should send correct amount of fees to owner fee recipient and methodologist", async () => {
@@ -703,7 +703,7 @@ describe("BasicIssuanceExtension", () => {
     });
 
     it("should emit a FeesDistributed event", async () => {
-      await expect(subject()).to.emit(basicIssuanceExtension, "FeesDistributed");
+      await expect(subject()).to.emit(issuanceExtension, "FeesDistributed");
     });
 
     describe("when methodologist fees are 0", async () => {
