@@ -35,8 +35,18 @@ contract ManagerCore is Ownable {
 
     event FactoryAdded(address indexed _factory);
     event FactoryRemoved(address indexed _factory);
+    event ManagerAdded(address indexed _manager, address indexed _factory);
+    event ManagerRemoved(address indexed _manager);
 
     /* ============ Modifiers ============ */
+
+    /**
+     * Throws if function is called by any address other than a valid factory.
+     */
+    modifier onlyFactory() {
+        require(isFactory[msg.sender], "Only valid factories can call");
+        _;
+    }
 
     modifier onlyInitialized() {
         require(isInitialized, "Contract must be initialized.");
@@ -45,10 +55,13 @@ contract ManagerCore is Ownable {
 
     /* ============ State Variables ============ */
 
+    // List of enabled managers
+    address[] public managers;
     // List of enabled factories of managers
     address[] public factories;
 
-    // Mapping to check whether address is valid Factory
+    // Mapping to check whether address is valid Manager or Factory
+    mapping(address => bool) public isManager;
     mapping(address => bool) public isFactory;
 
     // Return true if the ManagerCore is initialized
@@ -60,9 +73,11 @@ contract ManagerCore is Ownable {
      * Initializes any predeployed factories. Note: This function can only be called by
      * the owner once to batch initialize the initial system contracts.
      *
+     * @param _managers              List of managers to add
      * @param _factories             List of factories to add
      */
     function initialize(
+        address[] memory _managers,
         address[] memory _factories
     )
         external
@@ -70,9 +85,15 @@ contract ManagerCore is Ownable {
     {
         require(!isInitialized, "ManagerCore is already initialized");
 
+        managers = _managers;
         factories = _factories;
 
-        // Loop through and initialize isFactory mapping
+        // Loop through and initialize isManager and isFactory mapping
+        for (uint256 i = 0; i < _managers.length; i++) {
+            address manager = _managers[i];
+            require(manager != address(0), "Zero address submitted.");
+            isManager[manager] = true;
+        }
         for (uint256 i = 0; i < _factories.length; i++) {
             address factory = _factories[i];
             require(factory != address(0), "Zero address submitted.");
@@ -81,6 +102,36 @@ contract ManagerCore is Ownable {
 
         // Set to true to only allow initialization once
         isInitialized = true;
+    }
+
+    /**
+     * PRIVILEGED FACTORY FUNCTION. Adds a newly deployed manager as an enabled manager.
+     *
+     * @param _manager               Address of the manager contract to add
+     */
+    function addManager(address _manager) external onlyInitialized onlyFactory {
+        require(!isManager[_manager], "Manager already exists");
+
+        isManager[_manager] = true;
+
+        managers.push(_manager);
+
+        emit ManagerAdded(_manager, msg.sender);
+    }
+
+    /**
+     * PRIVILEGED GOVERNANCE FUNCTION. Allows governance to remove a manager
+     *
+     * @param _manager               Address of the manager contract to remove
+     */
+    function removeManager(address _manager) external onlyInitialized onlyOwner {
+        require(isManager[_manager], "Manager does not exist");
+
+        managers = managers.remove(_manager);
+
+        isManager[_manager] = false;
+
+        emit ManagerRemoved(_manager);
     }
 
     /**
@@ -114,6 +165,10 @@ contract ManagerCore is Ownable {
     }
 
     /* ============ External Getter Functions ============ */
+
+    function getManagers() external view returns (address[] memory) {
+        return managers;
+    }
 
     function getFactories() external view returns (address[] memory) {
         return factories;

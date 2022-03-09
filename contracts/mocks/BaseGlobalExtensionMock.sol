@@ -39,12 +39,8 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
         IDelegatedManager _manager
     )
         external
+        onlyValidManager(_manager)
     {
-        require(
-            managerCore.isFactory(msg.sender) || 
-            address(_manager) == _setToken.manager(),
-            "Must be factory or input must be SetToken manager"
-        );
         require(msg.sender == _manager.owner(), "Must be owner");
         initializeInfo[_setToken] = _manager;
 
@@ -68,6 +64,11 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
     function testOnlyOperator(ISetToken _setToken)
         external
         onlyOperator(_setToken)
+    {}
+
+    function testOnlyValidManager(IDelegatedManager _delegatedManager)
+        external
+        onlyValidManager(_delegatedManager)
     {}
 
     function testOnlyAllowedAsset(ISetToken _setToken, address _asset)

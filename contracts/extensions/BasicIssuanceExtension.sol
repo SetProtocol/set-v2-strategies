@@ -116,14 +116,9 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
      *
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
-    function initializeExtension(IDelegatedManager _delegatedManager) external {
+    function initializeExtension(IDelegatedManager _delegatedManager) external onlyValidManager(_delegatedManager) {
         ISetToken setToken = _delegatedManager.setToken();
 
-        require(
-            managerCore.isFactory(msg.sender) || 
-            address(_delegatedManager) == setToken.manager(),
-            "Must be factory or input must be SetToken manager"
-        );
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
@@ -142,7 +137,7 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
      * @param _managerIssueFee              Fee to charge on issuance
      * @param _managerRedeemFee             Fee to charge on redemption
      * @param _feeRecipient                 Address to send fees to
-     * @param _managerIssuanceHook          Instance of the Manager Contract with the Pre-Issuance Hook function
+     * @param _managerIssuanceHook          Instance of the contract with the Pre-Issuance Hook function
      */
     function initializeModuleAndExtension(
         IDelegatedManager _delegatedManager,
@@ -152,7 +147,8 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
         address _feeRecipient,
         address _managerIssuanceHook
     ) 
-        external 
+        external
+        onlyValidManager(_delegatedManager)
     {
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");

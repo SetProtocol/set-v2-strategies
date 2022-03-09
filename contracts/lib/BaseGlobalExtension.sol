@@ -66,6 +66,14 @@ abstract contract BaseGlobalExtension {
     }
 
     /**
+     * Throws if the manager is not enabled on the ManagerCore
+     */
+    modifier onlyValidManager(IDelegatedManager _delegatedManager) {
+        require(managerCore.isManager(address(_delegatedManager)), "Must be ManagerCore-enabled manager");
+        _;
+    }
+
+    /**
      * Throws if asset is not allowed to be held by the Set
      */
     modifier onlyAllowedAsset(ISetToken _setToken, address _asset) {

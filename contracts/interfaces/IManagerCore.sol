@@ -18,5 +18,7 @@
 pragma solidity 0.6.10;
 
 interface IManagerCore {
+    function addManager(address _manager) external;
+    function isManager(address _manager) external view returns(bool);
     function isFactory(address _factory) external view returns(bool);
 }

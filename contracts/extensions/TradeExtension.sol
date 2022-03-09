@@ -69,14 +69,9 @@ contract TradeExtension is BaseGlobalExtension {
      *
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
-    function initializeExtension(IDelegatedManager _delegatedManager) external {
+    function initializeExtension(IDelegatedManager _delegatedManager) external onlyValidManager(_delegatedManager) {
         ISetToken setToken = _delegatedManager.setToken();
 
-        require(
-            managerCore.isFactory(msg.sender) || 
-            address(_delegatedManager) == setToken.manager(),
-            "Must be factory or input must be SetToken manager"
-        );
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
@@ -92,7 +87,7 @@ contract TradeExtension is BaseGlobalExtension {
      *
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
-    function initializeModuleAndExtension(IDelegatedManager _delegatedManager) external {
+    function initializeModuleAndExtension(IDelegatedManager _delegatedManager) external onlyValidManager(_delegatedManager){
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 

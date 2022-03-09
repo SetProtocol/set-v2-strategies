@@ -20,6 +20,9 @@ const expect = getWaffleExpect();
 
 describe("ManagerCore", () => {
   let owner: Account;
+  let otherAccount: Account;
+  let mockDelegatedManagerFactory: Account;
+  let mockManager: Account;
 
   let deployer: DeployHelper;
   let setV2Setup: SystemFixture;
@@ -29,7 +32,10 @@ describe("ManagerCore", () => {
 
   before(async () => {
     [
-      owner
+      owner,
+      otherAccount,
+      mockDelegatedManagerFactory,
+      mockManager
     ] = await getAccounts();
 
     deployer = new DeployHelper(owner.wallet);
@@ -40,6 +46,7 @@ describe("ManagerCore", () => {
     managerCore = await deployer.managerCore.deployManagerCore();
 
     delegatedManagerFactory = await deployer.factories.deployDelegatedManagerFactory(
+      managerCore.address,
       setV2Setup.factory.address
     );
   });
@@ -67,16 +74,32 @@ describe("ManagerCore", () => {
 
   describe("#initialize", async () => {
     let subjectCaller: Account;
+    let subjectManagers: Address[];
     let subjectFactories: Address[];
 
     beforeEach(async () => {
       subjectCaller = owner;
+      subjectManagers = [otherAccount.address];
       subjectFactories = [delegatedManagerFactory.address];
     });
 
     async function subject(): Promise<any> {
-      return await managerCore.connect(subjectCaller.wallet).initialize(subjectFactories);
+      return await managerCore.connect(subjectCaller.wallet).initialize(subjectManagers, subjectFactories);
     }
+
+    it("should have set the correct managers length of 1", async () => {
+      await subject();
+
+      const managers = await managerCore.getManagers();
+      expect(managers.length).to.eq(1);
+    });
+
+    it("should have a valid manager", async () => {
+      await subject();
+
+      const validManager = await managerCore.isManager(otherAccount.address);
+      expect(validManager).to.eq(true);
+    });
 
     it("should have set the correct factories length of 1", async () => {
       await subject();
@@ -109,6 +132,16 @@ describe("ManagerCore", () => {
       });
     });
 
+    describe("when zero address passed for manager", async () => {
+      beforeEach(async () => {
+        subjectManagers = [ADDRESS_ZERO];
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Zero address submitted.");
+      });
+    });
+
     describe("when zero address passed for factory", async () => {
       beforeEach(async () => {
         subjectFactories = [ADDRESS_ZERO];
@@ -130,13 +163,149 @@ describe("ManagerCore", () => {
     });
   });
 
+  describe("#addManager", async () => {
+    let subjectManagerCore: ManagerCore;
+    let subjectManager: Address;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      managerCore.initialize([], []);
+      managerCore.addFactory(mockDelegatedManagerFactory.address);
+
+      subjectManagerCore = managerCore;
+      subjectManager = mockManager.address;
+      subjectCaller = mockDelegatedManagerFactory;
+    });
+
+    async function subject(): Promise<any> {
+      subjectManagerCore = subjectManagerCore.connect(subjectCaller.wallet);
+      return subjectManagerCore.addManager(subjectManager);
+    }
+
+    it("should be stored in the manager array", async () => {
+      await subject();
+
+      const managers = await managerCore.getManagers();
+      expect(managers.length).to.eq(1);
+    });
+
+    it("should be returned as a valid manager", async () => {
+      await subject();
+
+      const validManager = await managerCore.isManager(mockManager.address);
+      expect(validManager).to.eq(true);
+    });
+
+    it("should emit the ManagerAdded event", async () => {
+      await expect(subject()).to.emit(managerCore, "ManagerAdded").withArgs(subjectManager, subjectCaller.address);
+    });
+
+    describe("when the manager already exists", async () => {
+      beforeEach(async () => {
+        await subject();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Manager already exists");
+      });
+    });
+
+    describe("when the caller is not a factory", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Only valid factories can call");
+      });
+    });
+
+    describe("when the ManagerCore is not initialized", async () => {
+      beforeEach(async () => {
+        subjectManagerCore = await deployer.managerCore.deployManagerCore();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Contract must be initialized.");
+      });
+    });
+  });
+
+  describe("#removeManager", async () => {
+    let subjectManagerCore: ManagerCore;
+    let subjectManager: Address;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      await managerCore.initialize([], []);
+      await managerCore.addFactory(mockDelegatedManagerFactory.address);
+      await managerCore.connect(mockDelegatedManagerFactory.wallet).addManager(mockManager.address);
+
+      subjectManagerCore = managerCore;
+      subjectManager = mockManager.address;
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<any> {
+      return subjectManagerCore.connect(subjectCaller.wallet).removeManager(subjectManager);
+    }
+
+    it("should remove manager from manager array", async () => {
+      await subject();
+
+      const managers = await managerCore.getManagers();
+      expect(managers.length).to.eq(0);
+    });
+
+    it("should return false as a valid manager", async () => {
+      await subject();
+
+      const isManager = await managerCore.isManager(mockManager.address);
+      expect(isManager).to.eq(false);
+    });
+
+    it("should emit the ManagerRemoved event", async () => {
+      await expect(subject()).to.emit(managerCore, "ManagerRemoved").withArgs(subjectManager);
+    });
+
+    describe("when the manager does not exist", async () => {
+      beforeEach(async () => {
+        await subject();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Manager does not exist");
+      });
+    });
+
+    describe("when the sender is not the owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+    });
+
+    describe("when the ManagerCore is not initialized", async () => {
+      beforeEach(async () => {
+        subjectManagerCore = await deployer.managerCore.deployManagerCore();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Contract must be initialized.");
+      });
+    });
+  });
+
   describe("#addFactory", async () => {
     let subjectFactory: Address;
     let subjectCaller: Account;
     let subjectManagerCore: ManagerCore;
 
     beforeEach(async () => {
-      await managerCore.initialize([]);
+      await managerCore.initialize([], []);
 
       subjectFactory = delegatedManagerFactory.address;
       subjectCaller = owner;
@@ -202,7 +371,7 @@ describe("ManagerCore", () => {
     let subjectManagerCore: ManagerCore;
 
     beforeEach(async () => {
-      await managerCore.initialize([delegatedManagerFactory.address]);
+      await managerCore.initialize([], [delegatedManagerFactory.address]);
 
       subjectFactory = delegatedManagerFactory.address;
       subjectCaller = owner;

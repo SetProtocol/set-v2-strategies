@@ -101,7 +101,7 @@ describe("StreamingFeeSplitExtension", () => {
 
     await setToken.setManager(delegatedManager.address);
 
-    await managerCore.initialize([factory.address]);
+    await managerCore.initialize([delegatedManager.address], [factory.address]);
 
     feeRecipient = delegatedManager.address;
     maxStreamingFeePercentage = ether(.1);
@@ -206,39 +206,13 @@ describe("StreamingFeeSplitExtension", () => {
       });
     });
 
-    describe("when the caller is not the SetToken manager", async () => {
-      let newDelegatedManager: DelegatedManager;
-      let subjectDeployer: DeployHelper;
-
+    describe("when the manager is not a ManagerCore-enabled manager", async () => {
       beforeEach(async () => {
-        await delegatedManager.connect(owner.wallet).setManager(methodologist.address);
+        await managerCore.connect(owner.wallet).removeManager(delegatedManager.address);
       });
 
       it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("Must be factory or input must be SetToken manager");
-      });
-
-      describe("when the caller is an approved factory", async () => {
-        beforeEach(async () => {
-          subjectDeployer = new DeployHelper(factory.wallet);
-
-          newDelegatedManager = await subjectDeployer.manager.deployDelegatedManager(
-            setToken.address,
-            factory.address,
-            methodologist.address,
-            [streamingFeeSplitExtension.address],
-            [operator.address],
-            [setV2Setup.dai.address, setV2Setup.weth.address],
-            true
-          );
-
-          subjectDelegatedManager = newDelegatedManager.address;
-          subjectCaller = factory;
-        });
-
-        it("should successfully initialize", async () => {
-          await subject();
-        });
+        await expect(subject()).to.be.revertedWith("Must be ManagerCore-enabled manager");
       });
     });
   });
@@ -351,6 +325,16 @@ describe("StreamingFeeSplitExtension", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Extension must be pending");
+      });
+    });
+
+    describe("when the manager is not a ManagerCore-enabled manager", async () => {
+      beforeEach(async () => {
+        await managerCore.connect(owner.wallet).removeManager(delegatedManager.address);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be ManagerCore-enabled manager");
       });
     });
   });

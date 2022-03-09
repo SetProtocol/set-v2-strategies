@@ -93,7 +93,7 @@ describe("BaseGlobalExtension", () => {
     // Transfer ownership to DelegatedManager
     await setToken.setManager(delegatedManager.address);
 
-    await managerCore.initialize([factory.address]);
+    await managerCore.initialize([delegatedManager.address], [factory.address]);
 
     await baseExtensionMock.initializeExtension(setToken.address, delegatedManager.address);
   });
@@ -180,6 +180,39 @@ describe("BaseGlobalExtension", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Must be owner");
+      });
+    });
+  });
+
+  describe("#testOnlyValidManager", async () => {
+    let subjectSetToken: Address;
+    let subjectDelegatedManager: Address;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      await delegatedManager.connect(owner.wallet).removeExtensions([baseExtensionMock.address]);
+      await delegatedManager.connect(owner.wallet).addExtensions([baseExtensionMock.address]);
+
+      subjectSetToken = setToken.address;
+      subjectDelegatedManager = delegatedManager.address;
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return baseExtensionMock.connect(subjectCaller.wallet).initializeExtension(subjectSetToken, subjectDelegatedManager);
+    }
+
+    it("should succeed without revert", async () => {
+      await subject();
+    });
+
+    describe("when the manager is not a ManagerCore-enabled manager", async () => {
+      beforeEach(async () => {
+        await managerCore.connect(owner.wallet).removeManager(delegatedManager.address);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be ManagerCore-enabled manager");
       });
     });
   });
