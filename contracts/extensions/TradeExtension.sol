@@ -32,6 +32,11 @@ contract TradeExtension is BaseGlobalExtension {
 
     /* ============ Events ============ */
 
+    event TradeModuleInitialized(
+        address indexed _setToken,
+        address indexed _delegatedManager
+    );
+
     event TradeExtensionInitialized(
         address indexed _setToken,
         address indexed _delegatedManager
@@ -65,15 +70,32 @@ contract TradeExtension is BaseGlobalExtension {
     /* ============ External Functions ============ */
 
     /**
+     * ONLY OWNER: Initializes TradeModule on the SetToken associated with the DelegatedManager.
+     *
+     * @param _delegatedManager     Instance of the DelegatedManager to initialize the TradeModule for
+     */
+    function initializeModule(IDelegatedManager _delegatedManager) external onlyValidManager(_delegatedManager) {
+        require(msg.sender == _delegatedManager.owner(), "Must be owner");
+        require(_delegatedManager.isInitializedExtension(address(this)), "Extension must be initialized");
+
+        ISetToken setToken = _delegatedManager.setToken();
+
+        bytes memory callData = abi.encodeWithSignature("initialize(address)", _delegatedManager.setToken());
+        _invokeManager(setToken, address(tradeModule), callData);
+
+        TradeModuleInitialized(address(setToken), address(_delegatedManager));
+    }
+
+    /**
      * ONLY OWNER: Initializes TradeExtension to the DelegatedManager.
      *
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
     function initializeExtension(IDelegatedManager _delegatedManager) external onlyValidManager(_delegatedManager) {
-        ISetToken setToken = _delegatedManager.setToken();
-
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
+
+        ISetToken setToken = _delegatedManager.setToken();
 
         setManagers[setToken] = _delegatedManager;
 

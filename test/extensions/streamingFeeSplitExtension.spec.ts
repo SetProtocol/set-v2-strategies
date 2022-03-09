@@ -141,6 +141,115 @@ describe("StreamingFeeSplitExtension", () => {
     });
   });
 
+  describe("#initializeModule", async () => {
+    let subjectFeeSettings: StreamingFeeState;
+    let subjectDelegatedManager: Address;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      await streamingFeeSplitExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+
+      subjectFeeSettings = feeSettings;
+      subjectDelegatedManager = delegatedManager.address;
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return streamingFeeSplitExtension.connect(subjectCaller.wallet).initializeModule(subjectDelegatedManager, subjectFeeSettings);
+    }
+
+    it("should correctly initialize the StreamingFeeModule on the SetToken", async () => {
+      const txTimestamp = await getTransactionTimestamp(subject());
+
+      const isModuleInitialized: Boolean = await setToken.isInitializedModule(setV2Setup.streamingFeeModule.address);
+      expect(isModuleInitialized).to.eq(true);
+
+      const storedFeeState: StreamingFeeState = await setV2Setup.streamingFeeModule.feeStates(setToken.address);
+      expect(storedFeeState.feeRecipient).to.eq(feeRecipient);
+      expect(storedFeeState.maxStreamingFeePercentage).to.eq(maxStreamingFeePercentage);
+      expect(storedFeeState.streamingFeePercentage).to.eq(streamingFeePercentage);
+      expect(storedFeeState.lastStreamingFeeTimestamp).to.eq(txTimestamp);
+    });
+
+    it("should emit the correct ModuleInitialized event", async () => {
+      await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(setV2Setup.streamingFeeModule.address);
+    });
+
+    it("should emit the correct StreamingFeeModuleInitialized event", async () => {
+      await expect(subject()).to.emit(
+        streamingFeeSplitExtension,
+        "StreamingFeeModuleInitialized"
+      ).withArgs(setToken.address, delegatedManager.address);
+    });
+
+    describe("when the sender is not the owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be owner");
+      });
+    });
+
+    describe("when the StreamingFeeModule is not pending or initialized", async () => {
+      beforeEach(async () => {
+        await subject();
+        await delegatedManager.connect(owner.wallet).removeExtensions([streamingFeeSplitExtension.address]);
+        await delegatedManager.connect(owner.wallet).setManager(owner.address);
+        await setToken.connect(owner.wallet).removeModule(setV2Setup.streamingFeeModule.address);
+        await setToken.connect(owner.wallet).setManager(delegatedManager.address);
+        await delegatedManager.connect(owner.wallet).addExtensions([streamingFeeSplitExtension.address]);
+        await streamingFeeSplitExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be pending initialization");
+      });
+    });
+
+    describe("when the StreamingFeeModule is already initialized", async () => {
+      beforeEach(async () => {
+        await subject();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be pending initialization");
+      });
+    });
+
+    describe("when the extension is not pending or initialized", async () => {
+      beforeEach(async () => {
+        await delegatedManager.connect(owner.wallet).removeExtensions([streamingFeeSplitExtension.address]);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Extension must be initialized");
+      });
+    });
+
+    describe("when the extension is pending", async () => {
+      beforeEach(async () => {
+        await delegatedManager.connect(owner.wallet).removeExtensions([streamingFeeSplitExtension.address]);
+        await delegatedManager.connect(owner.wallet).addExtensions([streamingFeeSplitExtension.address]);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Extension must be initialized");
+      });
+    });
+
+    describe("when the manager is not a ManagerCore-enabled manager", async () => {
+      beforeEach(async () => {
+        await managerCore.connect(owner.wallet).removeManager(delegatedManager.address);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be ManagerCore-enabled manager");
+      });
+    });
+  });
+
   describe("#initializeExtension", async () => {
     let subjectDelegatedManager: Address;
     let subjectCaller: Account;

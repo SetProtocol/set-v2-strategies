@@ -125,6 +125,104 @@ describe("TradeExtension", () => {
     });
   });
 
+  describe("#initializeModule", async () => {
+    let subjectDelegatedManager: Address;
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      await tradeExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+
+      subjectDelegatedManager = delegatedManager.address;
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return tradeExtension.connect(subjectCaller.wallet).initializeModule(subjectDelegatedManager);
+    }
+
+    it("should initialize the module on the SetToken", async () => {
+      await subject();
+
+      const isModuleInitialized: Boolean = await setToken.isInitializedModule(tradeModule.address);
+      expect(isModuleInitialized).to.eq(true);
+    });
+
+    it("should emit the correct ModuleInitialized event", async () => {
+      await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(tradeModule.address);
+    });
+
+    it("should emit the correct TradeModuleInitialized event", async () => {
+      await expect(subject()).to.emit(tradeExtension, "TradeModuleInitialized").withArgs(setToken.address, delegatedManager.address);
+    });
+
+    describe("when the sender is not the owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be owner");
+      });
+    });
+
+    describe("when the module is not pending or initialized", async () => {
+      beforeEach(async () => {
+        await subject();
+        await delegatedManager.connect(owner.wallet).removeExtensions([tradeExtension.address]);
+        await delegatedManager.connect(owner.wallet).setManager(owner.address);
+        await setToken.connect(owner.wallet).removeModule(tradeModule.address);
+        await setToken.connect(owner.wallet).setManager(delegatedManager.address);
+        await delegatedManager.connect(owner.wallet).addExtensions([tradeExtension.address]);
+        await tradeExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be pending initialization");
+      });
+    });
+
+    describe("when the module is already initialized", async () => {
+      beforeEach(async () => {
+        await subject();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be pending initialization");
+      });
+    });
+
+    describe("when the extension is not pending or initialized", async () => {
+      beforeEach(async () => {
+        await delegatedManager.connect(owner.wallet).removeExtensions([tradeExtension.address]);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Extension must be initialized");
+      });
+    });
+
+    describe("when the extension is pending", async () => {
+      beforeEach(async () => {
+        await delegatedManager.connect(owner.wallet).removeExtensions([tradeExtension.address]);
+        await delegatedManager.connect(owner.wallet).addExtensions([tradeExtension.address]);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Extension must be initialized");
+      });
+    });
+
+    describe("when the manager is not a ManagerCore-enabled manager", async () => {
+      beforeEach(async () => {
+        await managerCore.connect(owner.wallet).removeManager(delegatedManager.address);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be ManagerCore-enabled manager");
+      });
+    });
+  });
+
   describe("#initializeExtension", async () => {
     let subjectDelegatedManager: Address;
     let subjectCaller: Account;

@@ -45,6 +45,11 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
 
     /* ============ Events ============ */
 
+    event StreamingFeeModuleInitialized(
+        address indexed _setToken,
+        address indexed _delegatedManager
+    );
+
     event StreamingFeeSplitExtensionInitialized(
         address indexed _setToken,
         address indexed _delegatedManager
@@ -115,6 +120,33 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     }
 
     /**
+     * ONLY OWNER: Initializes StreamingFeeModule on the SetToken associated with the DelegatedManager.
+     *
+     * @param _delegatedManager     Instance of the DelegatedManager to initialize the StreamingFeeModule for
+     * @param _settings             FeeState struct defining fee parameters for StreamingFeeModule initialization
+     */
+    function initializeModule(
+        IDelegatedManager _delegatedManager,
+        IStreamingFeeModule.FeeState memory _settings
+    ) 
+        external 
+        onlyValidManager(_delegatedManager) 
+    {
+        require(msg.sender == _delegatedManager.owner(), "Must be owner");
+        require(_delegatedManager.isInitializedExtension(address(this)), "Extension must be initialized");
+
+        ISetToken setToken = _delegatedManager.setToken();
+
+        bytes memory callData = abi.encodeWithSignature(
+            "initialize(address,(address,uint256,uint256,uint256))", 
+            setToken,
+            _settings);
+        _invokeManager(setToken, address(streamingFeeModule), callData);
+
+        StreamingFeeModuleInitialized(address(setToken), address(_delegatedManager));
+    }
+
+    /**
      * ONLY OWNER: Initializes StreamingFeeSplitExtension to the DelegatedManager.
      *
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
@@ -164,7 +196,7 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the TradeExtension 
+     * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the StreamingFeeSplitExtension 
      */
     function removeExtension() external override {
         IDelegatedManager delegatedManager = IDelegatedManager(msg.sender);
