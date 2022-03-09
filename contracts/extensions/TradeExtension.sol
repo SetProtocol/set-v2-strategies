@@ -32,14 +32,14 @@ contract TradeExtension is BaseGlobalExtension {
 
     /* ============ Events ============ */
 
-    event ExtensionInitialized(
-        address _setToken,
-        address _delegatedManager
+    event TradeExtensionInitialized(
+        address indexed _setToken,
+        address indexed _delegatedManager
     );
 
-    event ExtensionRemoved(
-        address _setToken,
-        address _delegatedManager
+    event TradeExtensionRemoved(
+        address indexed _setToken,
+        address indexed _delegatedManager
     );
 
     /* ============ State Variables ============ */
@@ -84,7 +84,7 @@ contract TradeExtension is BaseGlobalExtension {
 
         _delegatedManager.initializeExtension();
 
-        ExtensionInitialized(address(setToken), address(_delegatedManager));
+        TradeExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -98,8 +98,6 @@ contract TradeExtension is BaseGlobalExtension {
 
         ISetToken setToken = _delegatedManager.setToken();
 
-        require(setToken.isPendingModule(address(tradeModule)), "TradeModule must be pending");
-
         setManagers[setToken] = _delegatedManager;
 
         _delegatedManager.initializeExtension();
@@ -107,7 +105,7 @@ contract TradeExtension is BaseGlobalExtension {
         bytes memory callData = abi.encodeWithSignature("initialize(address)", _delegatedManager.setToken());
         _invokeManager(setToken, address(tradeModule), callData);
 
-        ExtensionInitialized(address(setToken), address(_delegatedManager));
+        TradeExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -121,7 +119,7 @@ contract TradeExtension is BaseGlobalExtension {
 
         delete setManagers[setToken];
 
-        ExtensionRemoved(address(setToken), address(delegatedManager));
+        TradeExtensionRemoved(address(setToken), address(delegatedManager));
     }
 
     /**

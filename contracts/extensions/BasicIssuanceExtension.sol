@@ -28,7 +28,6 @@ import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISe
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
 import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
-
 import { IIssuanceModule } from "../interfaces/IIssuanceModule.sol";
 
 /**
@@ -36,7 +35,8 @@ import { IIssuanceModule } from "../interfaces/IIssuanceModule.sol";
  * @author Set Protocol
  *
  * Smart contract global extension which provides DelegatedManager owner and 
- * methodologist the ability to accrue and split issuance and redemption fees at an mutable percentage.
+ * methodologist the ability to accrue and split issuance and redemption fees.
+ * Owner may configure the fee split percentages.
  */
 contract BasicIssuanceExtension is BaseGlobalExtension {
     using Address for address;
@@ -45,14 +45,14 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
 
     /* ============ Events ============ */
 
-    event ExtensionInitialized(
-        address _setToken,
-        address _delegatedManager
+    event BasicIssuanceExtensionInitialized(
+        address indexed _setToken,
+        address indexed _delegatedManager
     );
 
-    event ExtensionRemoved(
-        address _setToken,
-        address _delegatedManager
+    event BasicIssuanceExtensionRemoved(
+        address indexed _setToken,
+        address indexed _delegatedManager
     );
 
     event FeesDistributed(
@@ -131,7 +131,7 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
 
         _delegatedManager.initializeExtension();
 
-        ExtensionInitialized(address(setToken), address(_delegatedManager));
+        BasicIssuanceExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -159,8 +159,6 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
 
         ISetToken setToken = _delegatedManager.setToken();
 
-        require(setToken.isPendingModule(address(issuanceModule)), "BasicIssuanceModule must be pending");
-
         setManagers[setToken] = _delegatedManager;
 
         _delegatedManager.initializeExtension();
@@ -176,7 +174,7 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
         );
         _invokeManager(setToken, address(issuanceModule), callData);
 
-        ExtensionInitialized(address(setToken), address(_delegatedManager));
+        BasicIssuanceExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -190,7 +188,7 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
 
         delete setManagers[setToken];
 
-        ExtensionRemoved(address(setToken), address(delegatedManager));
+        BasicIssuanceExtensionRemoved(address(setToken), address(delegatedManager));
     }
 
     /**

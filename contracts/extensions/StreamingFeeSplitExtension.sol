@@ -28,7 +28,6 @@ import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISe
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
 import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
-
 import { IStreamingFeeModule } from "../interfaces/IStreamingFeeModuleV2.sol";
 
 /**
@@ -36,7 +35,8 @@ import { IStreamingFeeModule } from "../interfaces/IStreamingFeeModuleV2.sol";
  * @author Set Protocol
  *
  * Smart contract global extension which provides DelegatedManager owner and 
- * methodologist the ability to accrue and split streaming fees at an mutable percentage.
+ * methodologist the ability to accrue and split streaming fees.
+ * Owner may configure the fee split percentages.
  */
 contract StreamingFeeSplitExtension is BaseGlobalExtension {
     using Address for address;
@@ -45,14 +45,14 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
 
     /* ============ Events ============ */
 
-    event ExtensionInitialized(
-        address _setToken,
-        address _delegatedManager
+    event StreamingFeeSplitExtensionInitialized(
+        address indexed _setToken,
+        address indexed _delegatedManager
     );
 
-    event ExtensionRemoved(
-        address _setToken,
-        address _delegatedManager
+    event StreamingFeeSplitExtensionRemoved(
+        address indexed _setToken,
+        address indexed _delegatedManager
     );
 
     event FeesDistributed(
@@ -134,7 +134,7 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
 
         _delegatedManager.initializeExtension();
 
-        ExtensionInitialized(address(setToken), address(_delegatedManager));
+        StreamingFeeSplitExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -154,8 +154,6 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
 
         ISetToken setToken = _delegatedManager.setToken();
 
-        require(setToken.isPendingModule(address(streamingFeeModule)), "StreamingFeeModule must be pending");
-
         setManagers[setToken] = _delegatedManager;
 
         _delegatedManager.initializeExtension();
@@ -166,7 +164,7 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
             _settings);
         _invokeManager(setToken, address(streamingFeeModule), callData);
 
-        ExtensionInitialized(address(setToken), address(_delegatedManager));
+        StreamingFeeSplitExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -180,7 +178,7 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
 
         delete setManagers[setToken];
 
-        ExtensionRemoved(address(setToken), address(delegatedManager));
+        StreamingFeeSplitExtensionRemoved(address(setToken), address(delegatedManager));
     }
 
     /**

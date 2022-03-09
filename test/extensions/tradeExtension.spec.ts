@@ -152,8 +152,8 @@ describe("TradeExtension", () => {
       expect(isExtensionInitialized).to.eq(true);
     });
 
-    it("should emit the correct ExtensionInitialized event", async () => {
-      await expect(subject()).to.emit(tradeExtension, "ExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
+    it("should emit the correct TradeExtensionInitialized event", async () => {
+      await expect(subject()).to.emit(tradeExtension, "TradeExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {
@@ -262,8 +262,8 @@ describe("TradeExtension", () => {
       await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(tradeModule.address);
     });
 
-    it("should emit the correct ExtensionInitialized event", async () => {
-      await expect(subject()).to.emit(tradeExtension, "ExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
+    it("should emit the correct TradeExtensionInitialized event", async () => {
+      await expect(subject()).to.emit(tradeExtension, "TradeExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {
@@ -287,7 +287,7 @@ describe("TradeExtension", () => {
       });
 
       it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("TradeModule must be pending");
+        await expect(subject()).to.be.revertedWith("Must be pending initialization");
       });
     });
 
@@ -299,7 +299,7 @@ describe("TradeExtension", () => {
       });
 
       it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("TradeModule must be pending");
+        await expect(subject()).to.be.revertedWith("Must be pending initialization");
       });
     });
 
@@ -349,8 +349,8 @@ describe("TradeExtension", () => {
       expect(storedDelegatedManager).to.eq(ADDRESS_ZERO);
     });
 
-    it("should emit the correct ExtensionRemoved event", async () => {
-      await expect(subject()).to.emit(tradeExtension, "ExtensionRemoved").withArgs(setToken.address, delegatedManager.address);
+    it("should emit the correct TradeExtensionRemoved event", async () => {
+      await expect(subject()).to.emit(tradeExtension, "TradeExtensionRemoved").withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the caller is not the SetToken manager", async () => {

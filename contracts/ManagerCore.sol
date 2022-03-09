@@ -19,8 +19,15 @@
 pragma solidity 0.6.10;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+
 import { AddressArrayUtils } from "./lib/AddressArrayUtils.sol";
 
+/**
+ * @title ManagerCore
+ * @author Set Protocol
+ *
+ *  Registry for governance approved DelegatedManagerFactories
+ */
 contract ManagerCore is Ownable {
     using AddressArrayUtils for address[];
 
@@ -67,8 +74,9 @@ contract ManagerCore is Ownable {
 
         // Loop through and initialize isFactory mapping
         for (uint256 i = 0; i < _factories.length; i++) {
-            require(_factories[i] != address(0), "Zero address submitted.");
-            isFactory[_factories[i]] = true;
+            address factory = _factories[i];
+            require(factory != address(0), "Zero address submitted.");
+            isFactory[factory] = true;
         }
 
         // Set to true to only allow initialization once

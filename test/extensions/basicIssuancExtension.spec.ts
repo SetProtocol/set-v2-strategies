@@ -99,9 +99,6 @@ describe("BasicIssuanceExtension", () => {
 
     await managerCore.initialize([factory.address]);
 
-    const didItWork: Boolean = await managerCore.isFactory(factory.address);
-    console.log(didItWork);
-
     maxManagerFee = ether(.1);
     managerIssueFee = ether(.02);
     managerRedeemFee = ether(.03);
@@ -162,8 +159,11 @@ describe("BasicIssuanceExtension", () => {
       expect(isExtensionInitialized).to.eq(true);
     });
 
-    it("should emit the correct ExtensionInitialized event", async () => {
-      await expect(subject()).to.emit(basicIssuanceExtension, "ExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
+    it("should emit the correct BasicIssuanceExtensionInitialized event", async () => {
+      await expect(subject()).to.emit(
+        basicIssuanceExtension,
+        "BasicIssuanceExtensionInitialized"
+      ).withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {
@@ -297,8 +297,11 @@ describe("BasicIssuanceExtension", () => {
       await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(debtIssuanceModule.address);
     });
 
-    it("should emit the correct ExtensionInitialized event", async () => {
-      await expect(subject()).to.emit(basicIssuanceExtension, "ExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
+    it("should emit the correct BasicIssuanceExtensionInitialized event", async () => {
+      await expect(subject()).to.emit(
+        basicIssuanceExtension,
+        "BasicIssuanceExtensionInitialized"
+      ).withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {
@@ -329,7 +332,7 @@ describe("BasicIssuanceExtension", () => {
       });
 
       it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("BasicIssuanceModule must be pending");
+        await expect(subject()).to.be.revertedWith("Must be pending initialization");
       });
     });
 
@@ -348,7 +351,7 @@ describe("BasicIssuanceExtension", () => {
       });
 
       it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("BasicIssuanceModule must be pending");
+        await expect(subject()).to.be.revertedWith("Must be pending initialization");
       });
     });
 
@@ -398,8 +401,11 @@ describe("BasicIssuanceExtension", () => {
       expect(storedDelegatedManager).to.eq(ADDRESS_ZERO);
     });
 
-    it("should emit the correct ExtensionRemoved event", async () => {
-      await expect(subject()).to.emit(basicIssuanceExtension, "ExtensionRemoved").withArgs(setToken.address, delegatedManager.address);
+    it("should emit the correct BasicIssuanceExtensionRemoved event", async () => {
+      await expect(subject()).to.emit(
+        basicIssuanceExtension,
+        "BasicIssuanceExtensionRemoved"
+      ).withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the caller is not the SetToken manager", async () => {

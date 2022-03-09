@@ -168,8 +168,11 @@ describe("StreamingFeeSplitExtension", () => {
       expect(isExtensionInitialized).to.eq(true);
     });
 
-    it("should emit the correct ExtensionInitialized event", async () => {
-      await expect(subject()).to.emit(streamingFeeSplitExtension, "ExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
+    it("should emit the correct StreamingFeeSplitExtensionInitialized event", async () => {
+      await expect(subject()).to.emit(
+        streamingFeeSplitExtension,
+        "StreamingFeeSplitExtensionInitialized"
+      ).withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {
@@ -286,8 +289,11 @@ describe("StreamingFeeSplitExtension", () => {
       await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(setV2Setup.streamingFeeModule.address);
     });
 
-    it("should emit the correct ExtensionInitialized event", async () => {
-      await expect(subject()).to.emit(streamingFeeSplitExtension, "ExtensionInitialized").withArgs(setToken.address, delegatedManager.address);
+    it("should emit the correct StreamingFeeSplitExtensionInitialized event", async () => {
+      await expect(subject()).to.emit(
+        streamingFeeSplitExtension,
+        "StreamingFeeSplitExtensionInitialized"
+      ).withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {
@@ -311,7 +317,7 @@ describe("StreamingFeeSplitExtension", () => {
       });
 
       it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("StreamingFeeModule must be pending");
+        await expect(subject()).to.be.revertedWith("Must be pending initialization");
       });
     });
 
@@ -323,7 +329,7 @@ describe("StreamingFeeSplitExtension", () => {
       });
 
       it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("StreamingFeeModule must be pending");
+        await expect(subject()).to.be.revertedWith("Must be pending initialization");
       });
     });
 
@@ -373,8 +379,11 @@ describe("StreamingFeeSplitExtension", () => {
       expect(storedDelegatedManager).to.eq(ADDRESS_ZERO);
     });
 
-    it("should emit the correct ExtensionRemoved event", async () => {
-      await expect(subject()).to.emit(streamingFeeSplitExtension, "ExtensionRemoved").withArgs(setToken.address, delegatedManager.address);
+    it("should emit the correct StreamingFeeSplitExtensionRemoved event", async () => {
+      await expect(subject()).to.emit(
+        streamingFeeSplitExtension,
+        "StreamingFeeSplitExtensionRemoved"
+      ).withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the caller is not the SetToken manager", async () => {
