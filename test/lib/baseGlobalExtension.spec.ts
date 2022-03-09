@@ -95,7 +95,7 @@ describe("BaseGlobalExtension", () => {
 
     await managerCore.initialize([delegatedManager.address], [factory.address]);
 
-    await baseExtensionMock.initializeExtension(setToken.address, delegatedManager.address);
+    await baseExtensionMock.initializeExtension(delegatedManager.address);
   });
 
   addSnapshotBeforeRestoreAfterEach();
@@ -185,7 +185,6 @@ describe("BaseGlobalExtension", () => {
   });
 
   describe("#testOnlyValidManager", async () => {
-    let subjectSetToken: Address;
     let subjectDelegatedManager: Address;
     let subjectCaller: Account;
 
@@ -193,13 +192,12 @@ describe("BaseGlobalExtension", () => {
       await delegatedManager.connect(owner.wallet).removeExtensions([baseExtensionMock.address]);
       await delegatedManager.connect(owner.wallet).addExtensions([baseExtensionMock.address]);
 
-      subjectSetToken = setToken.address;
       subjectDelegatedManager = delegatedManager.address;
       subjectCaller = owner;
     });
 
     async function subject(): Promise<ContractTransaction> {
-      return baseExtensionMock.connect(subjectCaller.wallet).initializeExtension(subjectSetToken, subjectDelegatedManager);
+      return baseExtensionMock.connect(subjectCaller.wallet).initializeExtension(subjectDelegatedManager);
     }
 
     it("should succeed without revert", async () => {

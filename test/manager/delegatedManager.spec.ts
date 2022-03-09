@@ -398,7 +398,6 @@ describe("DelegatedManager", () => {
 
     beforeEach(async () => {
       await baseExtension.connect(owner.wallet).initializeExtension(
-        setToken.address,
         delegatedManager.address
       );
 
@@ -925,7 +924,7 @@ describe("DelegatedManager", () => {
 
     describe("when manager still has extension initialized", async () => {
       beforeEach(async () => {
-        await baseExtension.initializeExtension(setToken.address, delegatedManager.address);
+        await baseExtension.initializeExtension(delegatedManager.address);
       });
 
       it("should revert", async () => {
@@ -1017,7 +1016,7 @@ describe("DelegatedManager", () => {
 
     describe("when extension is initialized", async () => {
       beforeEach(async () => {
-        await baseExtension.connect(owner.wallet).initializeExtension(setToken.address, delegatedManager.address);
+        await baseExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
       });
 
       it("should return false", async () => {
@@ -1029,7 +1028,7 @@ describe("DelegatedManager", () => {
 
     describe("when the extension is not tracked in allowlist", async () => {
       beforeEach(async () => {
-        await baseExtension.connect(owner.wallet).initializeExtension(setToken.address, delegatedManager.address);
+        await baseExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
         await delegatedManager.connect(owner.wallet).removeExtensions([baseExtension.address]);
       });
 
@@ -1060,7 +1059,7 @@ describe("DelegatedManager", () => {
 
     describe("when extension is initialized", async () => {
       beforeEach(async () => {
-        await baseExtension.connect(owner.wallet).initializeExtension(setToken.address, delegatedManager.address);
+        await baseExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
       });
 
       it("should return false", async () => {
@@ -1072,7 +1071,7 @@ describe("DelegatedManager", () => {
 
     describe("when the extension is not tracked in allowlist", async () => {
       beforeEach(async () => {
-        await baseExtension.connect(owner.wallet).initializeExtension(setToken.address, delegatedManager.address);
+        await baseExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
         await delegatedManager.connect(owner.wallet).removeExtensions([baseExtension.address]);
       });
 

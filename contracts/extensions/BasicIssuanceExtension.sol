@@ -50,16 +50,6 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
         address indexed _delegatedManager
     );
 
-    event BasicIssuanceExtensionInitialized(
-        address indexed _setToken,
-        address indexed _delegatedManager
-    );
-
-    event BasicIssuanceExtensionRemoved(
-        address indexed _setToken,
-        address indexed _delegatedManager
-    );
-
     event FeesDistributed(
         address _setToken,
         address indexed _ownerFeeRecipient,
@@ -72,9 +62,6 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
 
     // Instance of BasicIssuanceModule
     IIssuanceModule public immutable issuanceModule;
-
-    // Mapping from Set Token to DelegatedManager 
-    mapping(ISetToken => IDelegatedManager) public setManagers;
 
     /* ============ Constructor ============ */
 
@@ -140,20 +127,14 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isInitializedExtension(address(this)), "Extension must be initialized");
 
-        ISetToken setToken = _delegatedManager.setToken();
-
-        bytes memory callData = abi.encodeWithSignature(
-            "initialize(address,uint256,uint256,uint256,address,address)", 
-            setToken,
-            _maxManagerFee,
+        _initializeModule(
+            _delegatedManager,
+            _maxManagerFee, 
             _managerIssueFee,
             _managerRedeemFee,
             _feeRecipient,
             _managerIssuanceHook
         );
-        _invokeManager(setToken, address(issuanceModule), callData);
-
-        BasicIssuanceModuleInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -162,16 +143,10 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
     function initializeExtension(IDelegatedManager _delegatedManager) external onlyValidManager(_delegatedManager) {
-        ISetToken setToken = _delegatedManager.setToken();
-
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        setManagers[setToken] = _delegatedManager;
-
-        _delegatedManager.initializeExtension();
-
-        BasicIssuanceExtensionInitialized(address(setToken), address(_delegatedManager));
+        _initializeExtension(_delegatedManager);
     }
 
     /**
@@ -198,38 +173,22 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        ISetToken setToken = _delegatedManager.setToken();
-
-        setManagers[setToken] = _delegatedManager;
-
-        _delegatedManager.initializeExtension();
-
-        bytes memory callData = abi.encodeWithSignature(
-            "initialize(address,uint256,uint256,uint256,address,address)", 
-            setToken,
-            _maxManagerFee,
+        _initializeExtension(_delegatedManager);
+        _initializeModule(
+            _delegatedManager,
+            _maxManagerFee, 
             _managerIssueFee,
             _managerRedeemFee,
             _feeRecipient,
             _managerIssuanceHook
         );
-        _invokeManager(setToken, address(issuanceModule), callData);
-
-        BasicIssuanceExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
      * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the BasicIssuanceExtension 
      */
     function removeExtension() external override {
-        IDelegatedManager delegatedManager = IDelegatedManager(msg.sender);
-        ISetToken setToken = delegatedManager.setToken();
-
-        require(msg.sender == address(_manager(setToken)), "Must be Manager");
-
-        delete setManagers[setToken];
-
-        BasicIssuanceExtensionRemoved(address(setToken), address(delegatedManager));
+        _removeExtension();
     }
 
     /**
@@ -277,11 +236,38 @@ contract BasicIssuanceExtension is BaseGlobalExtension {
     /* ============ Internal Functions ============ */
 
     /**
-     * Internal function to grab manager of passed SetToken from BasicIssuanceExtension data structure.
+     * Internal function to initialize BasicIssuanceModule on the SetToken associated with the DelegatedManager.
      *
-     * @param _setToken         SetToken who's manager is needed 
+     * @param _delegatedManager     Instance of the DelegatedManager to initialize the TradeModule for
+     * @param _maxManagerFee                Maximum fee that can be charged on issue and redeem
+     * @param _managerIssueFee              Fee to charge on issuance
+     * @param _managerRedeemFee             Fee to charge on redemption
+     * @param _feeRecipient                 Address to send fees to
+     * @param _managerIssuanceHook          Instance of the contract with the Pre-Issuance Hook function
      */
-    function _manager(ISetToken _setToken) internal override view returns (IDelegatedManager) {
-        return setManagers[_setToken];
+    function _initializeModule(
+        IDelegatedManager _delegatedManager,
+        uint256 _maxManagerFee,
+        uint256 _managerIssueFee,
+        uint256 _managerRedeemFee,
+        address _feeRecipient,
+        address _managerIssuanceHook
+    ) 
+        internal
+    {
+        ISetToken setToken = _delegatedManager.setToken();
+
+        bytes memory callData = abi.encodeWithSignature(
+            "initialize(address,uint256,uint256,uint256,address,address)", 
+            setToken,
+            _maxManagerFee,
+            _managerIssueFee,
+            _managerRedeemFee,
+            _feeRecipient,
+            _managerIssuanceHook
+        );
+        _invokeManager(setToken, address(issuanceModule), callData);
+
+        BasicIssuanceModuleInitialized(address(setToken), address(_delegatedManager));
     }
 }

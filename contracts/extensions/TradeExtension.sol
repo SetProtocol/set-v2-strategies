@@ -37,23 +37,10 @@ contract TradeExtension is BaseGlobalExtension {
         address indexed _delegatedManager
     );
 
-    event TradeExtensionInitialized(
-        address indexed _setToken,
-        address indexed _delegatedManager
-    );
-
-    event TradeExtensionRemoved(
-        address indexed _setToken,
-        address indexed _delegatedManager
-    );
-
     /* ============ State Variables ============ */
 
     // Instance of TradeModule
     ITradeModule public immutable tradeModule;
-
-    // Mapping from Set Token to DelegatedManager 
-    mapping(ISetToken => IDelegatedManager) public setManagers;
 
     /* ============ Constructor ============ */
 
@@ -78,12 +65,7 @@ contract TradeExtension is BaseGlobalExtension {
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isInitializedExtension(address(this)), "Extension must be initialized");
 
-        ISetToken setToken = _delegatedManager.setToken();
-
-        bytes memory callData = abi.encodeWithSignature("initialize(address)", _delegatedManager.setToken());
-        _invokeManager(setToken, address(tradeModule), callData);
-
-        TradeModuleInitialized(address(setToken), address(_delegatedManager));
+        _initializeModule(_delegatedManager);
     }
 
     /**
@@ -95,13 +77,7 @@ contract TradeExtension is BaseGlobalExtension {
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        ISetToken setToken = _delegatedManager.setToken();
-
-        setManagers[setToken] = _delegatedManager;
-
-        _delegatedManager.initializeExtension();
-
-        TradeExtensionInitialized(address(setToken), address(_delegatedManager));
+        _initializeExtension(_delegatedManager);
     }
 
     /**
@@ -113,30 +89,15 @@ contract TradeExtension is BaseGlobalExtension {
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        ISetToken setToken = _delegatedManager.setToken();
-
-        setManagers[setToken] = _delegatedManager;
-
-        _delegatedManager.initializeExtension();
-
-        bytes memory callData = abi.encodeWithSignature("initialize(address)", _delegatedManager.setToken());
-        _invokeManager(setToken, address(tradeModule), callData);
-
-        TradeExtensionInitialized(address(setToken), address(_delegatedManager));
+        _initializeExtension(_delegatedManager);
+        _initializeModule(_delegatedManager);
     }
 
     /**
      * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the TradeExtension 
      */
     function removeExtension() external override {
-        IDelegatedManager delegatedManager = IDelegatedManager(msg.sender);
-        ISetToken setToken = delegatedManager.setToken();
-
-        require(msg.sender == address(_manager(setToken)), "Must be Manager");
-
-        delete setManagers[setToken];
-
-        TradeExtensionRemoved(address(setToken), address(delegatedManager));
+        _removeExtension();
     }
 
     /**
@@ -181,11 +142,16 @@ contract TradeExtension is BaseGlobalExtension {
     /* ============ Internal Functions ============ */
 
     /**
-     * Internal function to grab manager of passed SetToken from TradeExtension data structure.
+     * Internal function to initialize TradeModule on the SetToken associated with the DelegatedManager.
      *
-     * @param _setToken         SetToken who's manager is needed 
+     * @param _delegatedManager     Instance of the DelegatedManager to initialize the TradeModule for
      */
-    function _manager(ISetToken _setToken) internal override view returns (IDelegatedManager) {
-        return setManagers[_setToken];
+    function _initializeModule(IDelegatedManager _delegatedManager) internal {
+        ISetToken setToken = _delegatedManager.setToken();
+
+        bytes memory callData = abi.encodeWithSignature("initialize(address)", _delegatedManager.setToken());
+        _invokeManager(setToken, address(tradeModule), callData);
+
+        TradeModuleInitialized(address(setToken), address(_delegatedManager));
     }
 }

@@ -116,7 +116,6 @@ describe("DelegatedManagerFactory", () => {
     ]);
 
     const extensionBytecode = mockIssuanceExtension.interface.encodeFunctionData("initializeExtension", [
-      setToken,
       manager
     ]);
 

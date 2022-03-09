@@ -50,16 +50,6 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
         address indexed _delegatedManager
     );
 
-    event StreamingFeeSplitExtensionInitialized(
-        address indexed _setToken,
-        address indexed _delegatedManager
-    );
-
-    event StreamingFeeSplitExtensionRemoved(
-        address indexed _setToken,
-        address indexed _delegatedManager
-    );
-
     event FeesDistributed(
         address _setToken,
         address indexed _ownerFeeRecipient,
@@ -72,9 +62,6 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
 
     // Instance of StreamingFeeModule
     IStreamingFeeModule public immutable streamingFeeModule;
-
-    // Mapping from Set Token to DelegatedManager 
-    mapping(ISetToken => IDelegatedManager) public setManagers;
 
     /* ============ Constructor ============ */
 
@@ -135,15 +122,7 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isInitializedExtension(address(this)), "Extension must be initialized");
 
-        ISetToken setToken = _delegatedManager.setToken();
-
-        bytes memory callData = abi.encodeWithSignature(
-            "initialize(address,(address,uint256,uint256,uint256))", 
-            setToken,
-            _settings);
-        _invokeManager(setToken, address(streamingFeeModule), callData);
-
-        StreamingFeeModuleInitialized(address(setToken), address(_delegatedManager));
+        _initializeModule(_delegatedManager, _settings);
     }
 
     /**
@@ -152,16 +131,10 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
     function initializeExtension(IDelegatedManager _delegatedManager) external onlyValidManager(_delegatedManager) {
-        ISetToken setToken = _delegatedManager.setToken();
-
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        setManagers[setToken] = _delegatedManager;
-
-        _delegatedManager.initializeExtension();
-
-        StreamingFeeSplitExtensionInitialized(address(setToken), address(_delegatedManager));
+        _initializeExtension(_delegatedManager);
     }
 
     /**
@@ -180,33 +153,15 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
         require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        ISetToken setToken = _delegatedManager.setToken();
-
-        setManagers[setToken] = _delegatedManager;
-
-        _delegatedManager.initializeExtension();
-
-        bytes memory callData = abi.encodeWithSignature(
-            "initialize(address,(address,uint256,uint256,uint256))", 
-            setToken,
-            _settings);
-        _invokeManager(setToken, address(streamingFeeModule), callData);
-
-        StreamingFeeSplitExtensionInitialized(address(setToken), address(_delegatedManager));
+        _initializeExtension(_delegatedManager);
+        _initializeModule(_delegatedManager, _settings);
     }
 
     /**
      * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the StreamingFeeSplitExtension 
      */
     function removeExtension() external override {
-        IDelegatedManager delegatedManager = IDelegatedManager(msg.sender);
-        ISetToken setToken = delegatedManager.setToken();
-
-        require(msg.sender == address(_manager(setToken)), "Must be Manager");
-
-        delete setManagers[setToken];
-
-        StreamingFeeSplitExtensionRemoved(address(setToken), address(delegatedManager));
+        _removeExtension();
     }
 
     /**
@@ -242,11 +197,25 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     /* ============ Internal Functions ============ */
 
     /**
-     * Internal function to grab manager of passed SetToken from StreamingFeeSplitExtension data structure.
+     * Internal function to initialize StreamingFeeModule on the SetToken associated with the DelegatedManager.
      *
-     * @param _setToken         SetToken who's manager is needed 
+     * @param _delegatedManager     Instance of the DelegatedManager to initialize the TradeModule for
+     * @param _settings             FeeState struct defining fee parameters for StreamingFeeModule initialization
      */
-    function _manager(ISetToken _setToken) internal override view returns (IDelegatedManager) {
-        return setManagers[_setToken];
+    function _initializeModule(
+        IDelegatedManager _delegatedManager,
+        IStreamingFeeModule.FeeState memory _settings
+    ) 
+        internal
+    {
+        ISetToken setToken = _delegatedManager.setToken();
+
+        bytes memory callData = abi.encodeWithSignature(
+            "initialize(address,(address,uint256,uint256,uint256))", 
+            setToken,
+            _settings);
+        _invokeManager(setToken, address(streamingFeeModule), callData);
+
+        StreamingFeeModuleInitialized(address(setToken), address(_delegatedManager));
     }
 }

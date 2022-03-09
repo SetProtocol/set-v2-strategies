@@ -26,8 +26,6 @@ import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 
 contract BaseGlobalExtensionMock is BaseGlobalExtension {
 
-    mapping(ISetToken=>IDelegatedManager) public initializeInfo;
-
     /* ============ Constructor ============ */
 
     constructor(IManagerCore _managerCore) public BaseGlobalExtension(_managerCore) {}
@@ -35,16 +33,15 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
     /* ============ External Functions ============ */
 
     function initializeExtension(
-        ISetToken _setToken,
-        IDelegatedManager _manager
+        IDelegatedManager _delegatedManager
     )
         external
-        onlyValidManager(_manager)
+        onlyValidManager(_delegatedManager)
     {
-        require(msg.sender == _manager.owner(), "Must be owner");
-        initializeInfo[_setToken] = _manager;
+        require(msg.sender == _delegatedManager.owner(), "Must be owner");
+        require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        _manager.initializeExtension();
+        _initializeExtension(_delegatedManager);
     }
 
     function testInvokeManager(ISetToken _setToken, address _module, bytes calldata _encoded) external {
@@ -77,14 +74,6 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
     {}
 
     function removeExtension() external override {
-        ISetToken setToken = IDelegatedManager(msg.sender).setToken();
-        require(msg.sender == address(_manager(setToken)), "Must be Manager");
-        delete initializeInfo[setToken];
-    }
-
-    /* ============ Internal Functions ============ */
-
-    function _manager(ISetToken _setToken) internal override view returns (IDelegatedManager) {
-        return initializeInfo[_setToken];
+        _removeExtension();
     }
 }

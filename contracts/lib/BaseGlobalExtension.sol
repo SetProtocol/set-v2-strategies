@@ -34,10 +34,27 @@ import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 abstract contract BaseGlobalExtension {
     using AddressArrayUtils for address[];
 
+    /* ============ Events ============ */
+
+    event ExtensionInitialized(
+        address indexed _extension,
+        address indexed _setToken,
+        address indexed _delegatedManager
+    );
+
+    event ExtensionRemoved(
+        address indexed _extension,
+        address indexed _setToken,
+        address indexed _delegatedManager
+    );
+
     /* ============ State Variables ============ */
 
     // Address of the ManagerCore
     IManagerCore public managerCore;
+
+    // Mapping from Set Token to DelegatedManager 
+    mapping(ISetToken => IDelegatedManager) public setManagers;
 
     /* ============ Modifiers ============ */
 
@@ -116,5 +133,36 @@ abstract contract BaseGlobalExtension {
      *
      * @param _setToken         SetToken who's manager is needed
      */
-    function _manager(ISetToken _setToken) internal virtual view returns (IDelegatedManager);
+    function _manager(ISetToken _setToken) internal view returns (IDelegatedManager) {
+        return setManagers[_setToken];
+    }
+
+    /**
+     * Internal function to initialize extension to the DelegatedManager.
+     *
+     * @param _delegatedManager     Instance of the DelegatedManager to initialize
+     */
+    function _initializeExtension(IDelegatedManager _delegatedManager) internal {
+        ISetToken setToken = _delegatedManager.setToken();
+
+        setManagers[setToken] = _delegatedManager;
+
+        _delegatedManager.initializeExtension();
+
+        ExtensionInitialized(address(this), address(setToken), address(_delegatedManager));
+    }
+
+    /**
+     * ONLY MANAGER: Internal function to delete SetToken/Manager state from extension
+     */
+    function _removeExtension() internal {
+        IDelegatedManager delegatedManager = IDelegatedManager(msg.sender);
+        ISetToken setToken = delegatedManager.setToken();
+
+        require(msg.sender == address(_manager(setToken)), "Must be Manager");
+
+        delete setManagers[setToken];
+
+        ExtensionRemoved(address(this), address(setToken), address(delegatedManager));
+    }
 }

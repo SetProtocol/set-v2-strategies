@@ -285,11 +285,11 @@ describe("BasicIssuanceExtension", () => {
       expect(isExtensionInitialized).to.eq(true);
     });
 
-    it("should emit the correct BasicIssuanceExtensionInitialized event", async () => {
+    it("should emit the correct ExtensionInitialized event", async () => {
       await expect(subject()).to.emit(
         basicIssuanceExtension,
-        "BasicIssuanceExtensionInitialized"
-      ).withArgs(setToken.address, delegatedManager.address);
+        "ExtensionInitialized"
+      ).withArgs(basicIssuanceExtension.address, setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {
@@ -397,11 +397,11 @@ describe("BasicIssuanceExtension", () => {
       await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(debtIssuanceModule.address);
     });
 
-    it("should emit the correct BasicIssuanceExtensionInitialized event", async () => {
+    it("should emit the correct ExtensionInitialized event", async () => {
       await expect(subject()).to.emit(
         basicIssuanceExtension,
-        "BasicIssuanceExtensionInitialized"
-      ).withArgs(setToken.address, delegatedManager.address);
+        "ExtensionInitialized"
+      ).withArgs(basicIssuanceExtension.address, setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {
@@ -511,11 +511,11 @@ describe("BasicIssuanceExtension", () => {
       expect(storedDelegatedManager).to.eq(ADDRESS_ZERO);
     });
 
-    it("should emit the correct BasicIssuanceExtensionRemoved event", async () => {
+    it("should emit the correct ExtensionRemoved event", async () => {
       await expect(subject()).to.emit(
         basicIssuanceExtension,
-        "BasicIssuanceExtensionRemoved"
-      ).withArgs(setToken.address, delegatedManager.address);
+        "ExtensionRemoved"
+      ).withArgs(basicIssuanceExtension.address, setToken.address, delegatedManager.address);
     });
 
     describe("when the caller is not the SetToken manager", async () => {
