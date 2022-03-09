@@ -12,7 +12,7 @@ import {
   BasicIssuanceExtension,
   ManagerCore
 } from "@utils/contracts/index";
-import { SetToken, DebtIssuanceModule } from "@setprotocol/set-protocol-v2/utils/contracts";
+import { SetToken, DebtIssuanceModuleV2 } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "@utils/deploys";
 import {
   addSnapshotBeforeRestoreAfterEach,
@@ -36,7 +36,7 @@ describe("BasicIssuanceExtension", () => {
   let setToken: SetToken;
   let setV2Setup: SystemFixture;
 
-  let debtIssuanceModule: DebtIssuanceModule;
+  let debtIssuanceModule: DebtIssuanceModuleV2;
 
   let managerCore: ManagerCore;
   let delegatedManager: DelegatedManager;
@@ -64,7 +64,7 @@ describe("BasicIssuanceExtension", () => {
     setV2Setup = getSystemFixture(owner.address);
     await setV2Setup.initialize();
 
-    debtIssuanceModule = await deployer.setV2.deployDebtIssuanceModule(setV2Setup.controller.address);
+    debtIssuanceModule = await deployer.setV2.deployDebtIssuanceModuleV2(setV2Setup.controller.address);
     await setV2Setup.controller.addModule(debtIssuanceModule.address);
 
     managerCore = await deployer.managerCore.deployManagerCore();
