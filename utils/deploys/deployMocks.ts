@@ -4,6 +4,7 @@ import {
   AddressArrayUtilsMock,
   BaseExtensionMock,
   BaseGlobalExtensionMock,
+  ManagerMock,
   MutualUpgradeMock,
   StandardTokenMock,
   StringArrayUtilsMock,
@@ -18,6 +19,7 @@ import {
 import { AddressArrayUtilsMock__factory } from "../../typechain/factories/AddressArrayUtilsMock__factory";
 import { BaseExtensionMock__factory } from "../../typechain/factories/BaseExtensionMock__factory";
 import { BaseGlobalExtensionMock__factory } from "../../typechain/factories/BaseGlobalExtensionMock__factory";
+import { ManagerMock__factory } from "../../typechain/factories/ManagerMock__factory";
 import { ChainlinkAggregatorMock__factory  } from "@setprotocol/set-protocol-v2/typechain";
 import { ContractCallerMock__factory } from "@setprotocol/set-protocol-v2/typechain";
 import { MutualUpgradeMock__factory } from "../../typechain/factories/MutualUpgradeMock__factory";
@@ -36,8 +38,12 @@ export default class DeployMocks {
     return await new BaseExtensionMock__factory(this._deployerSigner).deploy(manager);
   }
 
-  public async deployBaseGlobalExtensionMock(): Promise<BaseGlobalExtensionMock> {
-    return await new BaseGlobalExtensionMock__factory(this._deployerSigner).deploy();
+  public async deployBaseGlobalExtensionMock(managerCore: Address): Promise<BaseGlobalExtensionMock> {
+    return await new BaseGlobalExtensionMock__factory(this._deployerSigner).deploy(managerCore);
+  }
+
+  public async deployManagerMock(setToken: Address): Promise<ManagerMock> {
+    return await new ManagerMock__factory(this._deployerSigner).deploy(setToken);
   }
 
   public async deployAddressArrayUtilsMock(): Promise<AddressArrayUtilsMock> {

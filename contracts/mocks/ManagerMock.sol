@@ -17,10 +17,26 @@
 */
 
 pragma solidity 0.6.10;
-pragma experimental "ABIEncoderV2";
 
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
-interface IGlobalExtension {
-    function removeExtension() external;
+import { IGlobalExtension } from "../interfaces/IGlobalExtension.sol";
+
+contract ManagerMock {
+    ISetToken public immutable setToken;
+
+    constructor(
+        ISetToken _setToken
+    )
+        public
+    {
+        setToken = _setToken;
+    }
+
+    function removeExtensions(address[] memory _extensions) external {
+        for (uint256 i = 0; i < _extensions.length; i++) {
+            address extension = _extensions[i];
+            IGlobalExtension(extension).removeExtension();
+        }
+    }
 }

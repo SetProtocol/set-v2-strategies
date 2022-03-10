@@ -3,7 +3,7 @@ import "module-alias/register";
 import { BigNumber } from "ethers";
 import { Address, Account, Bytes } from "@utils/types";
 import { ADDRESS_ZERO, EXTENSION_STATE, ZERO } from "@utils/constants";
-import { DelegatedManager, BaseGlobalExtensionMock } from "@utils/contracts/index";
+import { DelegatedManager, BaseGlobalExtensionMock, ManagerCore } from "@utils/contracts/index";
 import { SetToken } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "@utils/deploys";
 import {
@@ -34,6 +34,7 @@ describe("DelegatedManager", () => {
   let deployer: DeployHelper;
   let setToken: SetToken;
 
+  let managerCore: ManagerCore;
   let delegatedManager: DelegatedManager;
   let baseExtension: BaseGlobalExtensionMock;
 
@@ -73,7 +74,9 @@ describe("DelegatedManager", () => {
     };
     await setV2Setup.streamingFeeModule.initialize(setToken.address, streamingFeeSettings);
 
-    baseExtension = await deployer.mocks.deployBaseGlobalExtensionMock();
+    managerCore = await deployer.managerCore.deployManagerCore();
+
+    baseExtension = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address);
 
     // Deploy DelegatedManager
     delegatedManager = await deployer.manager.deployDelegatedManager(
@@ -88,6 +91,9 @@ describe("DelegatedManager", () => {
 
     // Transfer ownership to DelegatedManager
     await setToken.setManager(delegatedManager.address);
+
+    await managerCore.initialize([factory.address]);
+    await managerCore.connect(factory.wallet).addManager(delegatedManager.address);
   });
 
   addSnapshotBeforeRestoreAfterEach();
@@ -200,7 +206,7 @@ describe("DelegatedManager", () => {
       return delegatedManager.connect(subjectCaller.wallet).initializeExtension();
     }
 
-    it("should mark the module as initialized", async () => {
+    it("should mark the extension as initialized", async () => {
       await subject();
 
       const isInitializedExternsion = await delegatedManager.extensionAllowlist(otherAccount.address);
@@ -393,7 +399,6 @@ describe("DelegatedManager", () => {
 
     beforeEach(async () => {
       await baseExtension.connect(owner.wallet).initializeExtension(
-        setToken.address,
         delegatedManager.address
       );
 
@@ -857,7 +862,7 @@ describe("DelegatedManager", () => {
       expect(isModule).to.eq(true);
     });
 
-    describe("when the caller is not the operator", async () => {
+    describe("when the caller is not the owner", async () => {
       beforeEach(async () => {
         subjectCaller = await getRandomAccount();
       });
@@ -887,7 +892,7 @@ describe("DelegatedManager", () => {
       expect(isModule).to.eq(false);
     });
 
-    describe("when the caller is not the operator", async () => {
+    describe("when the caller is not the owner", async () => {
       beforeEach(async () => {
         subjectCaller = await getRandomAccount();
       });
@@ -920,7 +925,7 @@ describe("DelegatedManager", () => {
 
     describe("when manager still has extension initialized", async () => {
       beforeEach(async () => {
-        await baseExtension.initializeExtension(setToken.address, delegatedManager.address);
+        await baseExtension.initializeExtension(delegatedManager.address);
       });
 
       it("should revert", async () => {
@@ -938,7 +943,7 @@ describe("DelegatedManager", () => {
       });
     });
 
-    describe("when the caller is not the operator", async () => {
+    describe("when the caller is not the owner", async () => {
       beforeEach(async () => {
         subjectCaller = methodologist;
       });
@@ -1012,7 +1017,7 @@ describe("DelegatedManager", () => {
 
     describe("when extension is initialized", async () => {
       beforeEach(async () => {
-        await baseExtension.connect(owner.wallet).initializeExtension(setToken.address, delegatedManager.address);
+        await baseExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
       });
 
       it("should return false", async () => {
@@ -1024,7 +1029,7 @@ describe("DelegatedManager", () => {
 
     describe("when the extension is not tracked in allowlist", async () => {
       beforeEach(async () => {
-        await baseExtension.connect(owner.wallet).initializeExtension(setToken.address, delegatedManager.address);
+        await baseExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
         await delegatedManager.connect(owner.wallet).removeExtensions([baseExtension.address]);
       });
 
@@ -1055,7 +1060,7 @@ describe("DelegatedManager", () => {
 
     describe("when extension is initialized", async () => {
       beforeEach(async () => {
-        await baseExtension.connect(owner.wallet).initializeExtension(setToken.address, delegatedManager.address);
+        await baseExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
       });
 
       it("should return false", async () => {
@@ -1067,7 +1072,7 @@ describe("DelegatedManager", () => {
 
     describe("when the extension is not tracked in allowlist", async () => {
       beforeEach(async () => {
-        await baseExtension.connect(owner.wallet).initializeExtension(setToken.address, delegatedManager.address);
+        await baseExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
         await delegatedManager.connect(owner.wallet).removeExtensions([baseExtension.address]);
       });
 

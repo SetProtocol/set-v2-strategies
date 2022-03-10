@@ -1,5 +1,5 @@
 /*
-    Copyright 2021 Set Labs Inc.
+    Copyright 2020 Set Labs Inc.
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -15,12 +15,19 @@
 
     SPDX-License-Identifier: Apache License, Version 2.0
 */
-
 pragma solidity 0.6.10;
 pragma experimental "ABIEncoderV2";
 
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
-interface IGlobalExtension {
-    function removeExtension() external;
+interface ITradeModule {
+    function initialize(ISetToken _setToken) external;
+    function trade(ISetToken _setToken, 
+                   string memory _exchangeName, 
+                   address _sendToken, 
+                   uint256 _sendQuantity,
+                   address _receiveToken,
+                   uint256 _minReceiveQuantity,
+                   bytes memory _data
+    ) external;
 }

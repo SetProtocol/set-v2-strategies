@@ -6,7 +6,8 @@ import { ADDRESS_ZERO, ZERO } from "@utils/constants";
 import {
   DelegatedManagerFactory,
   DelegatedManager,
-  BaseGlobalExtensionMock
+  BaseGlobalExtensionMock,
+  ManagerCore
 } from "@utils/contracts/index";
 import DeployHelper from "@utils/deploys";
 import {
@@ -42,6 +43,7 @@ describe("DelegatedManagerFactory", () => {
   let deployer: DeployHelper;
   let protocolUtils: ProtocolUtils;
 
+  let managerCore: ManagerCore;
   let delegatedManagerFactory: DelegatedManagerFactory;
   let mockFeeExtension: BaseGlobalExtensionMock;
   let mockIssuanceExtension: BaseGlobalExtensionMock;
@@ -61,12 +63,17 @@ describe("DelegatedManagerFactory", () => {
     setV2Setup = getSystemFixture(owner.address);
     await setV2Setup.initialize();
 
-    mockFeeExtension = await deployer.mocks.deployBaseGlobalExtensionMock();
-    mockIssuanceExtension = await deployer.mocks.deployBaseGlobalExtensionMock();
+    managerCore = await deployer.managerCore.deployManagerCore();
+
+    mockFeeExtension = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address);
+    mockIssuanceExtension = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address);
 
     delegatedManagerFactory = await deployer.factories.deployDelegatedManagerFactory(
+      managerCore.address,
       setV2Setup.factory.address
     );
+
+    await managerCore.initialize([delegatedManagerFactory.address]);
   });
 
   // Helper function to run a setup execution of either `createSetAndManager` or `createManager`
@@ -109,7 +116,6 @@ describe("DelegatedManagerFactory", () => {
     ]);
 
     const extensionBytecode = mockIssuanceExtension.interface.encodeFunctionData("initializeExtension", [
-      setToken,
       manager
     ]);
 
@@ -117,17 +123,27 @@ describe("DelegatedManagerFactory", () => {
   }
 
   describe("#constructor", async () => {
+    let subjectManagerCore: Address;
     let subjectSetTokenFactory: Address;
 
     beforeEach(async () => {
+      subjectManagerCore = managerCore.address;
       subjectSetTokenFactory = setV2Setup.factory.address;
     });
 
     async function subject(): Promise<DelegatedManagerFactory> {
       return await deployer.factories.deployDelegatedManagerFactory(
+        subjectManagerCore,
         subjectSetTokenFactory
       );
     }
+
+    it("should set the correct ManagerCore address", async () => {
+      const delegatedManager = await subject();
+
+      const actualManagerCore = await delegatedManager.managerCore();
+      expect (actualManagerCore).to.eq(subjectManagerCore);
+    });
 
     it("should set the correct SetToken factory address", async () => {
       const delegatedManager = await subject();
@@ -197,7 +213,7 @@ describe("DelegatedManagerFactory", () => {
       expect(await setToken.manager()).eq(delegatedManagerFactory.address);
     });
 
-    it("should configure the DelegatedBaseManager correctly", async () => {
+    it("should configure the DelegatedManager correctly", async () => {
       const tx = await subject();
 
       const setTokenAddress = await protocolUtils.getCreatedSetTokenAddress(tx.hash);
@@ -209,6 +225,17 @@ describe("DelegatedManagerFactory", () => {
       expect(await delegatedManager.factory()).eq(delegatedManagerFactory.address);
       expect(await delegatedManager.methodologist()).eq(subjectMethodologist);
       expect(await delegatedManager.useAssetAllowlist()).eq(true);
+    });
+
+    it("should enable the manager on the ManagerCore", async () => {
+      const tx = await subject();
+
+      const setTokenAddress = await protocolUtils.getCreatedSetTokenAddress(tx.hash);
+      const initializeParams = await delegatedManagerFactory.initializeState(setTokenAddress);
+
+      const delegatedManager = await deployer.manager.getDelegatedManager(initializeParams.manager);
+      const isDelegatedManagerEnabled = await managerCore.isManager(delegatedManager.address);
+      expect(isDelegatedManagerEnabled).to.eq(true);
     });
 
     it("should set the intialization state correctly", async() => {
@@ -301,6 +328,16 @@ describe("DelegatedManagerFactory", () => {
         await expect(subject()).to.be.revertedWith("Must have at least 1 extension");
       });
     });
+
+    describe("when the factory is not approved on the ManagerCore", async() => {
+      beforeEach(async() => {
+        await managerCore.removeFactory(delegatedManagerFactory.address);
+      });
+
+      it("should revert", async() => {
+        await expect(subject()).to.be.revertedWith("Only valid factories can call");
+      });
+    });
   });
 
   describe("#createManager", () => {
@@ -367,7 +404,7 @@ describe("DelegatedManagerFactory", () => {
       );
     }
 
-    it("should configure the DelegatedBaseManager correctly", async () => {
+    it("should configure the DelegatedManager correctly", async () => {
       await subject();
 
       const initializeParams = await delegatedManagerFactory.initializeState(subjectSetToken);
@@ -397,6 +434,16 @@ describe("DelegatedManagerFactory", () => {
       expect(initializeParams.owner).eq(subjectOwner);
       expect(initializeParams.isPending).eq(true);
       expect(initializeParams.manager).eq(newManagerAddress);
+    });
+
+    it("should enable the manager on the ManagerCore", async () => {
+      await subject();
+
+      const initializeParams = await delegatedManagerFactory.initializeState(subjectSetToken);
+
+      const delegatedManager = await deployer.manager.getDelegatedManager(initializeParams.manager);
+      const isDelegatedManagerEnabled = await managerCore.isManager(delegatedManager.address);
+      expect(isDelegatedManagerEnabled).to.eq(true);
     });
 
     it("should emit a DelegatedManagerDeployed event", async() => {
@@ -456,6 +503,16 @@ describe("DelegatedManagerFactory", () => {
         const delegatedManager = await deployer.manager.getDelegatedManager(initializeParams.manager);
 
         expect(await delegatedManager.useAssetAllowlist()).eq(false);
+      });
+    });
+
+    describe("when the factory is not approved on the ManagerCore", async() => {
+      beforeEach(async() => {
+        await managerCore.removeFactory(delegatedManagerFactory.address);
+      });
+
+      it("should revert", async() => {
+        await expect(subject()).to.be.revertedWith("Only valid factories can call");
       });
     });
 
@@ -586,6 +643,16 @@ describe("DelegatedManagerFactory", () => {
           initializeParams.manager
         );
       });
+
+      describe("when the factory is not approved by the ManagerCore", async() => {
+        beforeEach(async () => {
+          await managerCore.connect(owner.wallet).removeManager(manager.address);
+        });
+
+        it("should revert", async() => {
+          await expect(subject()).to.be.revertedWith("Must be ManagerCore-enabled manager");
+        });
+      });
     });
 
     describe("when a SetToken is being migrated to a DelegatedManager", async () => {
@@ -668,6 +735,16 @@ describe("DelegatedManagerFactory", () => {
         expect(finalInitializeParams.owner).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.manager).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.isPending).eq(false);
+      });
+
+      describe("when the factory is not approved by the ManagerCore", async() => {
+        beforeEach(async () => {
+          await managerCore.connect(owner.wallet).removeManager(manager.address);
+        });
+
+        it("should revert", async() => {
+          await expect(subject()).to.be.revertedWith("Must be ManagerCore-enabled manager");
+        });
       });
     });
 

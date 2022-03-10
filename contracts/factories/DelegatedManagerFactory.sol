@@ -25,6 +25,7 @@ import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISe
 import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
 import { DelegatedManager } from "../manager/DelegatedManager.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
+import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { ISetTokenCreator } from "../interfaces/ISetTokenCreator.sol";
 
 /**
@@ -75,6 +76,9 @@ contract DelegatedManagerFactory {
 
     /* ============ State Variables ============ */
 
+    // ManagerCore address
+    IManagerCore public immutable managerCore;
+
     // SetTokenFactory address
     ISetTokenCreator public setTokenFactory;
 
@@ -84,10 +88,17 @@ contract DelegatedManagerFactory {
     /* ============ Constructor ============ */
 
     /**
-     * @dev Sets setTokenFactory address.
+     * @dev Sets managerCore and setTokenFactory address.
+     * @param _managerCore                      Address of ManagerCore protocol contract
      * @param _setTokenFactory                  Address of SetTokenFactory protocol contract
      */
-    constructor(ISetTokenCreator _setTokenFactory) public {
+    constructor(
+        IManagerCore _managerCore,
+        ISetTokenCreator _setTokenFactory
+    ) 
+        public 
+    {
+        managerCore = _managerCore;
         setTokenFactory = _setTokenFactory;
     }
 
@@ -202,6 +213,7 @@ contract DelegatedManagerFactory {
      * NOTE: When migrating to this manager system from an existing SetToken, the SetToken's current manager address
      * must be reset to point at the newly deployed DelegatedManager contract in a separate, final transaction.
      *
+     * NOTE: Modules must be passed before corresponding extensions in _initializeTargets otherwise initializeExtension will revert.
      *
      * @param  _setToken                Instance of the SetToken
      * @param  _ownerFeeSplit           Percent of fees in precise units (10^16 = 1%) sent to operator, rest to methodologist
@@ -315,6 +327,9 @@ contract DelegatedManagerFactory {
             _assets,
             useAssetAllowlist
         );
+
+        // Registers manager with ManagerCore
+        managerCore.addManager(address(newManager));
 
         emit DelegatedManagerCreated(
             _setToken,

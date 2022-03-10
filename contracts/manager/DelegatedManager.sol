@@ -248,7 +248,7 @@ contract DelegatedManager is Ownable {
 
             extensionAllowlist[extension] = ExtensionState.NONE;
 
-            IGlobalExtension(extension).removeExtension(setToken);
+            IGlobalExtension(extension).removeExtension();
 
             emit ExtensionRemoved(extension);
         }

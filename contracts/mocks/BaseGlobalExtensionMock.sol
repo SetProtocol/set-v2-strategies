@@ -18,30 +18,33 @@
 
 pragma solidity 0.6.10;
 
-import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
-import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
+
+import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
+import { IManagerCore } from "../interfaces/IManagerCore.sol";
+import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 
 contract BaseGlobalExtensionMock is BaseGlobalExtension {
 
-    mapping(ISetToken=>IDelegatedManager) public initializeInfo;
+    /* ============ Constructor ============ */
+
+    constructor(IManagerCore _managerCore) public BaseGlobalExtension(_managerCore) {}
 
     /* ============ External Functions ============ */
 
     function initializeExtension(
-        ISetToken _setToken,
-        IDelegatedManager _manager
+        IDelegatedManager _delegatedManager
     )
         external
+        onlyOwnerAndValidManager(_delegatedManager)
     {
-        require(msg.sender == _manager.owner(), "Must be owner");
-        initializeInfo[_setToken] = _manager;
+        require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        _manager.initializeExtension();
+        _initializeExtension(_delegatedManager.setToken(), _delegatedManager);
     }
 
     function testInvokeManager(ISetToken _setToken, address _module, bytes calldata _encoded) external {
-        _invokeManager(_setToken, _module, _encoded);
+        _invokeManager(_manager(_setToken), _module, _encoded);
     }
 
     function testOnlyOwner(ISetToken _setToken)
@@ -59,9 +62,9 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
         onlyOperator(_setToken)
     {}
 
-    function testOnlyManager(ISetToken _setToken)
+    function testOnlyOwnerAndValidManager(IDelegatedManager _delegatedManager)
         external
-        onlyManager(_setToken)
+        onlyOwnerAndValidManager(_delegatedManager)
     {}
 
     function testOnlyAllowedAsset(ISetToken _setToken, address _asset)
@@ -69,13 +72,7 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
         onlyAllowedAsset(_setToken, _asset)
     {}
 
-    function removeExtension(ISetToken _setToken) external override onlyManager(_setToken) {
-        delete initializeInfo[_setToken];
-    }
-
-    /* ============ Internal Functions ============ */
-
-    function _manager(ISetToken _setToken) internal override view returns (IDelegatedManager) {
-        return initializeInfo[_setToken];
+    function removeExtension() external override {
+        _removeExtension();
     }
 }

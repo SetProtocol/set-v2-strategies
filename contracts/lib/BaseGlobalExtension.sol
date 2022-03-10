@@ -18,9 +18,11 @@
 
 pragma solidity 0.6.10;
 
+import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
+
 import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
-import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
+import { IManagerCore } from "../interfaces/IManagerCore.sol";
 
 /**
  * @title BaseExtension
@@ -31,6 +33,21 @@ import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISe
  */
 abstract contract BaseGlobalExtension {
     using AddressArrayUtils for address[];
+
+    /* ============ Events ============ */
+
+    event ExtensionRemoved(
+        address indexed _setToken,
+        address indexed _delegatedManager
+    );
+
+    /* ============ State Variables ============ */
+
+    // Address of the ManagerCore
+    IManagerCore public managerCore;
+
+    // Mapping from Set Token to DelegatedManager 
+    mapping(ISetToken => IDelegatedManager) public setManagers;
 
     /* ============ Modifiers ============ */
 
@@ -59,10 +76,11 @@ abstract contract BaseGlobalExtension {
     }
 
     /**
-     * Throws if the sender is not the SetToken manager contract
+     * Throws if the sender is not the SetToken manager contract owner or if the manager is not enabled on the ManagerCore
      */
-    modifier onlyManager(ISetToken _setToken) {
-        require(address(_manager(_setToken)) == msg.sender, "Must be manager");
+    modifier onlyOwnerAndValidManager(IDelegatedManager _delegatedManager) {
+        require(msg.sender == _delegatedManager.owner(), "Must be owner");
+        require(managerCore.isManager(address(_delegatedManager)), "Must be ManagerCore-enabled manager");
         _;
     }
 
@@ -74,21 +92,35 @@ abstract contract BaseGlobalExtension {
         _;
     }
 
+    /* ============ Constructor ============ */
+
+    /**
+     * Set state variables
+     *
+     * @param _managerCore             Address of managerCore contract
+     */
+    constructor(IManagerCore _managerCore) public {
+        managerCore = _managerCore;
+    }
+
+    /* ============ External Functions ============ */
+
     /**
      * ONLY MANAGER: Deletes SetToken/Manager state from extension. Must only be callable by manager!
      */
-    function removeExtension(ISetToken _setToken) external virtual;
+    function removeExtension() external virtual;
 
     /* ============ Internal Functions ============ */
 
     /**
      * Invoke call from manager
      *
-     * @param _module           Module to interact with
-     * @param _encoded          Encoded byte data
+     * @param _delegatedManager      Manager to interact with
+     * @param _module                Module to interact with
+     * @param _encoded               Encoded byte data
      */
-    function _invokeManager(ISetToken _setToken, address _module, bytes memory _encoded) internal {
-        _manager(_setToken).interactManager(_module, _encoded);
+    function _invokeManager(IDelegatedManager _delegatedManager, address _module, bytes memory _encoded) internal {
+        _delegatedManager.interactManager(_module, _encoded);
     }
 
     /**
@@ -96,5 +128,33 @@ abstract contract BaseGlobalExtension {
      *
      * @param _setToken         SetToken who's manager is needed
      */
-    function _manager(ISetToken _setToken) internal virtual view returns (IDelegatedManager);
+    function _manager(ISetToken _setToken) internal view returns (IDelegatedManager) {
+        return setManagers[_setToken];
+    }
+
+    /**
+     * Internal function to initialize extension to the DelegatedManager.
+     *
+     * @param _setToken             Instance of the SetToken corresponding to the DelegatedManager
+     * @param _delegatedManager     Instance of the DelegatedManager to initialize
+     */
+    function _initializeExtension(ISetToken _setToken, IDelegatedManager _delegatedManager) internal {
+        setManagers[_setToken] = _delegatedManager;
+
+        _delegatedManager.initializeExtension();
+    }
+
+    /**
+     * ONLY MANAGER: Internal function to delete SetToken/Manager state from extension
+     */
+    function _removeExtension() internal {
+        IDelegatedManager delegatedManager = IDelegatedManager(msg.sender);
+        ISetToken setToken = delegatedManager.setToken();
+
+        require(msg.sender == address(_manager(setToken)), "Must be Manager");
+
+        delete setManagers[setToken];
+
+        ExtensionRemoved(address(setToken), address(delegatedManager));
+    }
 }

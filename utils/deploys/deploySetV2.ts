@@ -7,6 +7,8 @@ import { SetToken } from "@setprotocol/set-protocol-v2/typechain/SetToken";
 import { SetToken__factory } from "@setprotocol/set-protocol-v2/typechain/factories/SetToken__factory";
 import { DebtIssuanceModule } from "@setprotocol/set-protocol-v2/typechain/DebtIssuanceModule";
 import { DebtIssuanceModule__factory } from "@setprotocol/set-protocol-v2/typechain/factories/DebtIssuanceModule__factory";
+import { DebtIssuanceModuleV2 } from "@setprotocol/set-protocol-v2/typechain/DebtIssuanceModuleV2";
+import { DebtIssuanceModuleV2__factory } from "@setprotocol/set-protocol-v2/typechain/factories/DebtIssuanceModuleV2__factory";
 
 export default class DeploySetV2 {
   private _deployerSigner: Signer;
@@ -19,6 +21,14 @@ export default class DeploySetV2 {
     controller: Address,
   ): Promise<DebtIssuanceModule> {
     return await new DebtIssuanceModule__factory(this._deployerSigner).deploy(
+      controller,
+    );
+  }
+
+  public async deployDebtIssuanceModuleV2(
+    controller: Address,
+  ): Promise<DebtIssuanceModuleV2> {
+    return await new DebtIssuanceModuleV2__factory(this._deployerSigner).deploy(
       controller,
     );
   }
