@@ -26,7 +26,7 @@ import { AddressArrayUtils } from "./lib/AddressArrayUtils.sol";
  * @title ManagerCore
  * @author Set Protocol
  *
- *  Registry for governance approved DelegatedManagerFactories
+ *  Registry for governance approved DelegatedManagerFactories and DelegatedManagers.
  */
 contract ManagerCore is Ownable {
     using AddressArrayUtils for address[];

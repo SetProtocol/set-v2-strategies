@@ -40,7 +40,7 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
     {
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        _initializeExtension(_delegatedManager);
+        _initializeExtension(_delegatedManager.setToken(), _delegatedManager);
     }
 
     function testInvokeManager(ISetToken _setToken, address _module, bytes calldata _encoded) external {

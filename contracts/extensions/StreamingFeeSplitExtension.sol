@@ -34,9 +34,8 @@ import { IStreamingFeeModule } from "../interfaces/IStreamingFeeModuleV2.sol";
  * @title StreamingFeeSplitExtension
  * @author Set Protocol
  *
- * Smart contract global extension which provides DelegatedManager owner and 
- * methodologist the ability to accrue and split streaming fees.
- * Owner may configure the fee split percentages.
+ * Smart contract global extension which provides DelegatedManager owner and methodologist the ability to accrue and split 
+ * streaming fees. Owner may configure the fee split percentages.
  */
 contract StreamingFeeSplitExtension is BaseGlobalExtension {
     using Address for address;
@@ -44,6 +43,11 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     using SafeMath for uint256;
 
     /* ============ Events ============ */
+
+    event StreamingFeeSplitExtensionInitialized(
+        address indexed _setToken,
+        address indexed _delegatedManager
+    );
 
     event FeesDistributed(
         address _setToken,
@@ -116,7 +120,7 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     {
         require(_delegatedManager.isInitializedExtension(address(this)), "Extension must be initialized");
 
-        _initializeModule(_delegatedManager, _settings);
+        _initializeModule(_delegatedManager.setToken(), _delegatedManager, _settings);
     }
 
     /**
@@ -127,7 +131,11 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     function initializeExtension(IDelegatedManager _delegatedManager) external onlyOwnerAndValidManager(_delegatedManager) {
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        _initializeExtension(_delegatedManager);
+        ISetToken setToken = _delegatedManager.setToken();
+
+        _initializeExtension(setToken, _delegatedManager);
+
+        StreamingFeeSplitExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -145,8 +153,12 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     {
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        _initializeExtension(_delegatedManager);
-        _initializeModule(_delegatedManager, _settings);
+        ISetToken setToken = _delegatedManager.setToken();
+
+        _initializeExtension(setToken, _delegatedManager);
+        _initializeModule(setToken, _delegatedManager, _settings);
+
+        StreamingFeeSplitExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -191,10 +203,12 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     /**
      * Internal function to initialize StreamingFeeModule on the SetToken associated with the DelegatedManager.
      *
+     * @param _setToken                     Instance of the SetToken corresponding to the DelegatedManager
      * @param _delegatedManager     Instance of the DelegatedManager to initialize the TradeModule for
      * @param _settings             FeeState struct defining fee parameters for StreamingFeeModule initialization
      */
     function _initializeModule(
+        ISetToken _setToken,
         IDelegatedManager _delegatedManager,
         IStreamingFeeModule.FeeState memory _settings
     ) 
@@ -202,7 +216,7 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     {
         bytes memory callData = abi.encodeWithSignature(
             "initialize(address,(address,uint256,uint256,uint256))", 
-            _delegatedManager.setToken(),
+            _setToken,
             _settings);
         _invokeManager(_delegatedManager, address(streamingFeeModule), callData);
     }

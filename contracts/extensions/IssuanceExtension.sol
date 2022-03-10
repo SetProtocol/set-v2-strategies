@@ -34,9 +34,8 @@ import { IManagerCore } from "../interfaces/IManagerCore.sol";
  * @title IssuanceExtension
  * @author Set Protocol
  *
- * Smart contract global extension which provides DelegatedManager owner and 
- * methodologist the ability to accrue and split issuance and redemption fees.
- * Owner may configure the fee split percentages.
+ * Smart contract global extension which provides DelegatedManager owner and methodologist the ability to accrue and split 
+ * issuance and redemption fees. Owner may configure the fee split percentages.
  */
 contract IssuanceExtension is BaseGlobalExtension {
     using Address for address;
@@ -44,6 +43,11 @@ contract IssuanceExtension is BaseGlobalExtension {
     using SafeMath for uint256;
 
     /* ============ Events ============ */
+
+    event IssuanceExtensionInitialized(
+        address indexed _setToken,
+        address indexed _delegatedManager
+    );
 
     event FeesDistributed(
         address _setToken,
@@ -122,6 +126,7 @@ contract IssuanceExtension is BaseGlobalExtension {
         require(_delegatedManager.isInitializedExtension(address(this)), "Extension must be initialized");
 
         _initializeModule(
+            _delegatedManager.setToken(),
             _delegatedManager,
             _maxManagerFee, 
             _managerIssueFee,
@@ -139,7 +144,11 @@ contract IssuanceExtension is BaseGlobalExtension {
     function initializeExtension(IDelegatedManager _delegatedManager) external onlyOwnerAndValidManager(_delegatedManager) {
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        _initializeExtension(_delegatedManager);
+        ISetToken setToken = _delegatedManager.setToken();
+
+        _initializeExtension(setToken, _delegatedManager);
+
+        IssuanceExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -165,8 +174,11 @@ contract IssuanceExtension is BaseGlobalExtension {
     {
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        _initializeExtension(_delegatedManager);
+        ISetToken setToken = _delegatedManager.setToken();
+
+        _initializeExtension(setToken, _delegatedManager);
         _initializeModule(
+            setToken,
             _delegatedManager,
             _maxManagerFee, 
             _managerIssueFee,
@@ -174,6 +186,8 @@ contract IssuanceExtension is BaseGlobalExtension {
             _feeRecipient,
             _managerIssuanceHook
         );
+
+        IssuanceExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -230,7 +244,8 @@ contract IssuanceExtension is BaseGlobalExtension {
     /**
      * Internal function to initialize IssuanceModule on the SetToken associated with the DelegatedManager.
      *
-     * @param _delegatedManager     Instance of the DelegatedManager to initialize the TradeModule for
+     * @param _setToken                     Instance of the SetToken corresponding to the DelegatedManager
+     * @param _delegatedManager             Instance of the DelegatedManager to initialize the TradeModule for
      * @param _maxManagerFee                Maximum fee that can be charged on issue and redeem
      * @param _managerIssueFee              Fee to charge on issuance
      * @param _managerRedeemFee             Fee to charge on redemption
@@ -238,6 +253,7 @@ contract IssuanceExtension is BaseGlobalExtension {
      * @param _managerIssuanceHook          Instance of the contract with the Pre-Issuance Hook function
      */
     function _initializeModule(
+        ISetToken _setToken,
         IDelegatedManager _delegatedManager,
         uint256 _maxManagerFee,
         uint256 _managerIssueFee,
@@ -249,7 +265,7 @@ contract IssuanceExtension is BaseGlobalExtension {
     {
         bytes memory callData = abi.encodeWithSignature(
             "initialize(address,uint256,uint256,uint256,address,address)", 
-            _delegatedManager.setToken(),
+            _setToken,
             _maxManagerFee,
             _managerIssueFee,
             _managerRedeemFee,

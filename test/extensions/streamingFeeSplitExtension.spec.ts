@@ -271,11 +271,11 @@ describe("StreamingFeeSplitExtension", () => {
       expect(isExtensionInitialized).to.eq(true);
     });
 
-    it("should emit the correct ExtensionInitialized event", async () => {
+    it("should emit the correct StreamingFeeSplitExtensionInitialized event", async () => {
       await expect(subject()).to.emit(
         streamingFeeSplitExtension,
-        "ExtensionInitialized"
-      ).withArgs(streamingFeeSplitExtension.address, setToken.address, delegatedManager.address);
+        "StreamingFeeSplitExtensionInitialized"
+      ).withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {
@@ -366,11 +366,11 @@ describe("StreamingFeeSplitExtension", () => {
       await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(setV2Setup.streamingFeeModule.address);
     });
 
-    it("should emit the correct ExtensionInitialized event", async () => {
+    it("should emit the correct StreamingFeeSplitExtensionInitialized event", async () => {
       await expect(subject()).to.emit(
         streamingFeeSplitExtension,
-        "ExtensionInitialized"
-      ).withArgs(streamingFeeSplitExtension.address, setToken.address, delegatedManager.address);
+        "StreamingFeeSplitExtensionInitialized"
+      ).withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {
@@ -470,7 +470,7 @@ describe("StreamingFeeSplitExtension", () => {
       await expect(subject()).to.emit(
         streamingFeeSplitExtension,
         "ExtensionRemoved"
-      ).withArgs(streamingFeeSplitExtension.address, setToken.address, delegatedManager.address);
+      ).withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the caller is not the SetToken manager", async () => {

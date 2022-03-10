@@ -247,9 +247,8 @@ describe("TradeExtension", () => {
       expect(isExtensionInitialized).to.eq(true);
     });
 
-    it("should emit the correct ExtensionInitialized event", async () => {
-      await expect(subject()).to.emit(tradeExtension, "ExtensionInitialized").withArgs(
-        tradeExtension.address,
+    it("should emit the correct TradeExtensionInitialized event", async () => {
+      await expect(subject()).to.emit(tradeExtension, "TradeExtensionInitialized").withArgs(
         setToken.address,
         delegatedManager.address
       );
@@ -335,9 +334,8 @@ describe("TradeExtension", () => {
       await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(tradeModule.address);
     });
 
-    it("should emit the correct ExtensionInitialized event", async () => {
-      await expect(subject()).to.emit(tradeExtension, "ExtensionInitialized").withArgs(
-        tradeExtension.address,
+    it("should emit the correct TradeExtensionInitialized event", async () => {
+      await expect(subject()).to.emit(tradeExtension, "TradeExtensionInitialized").withArgs(
         setToken.address,
         delegatedManager.address
       );
@@ -438,7 +436,6 @@ describe("TradeExtension", () => {
 
     it("should emit the correct ExtensionRemoved event", async () => {
       await expect(subject()).to.emit(tradeExtension, "ExtensionRemoved").withArgs(
-        tradeExtension.address,
         setToken.address,
         delegatedManager.address
       );

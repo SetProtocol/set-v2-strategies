@@ -25,10 +25,17 @@ import { ITradeModule } from "../interfaces/ITradeModule.sol";
  * @title TradeExtension
  * @author Set Protocol
  *
- * Smart contract global extension which provides DelegatedManager privileged operator(s) the ability 
- * to trade on a DEX and the owner the ability to restrict operator(s) permissions with an asset whitelist.
+ * Smart contract global extension which provides DelegatedManager privileged operator(s) the ability to trade on a DEX
+ * and the owner the ability to restrict operator(s) permissions with an asset whitelist.
  */
 contract TradeExtension is BaseGlobalExtension {
+
+    /* ============ Events ============ */
+
+    event TradeExtensionInitialized(
+        address indexed _setToken,
+        address indexed _delegatedManager
+    );
 
     /* ============ State Variables ============ */
 
@@ -57,7 +64,7 @@ contract TradeExtension is BaseGlobalExtension {
     function initializeModule(IDelegatedManager _delegatedManager) external onlyOwnerAndValidManager(_delegatedManager) {
         require(_delegatedManager.isInitializedExtension(address(this)), "Extension must be initialized");
 
-        _initializeModule(_delegatedManager);
+        _initializeModule(_delegatedManager.setToken(), _delegatedManager);
     }
 
     /**
@@ -68,7 +75,11 @@ contract TradeExtension is BaseGlobalExtension {
     function initializeExtension(IDelegatedManager _delegatedManager) external onlyOwnerAndValidManager(_delegatedManager) {
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        _initializeExtension(_delegatedManager);
+        ISetToken setToken = _delegatedManager.setToken();
+
+        _initializeExtension(setToken, _delegatedManager);
+
+        TradeExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -79,8 +90,12 @@ contract TradeExtension is BaseGlobalExtension {
     function initializeModuleAndExtension(IDelegatedManager _delegatedManager) external onlyOwnerAndValidManager(_delegatedManager){
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
-        _initializeExtension(_delegatedManager);
-        _initializeModule(_delegatedManager);
+        ISetToken setToken = _delegatedManager.setToken();
+
+        _initializeExtension(setToken, _delegatedManager);
+        _initializeModule(setToken, _delegatedManager);
+
+        TradeExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -134,10 +149,11 @@ contract TradeExtension is BaseGlobalExtension {
     /**
      * Internal function to initialize TradeModule on the SetToken associated with the DelegatedManager.
      *
+     * @param _setToken             Instance of the SetToken corresponding to the DelegatedManager
      * @param _delegatedManager     Instance of the DelegatedManager to initialize the TradeModule for
      */
-    function _initializeModule(IDelegatedManager _delegatedManager) internal {
-        bytes memory callData = abi.encodeWithSignature("initialize(address)", _delegatedManager.setToken());
+    function _initializeModule(ISetToken _setToken, IDelegatedManager _delegatedManager) internal {
+        bytes memory callData = abi.encodeWithSignature("initialize(address)", _setToken);
         _invokeManager(_delegatedManager, address(tradeModule), callData);
     }
 }

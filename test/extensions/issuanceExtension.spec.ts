@@ -279,11 +279,11 @@ describe("IssuanceExtension", () => {
       expect(isExtensionInitialized).to.eq(true);
     });
 
-    it("should emit the correct ExtensionInitialized event", async () => {
+    it("should emit the correct IssuanceExtensionInitialized event", async () => {
       await expect(subject()).to.emit(
         issuanceExtension,
-        "ExtensionInitialized"
-      ).withArgs(issuanceExtension.address, setToken.address, delegatedManager.address);
+        "IssuanceExtensionInitialized"
+      ).withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {
@@ -391,11 +391,11 @@ describe("IssuanceExtension", () => {
       await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(issuanceModule.address);
     });
 
-    it("should emit the correct ExtensionInitialized event", async () => {
+    it("should emit the correct IssuanceExtensionInitialized event", async () => {
       await expect(subject()).to.emit(
         issuanceExtension,
-        "ExtensionInitialized"
-      ).withArgs(issuanceExtension.address, setToken.address, delegatedManager.address);
+        "IssuanceExtensionInitialized"
+      ).withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {
@@ -509,7 +509,7 @@ describe("IssuanceExtension", () => {
       await expect(subject()).to.emit(
         issuanceExtension,
         "ExtensionRemoved"
-      ).withArgs(issuanceExtension.address, setToken.address, delegatedManager.address);
+      ).withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the caller is not the SetToken manager", async () => {

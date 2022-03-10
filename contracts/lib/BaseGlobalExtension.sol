@@ -36,14 +36,7 @@ abstract contract BaseGlobalExtension {
 
     /* ============ Events ============ */
 
-    event ExtensionInitialized(
-        address indexed _extension,
-        address indexed _setToken,
-        address indexed _delegatedManager
-    );
-
     event ExtensionRemoved(
-        address indexed _extension,
         address indexed _setToken,
         address indexed _delegatedManager
     );
@@ -142,16 +135,13 @@ abstract contract BaseGlobalExtension {
     /**
      * Internal function to initialize extension to the DelegatedManager.
      *
+     * @param _setToken             Instance of the SetToken corresponding to the DelegatedManager
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
-    function _initializeExtension(IDelegatedManager _delegatedManager) internal {
-        ISetToken setToken = _delegatedManager.setToken();
-
-        setManagers[setToken] = _delegatedManager;
+    function _initializeExtension(ISetToken _setToken, IDelegatedManager _delegatedManager) internal {
+        setManagers[_setToken] = _delegatedManager;
 
         _delegatedManager.initializeExtension();
-
-        ExtensionInitialized(address(this), address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -165,6 +155,6 @@ abstract contract BaseGlobalExtension {
 
         delete setManagers[setToken];
 
-        ExtensionRemoved(address(this), address(setToken), address(delegatedManager));
+        ExtensionRemoved(address(setToken), address(delegatedManager));
     }
 }
