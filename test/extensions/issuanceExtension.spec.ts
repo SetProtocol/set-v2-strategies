@@ -180,10 +180,6 @@ describe("IssuanceExtension", () => {
       expect(storedSettings.managerIssuanceHook).to.eq(managerIssuanceHook);
     });
 
-    it("should emit the correct ModuleInitialized event", async () => {
-      await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(issuanceModule.address);
-    });
-
     describe("when the sender is not the owner", async () => {
       beforeEach(async () => {
         subjectCaller = await getRandomAccount();
@@ -385,10 +381,6 @@ describe("IssuanceExtension", () => {
 
       const isExtensionInitialized: Boolean = await delegatedManager.isInitializedExtension(issuanceExtension.address);
       expect(isExtensionInitialized).to.eq(true);
-    });
-
-    it("should emit the correct ModuleInitialized event", async () => {
-      await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(issuanceModule.address);
     });
 
     it("should emit the correct IssuanceExtensionInitialized event", async () => {

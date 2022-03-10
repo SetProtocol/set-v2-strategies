@@ -172,10 +172,6 @@ describe("StreamingFeeSplitExtension", () => {
       expect(storedFeeState.lastStreamingFeeTimestamp).to.eq(txTimestamp);
     });
 
-    it("should emit the correct ModuleInitialized event", async () => {
-      await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(setV2Setup.streamingFeeModule.address);
-    });
-
     describe("when the sender is not the owner", async () => {
       beforeEach(async () => {
         subjectCaller = await getRandomAccount();
@@ -360,10 +356,6 @@ describe("StreamingFeeSplitExtension", () => {
 
       const isExtensionInitialized: Boolean = await delegatedManager.isInitializedExtension(streamingFeeSplitExtension.address);
       expect(isExtensionInitialized).to.eq(true);
-    });
-
-    it("should emit the correct ModuleInitialized event", async () => {
-      await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(setV2Setup.streamingFeeModule.address);
     });
 
     it("should emit the correct StreamingFeeSplitExtensionInitialized event", async () => {

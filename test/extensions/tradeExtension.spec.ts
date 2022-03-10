@@ -148,10 +148,6 @@ describe("TradeExtension", () => {
       expect(isModuleInitialized).to.eq(true);
     });
 
-    it("should emit the correct ModuleInitialized event", async () => {
-      await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(tradeModule.address);
-    });
-
     describe("when the sender is not the owner", async () => {
       beforeEach(async () => {
         subjectCaller = await getRandomAccount();
@@ -328,10 +324,6 @@ describe("TradeExtension", () => {
 
       const isExtensionInitialized: Boolean = await delegatedManager.isInitializedExtension(tradeExtension.address);
       expect(isExtensionInitialized).to.eq(true);
-    });
-
-    it("should emit the correct ModuleInitialized event", async () => {
-      await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(tradeModule.address);
     });
 
     it("should emit the correct TradeExtensionInitialized event", async () => {
