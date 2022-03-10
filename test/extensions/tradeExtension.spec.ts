@@ -96,7 +96,8 @@ describe("TradeExtension", () => {
 
     await setToken.setManager(delegatedManager.address);
 
-    await managerCore.initialize([delegatedManager.address], [factory.address]);
+    await managerCore.initialize([factory.address]);
+    await managerCore.connect(factory.wallet).addManager(delegatedManager.address);
   });
 
   addSnapshotBeforeRestoreAfterEach();
@@ -149,10 +150,6 @@ describe("TradeExtension", () => {
 
     it("should emit the correct ModuleInitialized event", async () => {
       await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(tradeModule.address);
-    });
-
-    it("should emit the correct TradeModuleInitialized event", async () => {
-      await expect(subject()).to.emit(tradeExtension, "TradeModuleInitialized").withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {

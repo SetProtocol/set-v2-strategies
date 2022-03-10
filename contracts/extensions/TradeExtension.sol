@@ -17,8 +17,8 @@ pragma solidity 0.6.10;
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
-import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
+import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { ITradeModule } from "../interfaces/ITradeModule.sol";
 
 /**
@@ -29,13 +29,6 @@ import { ITradeModule } from "../interfaces/ITradeModule.sol";
  * to trade on a DEX and the owner the ability to restrict operator(s) permissions with an asset whitelist.
  */
 contract TradeExtension is BaseGlobalExtension {
-
-    /* ============ Events ============ */
-
-    event TradeModuleInitialized(
-        address indexed _setToken,
-        address indexed _delegatedManager
-    );
 
     /* ============ State Variables ============ */
 
@@ -151,7 +144,5 @@ contract TradeExtension is BaseGlobalExtension {
 
         bytes memory callData = abi.encodeWithSignature("initialize(address)", _delegatedManager.setToken());
         _invokeManager(setToken, address(tradeModule), callData);
-
-        TradeModuleInitialized(address(setToken), address(_delegatedManager));
     }
 }

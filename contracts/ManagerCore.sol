@@ -73,11 +73,9 @@ contract ManagerCore is Ownable {
      * Initializes any predeployed factories. Note: This function can only be called by
      * the owner once to batch initialize the initial system contracts.
      *
-     * @param _managers              List of managers to add
      * @param _factories             List of factories to add
      */
     function initialize(
-        address[] memory _managers,
         address[] memory _factories
     )
         external
@@ -85,15 +83,9 @@ contract ManagerCore is Ownable {
     {
         require(!isInitialized, "ManagerCore is already initialized");
 
-        managers = _managers;
         factories = _factories;
 
-        // Loop through and initialize isManager and isFactory mapping
-        for (uint256 i = 0; i < _managers.length; i++) {
-            address manager = _managers[i];
-            require(manager != address(0), "Zero address submitted.");
-            isManager[manager] = true;
-        }
+        // Loop through and initialize isFactory mapping
         for (uint256 i = 0; i < _factories.length; i++) {
             address factory = _factories[i];
             require(factory != address(0), "Zero address submitted.");
@@ -127,7 +119,7 @@ contract ManagerCore is Ownable {
     function removeManager(address _manager) external onlyInitialized onlyOwner {
         require(isManager[_manager], "Manager does not exist");
 
-        managers = managers.remove(_manager);
+        managers.removeStorage(_manager);
 
         isManager[_manager] = false;
 
@@ -157,7 +149,7 @@ contract ManagerCore is Ownable {
     function removeFactory(address _factory) external onlyInitialized onlyOwner {
         require(isFactory[_factory], "Factory does not exist");
 
-        factories = factories.remove(_factory);
+        factories.removeStorage(_factory);
 
         isFactory[_factory] = false;
 

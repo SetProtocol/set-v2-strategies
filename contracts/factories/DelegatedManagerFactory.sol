@@ -25,8 +25,8 @@ import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISe
 import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
 import { DelegatedManager } from "../manager/DelegatedManager.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
-import { ISetTokenCreator } from "../interfaces/ISetTokenCreator.sol";
 import { IManagerCore } from "../interfaces/IManagerCore.sol";
+import { ISetTokenCreator } from "../interfaces/ISetTokenCreator.sol";
 
 /**
  * @title DelegatedManagerFactory

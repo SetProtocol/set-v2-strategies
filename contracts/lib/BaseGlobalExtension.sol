@@ -21,8 +21,8 @@ pragma solidity 0.6.10;
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
-import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
+import { IManagerCore } from "../interfaces/IManagerCore.sol";
 
 /**
  * @title BaseExtension

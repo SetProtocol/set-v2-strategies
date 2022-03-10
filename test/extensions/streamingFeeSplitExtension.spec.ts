@@ -101,7 +101,8 @@ describe("StreamingFeeSplitExtension", () => {
 
     await setToken.setManager(delegatedManager.address);
 
-    await managerCore.initialize([delegatedManager.address], [factory.address]);
+    await managerCore.initialize([factory.address]);
+    await managerCore.connect(factory.wallet).addManager(delegatedManager.address);
 
     feeRecipient = delegatedManager.address;
     maxStreamingFeePercentage = ether(.1);
@@ -173,13 +174,6 @@ describe("StreamingFeeSplitExtension", () => {
 
     it("should emit the correct ModuleInitialized event", async () => {
       await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(setV2Setup.streamingFeeModule.address);
-    });
-
-    it("should emit the correct StreamingFeeModuleInitialized event", async () => {
-      await expect(subject()).to.emit(
-        streamingFeeSplitExtension,
-        "StreamingFeeModuleInitialized"
-      ).withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {

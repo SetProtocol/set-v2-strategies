@@ -22,13 +22,13 @@ pragma experimental "ABIEncoderV2";
 import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 
-import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/PreciseUnitMath.sol";
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
+import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/PreciseUnitMath.sol";
 
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
-import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { IIssuanceModule } from "../interfaces/IIssuanceModule.sol";
+import { IManagerCore } from "../interfaces/IManagerCore.sol";
 
 /**
  * @title IssuanceExtension
@@ -44,11 +44,6 @@ contract IssuanceExtension is BaseGlobalExtension {
     using SafeMath for uint256;
 
     /* ============ Events ============ */
-
-    event IssuanceModuleInitialized(
-        address indexed _setToken,
-        address indexed _delegatedManager
-    );
 
     event FeesDistributed(
         address _setToken,
@@ -267,7 +262,5 @@ contract IssuanceExtension is BaseGlobalExtension {
             _managerIssuanceHook
         );
         _invokeManager(setToken, address(issuanceModule), callData);
-
-        IssuanceModuleInitialized(address(setToken), address(_delegatedManager));
     }
 }

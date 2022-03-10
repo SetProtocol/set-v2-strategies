@@ -97,7 +97,8 @@ describe("IssuanceExtension", () => {
 
     await setToken.setManager(delegatedManager.address);
 
-    await managerCore.initialize([delegatedManager.address], [factory.address]);
+    await managerCore.initialize([factory.address]);
+    await managerCore.connect(factory.wallet).addManager(delegatedManager.address);
 
     maxManagerFee = ether(.1);
     managerIssueFee = ether(.02);
@@ -181,13 +182,6 @@ describe("IssuanceExtension", () => {
 
     it("should emit the correct ModuleInitialized event", async () => {
       await expect(subject()).to.emit(setToken, "ModuleInitialized").withArgs(issuanceModule.address);
-    });
-
-    it("should emit the correct IssuanceModuleInitialized event", async () => {
-      await expect(subject()).to.emit(
-        issuanceExtension,
-        "IssuanceModuleInitialized"
-      ).withArgs(setToken.address, delegatedManager.address);
     });
 
     describe("when the sender is not the owner", async () => {

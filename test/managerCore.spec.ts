@@ -20,7 +20,6 @@ const expect = getWaffleExpect();
 
 describe("ManagerCore", () => {
   let owner: Account;
-  let otherAccount: Account;
   let mockDelegatedManagerFactory: Account;
   let mockManager: Account;
 
@@ -33,7 +32,6 @@ describe("ManagerCore", () => {
   before(async () => {
     [
       owner,
-      otherAccount,
       mockDelegatedManagerFactory,
       mockManager
     ] = await getAccounts();
@@ -74,32 +72,16 @@ describe("ManagerCore", () => {
 
   describe("#initialize", async () => {
     let subjectCaller: Account;
-    let subjectManagers: Address[];
     let subjectFactories: Address[];
 
     beforeEach(async () => {
       subjectCaller = owner;
-      subjectManagers = [otherAccount.address];
       subjectFactories = [delegatedManagerFactory.address];
     });
 
     async function subject(): Promise<any> {
-      return await managerCore.connect(subjectCaller.wallet).initialize(subjectManagers, subjectFactories);
+      return await managerCore.connect(subjectCaller.wallet).initialize(subjectFactories);
     }
-
-    it("should have set the correct managers length of 1", async () => {
-      await subject();
-
-      const managers = await managerCore.getManagers();
-      expect(managers.length).to.eq(1);
-    });
-
-    it("should have a valid manager", async () => {
-      await subject();
-
-      const validManager = await managerCore.isManager(otherAccount.address);
-      expect(validManager).to.eq(true);
-    });
 
     it("should have set the correct factories length of 1", async () => {
       await subject();
@@ -132,16 +114,6 @@ describe("ManagerCore", () => {
       });
     });
 
-    describe("when zero address passed for manager", async () => {
-      beforeEach(async () => {
-        subjectManagers = [ADDRESS_ZERO];
-      });
-
-      it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("Zero address submitted.");
-      });
-    });
-
     describe("when zero address passed for factory", async () => {
       beforeEach(async () => {
         subjectFactories = [ADDRESS_ZERO];
@@ -169,7 +141,7 @@ describe("ManagerCore", () => {
     let subjectCaller: Account;
 
     beforeEach(async () => {
-      managerCore.initialize([], []);
+      managerCore.initialize([]);
       managerCore.addFactory(mockDelegatedManagerFactory.address);
 
       subjectManagerCore = managerCore;
@@ -237,7 +209,7 @@ describe("ManagerCore", () => {
     let subjectCaller: Account;
 
     beforeEach(async () => {
-      await managerCore.initialize([], []);
+      await managerCore.initialize([]);
       await managerCore.addFactory(mockDelegatedManagerFactory.address);
       await managerCore.connect(mockDelegatedManagerFactory.wallet).addManager(mockManager.address);
 
@@ -305,7 +277,7 @@ describe("ManagerCore", () => {
     let subjectManagerCore: ManagerCore;
 
     beforeEach(async () => {
-      await managerCore.initialize([], []);
+      await managerCore.initialize([]);
 
       subjectFactory = delegatedManagerFactory.address;
       subjectCaller = owner;
@@ -371,7 +343,7 @@ describe("ManagerCore", () => {
     let subjectManagerCore: ManagerCore;
 
     beforeEach(async () => {
-      await managerCore.initialize([], [delegatedManagerFactory.address]);
+      await managerCore.initialize([delegatedManagerFactory.address]);
 
       subjectFactory = delegatedManagerFactory.address;
       subjectCaller = owner;
