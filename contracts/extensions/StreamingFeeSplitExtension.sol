@@ -112,9 +112,8 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
         IStreamingFeeModule.FeeState memory _settings
     ) 
         external 
-        onlyValidManager(_delegatedManager) 
+        onlyOwnerAndValidManager(_delegatedManager) 
     {
-        require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isInitializedExtension(address(this)), "Extension must be initialized");
 
         _initializeModule(_delegatedManager, _settings);
@@ -125,8 +124,7 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
      *
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
-    function initializeExtension(IDelegatedManager _delegatedManager) external onlyValidManager(_delegatedManager) {
-        require(msg.sender == _delegatedManager.owner(), "Must be owner");
+    function initializeExtension(IDelegatedManager _delegatedManager) external onlyOwnerAndValidManager(_delegatedManager) {
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
         _initializeExtension(_delegatedManager);
@@ -143,9 +141,8 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
         IStreamingFeeModule.FeeState memory _settings
     ) 
         external 
-        onlyValidManager(_delegatedManager)
+        onlyOwnerAndValidManager(_delegatedManager)
     {
-        require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
         _initializeExtension(_delegatedManager);
@@ -172,7 +169,7 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
         onlyOwner(_setToken)
     {
         bytes memory callData = abi.encodeWithSignature("updateStreamingFee(address,uint256)", _setToken, _newFee);
-        _invokeManager(_setToken, address(streamingFeeModule), callData);
+        _invokeManager(_manager(_setToken), address(streamingFeeModule), callData);
     }
 
     /**
@@ -186,7 +183,7 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
         onlyOwner(_setToken)
     {
         bytes memory callData = abi.encodeWithSignature("updateFeeRecipient(address,address)", _setToken, _newFeeRecipient);
-        _invokeManager(_setToken, address(streamingFeeModule), callData);
+        _invokeManager(_manager(_setToken), address(streamingFeeModule), callData);
     }
 
     /* ============ Internal Functions ============ */
@@ -203,12 +200,10 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     ) 
         internal
     {
-        ISetToken setToken = _delegatedManager.setToken();
-
         bytes memory callData = abi.encodeWithSignature(
             "initialize(address,(address,uint256,uint256,uint256))", 
-            setToken,
+            _delegatedManager.setToken(),
             _settings);
-        _invokeManager(setToken, address(streamingFeeModule), callData);
+        _invokeManager(_delegatedManager, address(streamingFeeModule), callData);
     }
 }

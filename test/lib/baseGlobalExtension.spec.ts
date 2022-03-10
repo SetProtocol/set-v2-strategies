@@ -185,7 +185,7 @@ describe("BaseGlobalExtension", () => {
     });
   });
 
-  describe("#testOnlyValidManager", async () => {
+  describe("#testOnlyOwnerAndValidManager", async () => {
     let subjectDelegatedManager: Address;
     let subjectCaller: Account;
 
@@ -203,6 +203,16 @@ describe("BaseGlobalExtension", () => {
 
     it("should succeed without revert", async () => {
       await subject();
+    });
+
+    describe("when the sender is not the owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = operator;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be owner");
+      });
     });
 
     describe("when the manager is not a ManagerCore-enabled manager", async () => {

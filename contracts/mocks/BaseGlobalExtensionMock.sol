@@ -36,16 +36,15 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
         IDelegatedManager _delegatedManager
     )
         external
-        onlyValidManager(_delegatedManager)
+        onlyOwnerAndValidManager(_delegatedManager)
     {
-        require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
         _initializeExtension(_delegatedManager);
     }
 
     function testInvokeManager(ISetToken _setToken, address _module, bytes calldata _encoded) external {
-        _invokeManager(_setToken, _module, _encoded);
+        _invokeManager(_manager(_setToken), _module, _encoded);
     }
 
     function testOnlyOwner(ISetToken _setToken)
@@ -63,9 +62,9 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
         onlyOperator(_setToken)
     {}
 
-    function testOnlyValidManager(IDelegatedManager _delegatedManager)
+    function testOnlyOwnerAndValidManager(IDelegatedManager _delegatedManager)
         external
-        onlyValidManager(_delegatedManager)
+        onlyOwnerAndValidManager(_delegatedManager)
     {}
 
     function testOnlyAllowedAsset(ISetToken _setToken, address _asset)

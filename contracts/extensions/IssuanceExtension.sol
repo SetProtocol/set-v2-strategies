@@ -117,9 +117,8 @@ contract IssuanceExtension is BaseGlobalExtension {
         address _managerIssuanceHook
     ) 
         external 
-        onlyValidManager(_delegatedManager) 
+        onlyOwnerAndValidManager(_delegatedManager) 
     {
-        require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isInitializedExtension(address(this)), "Extension must be initialized");
 
         _initializeModule(
@@ -137,8 +136,7 @@ contract IssuanceExtension is BaseGlobalExtension {
      *
      * @param _delegatedManager     Instance of the DelegatedManager to initialize
      */
-    function initializeExtension(IDelegatedManager _delegatedManager) external onlyValidManager(_delegatedManager) {
-        require(msg.sender == _delegatedManager.owner(), "Must be owner");
+    function initializeExtension(IDelegatedManager _delegatedManager) external onlyOwnerAndValidManager(_delegatedManager) {
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
         _initializeExtension(_delegatedManager);
@@ -163,9 +161,8 @@ contract IssuanceExtension is BaseGlobalExtension {
         address _managerIssuanceHook
     ) 
         external
-        onlyValidManager(_delegatedManager)
+        onlyOwnerAndValidManager(_delegatedManager)
     {
-        require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
         _initializeExtension(_delegatedManager);
@@ -197,7 +194,7 @@ contract IssuanceExtension is BaseGlobalExtension {
         onlyOwner(_setToken)
     {
         bytes memory callData = abi.encodeWithSignature("updateIssueFee(address,uint256)", _setToken, _newFee);
-        _invokeManager(_setToken, address(issuanceModule), callData);
+        _invokeManager(_manager(_setToken), address(issuanceModule), callData);
     }
 
     /**
@@ -211,7 +208,7 @@ contract IssuanceExtension is BaseGlobalExtension {
         onlyOwner(_setToken)
     {
         bytes memory callData = abi.encodeWithSignature("updateRedeemFee(address,uint256)", _setToken, _newFee);
-        _invokeManager(_setToken, address(issuanceModule), callData);
+        _invokeManager(_manager(_setToken), address(issuanceModule), callData);
     }
 
     /**
@@ -225,7 +222,7 @@ contract IssuanceExtension is BaseGlobalExtension {
         onlyOwner(_setToken)
     {
         bytes memory callData = abi.encodeWithSignature("updateFeeRecipient(address,address)", _setToken, _newFeeRecipient);
-        _invokeManager(_setToken, address(issuanceModule), callData);
+        _invokeManager(_manager(_setToken), address(issuanceModule), callData);
     }
 
     /* ============ Internal Functions ============ */
@@ -250,17 +247,15 @@ contract IssuanceExtension is BaseGlobalExtension {
     ) 
         internal
     {
-        ISetToken setToken = _delegatedManager.setToken();
-
         bytes memory callData = abi.encodeWithSignature(
             "initialize(address,uint256,uint256,uint256,address,address)", 
-            setToken,
+            _delegatedManager.setToken(),
             _maxManagerFee,
             _managerIssueFee,
             _managerRedeemFee,
             _feeRecipient,
             _managerIssuanceHook
         );
-        _invokeManager(setToken, address(issuanceModule), callData);
+        _invokeManager(_delegatedManager, address(issuanceModule), callData);
     }
 }

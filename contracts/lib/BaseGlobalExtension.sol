@@ -83,9 +83,10 @@ abstract contract BaseGlobalExtension {
     }
 
     /**
-     * Throws if the manager is not enabled on the ManagerCore
+     * Throws if the sender is not the SetToken manager contract owner or if the manager is not enabled on the ManagerCore
      */
-    modifier onlyValidManager(IDelegatedManager _delegatedManager) {
+    modifier onlyOwnerAndValidManager(IDelegatedManager _delegatedManager) {
+        require(msg.sender == _delegatedManager.owner(), "Must be owner");
         require(managerCore.isManager(address(_delegatedManager)), "Must be ManagerCore-enabled manager");
         _;
     }
@@ -121,11 +122,12 @@ abstract contract BaseGlobalExtension {
     /**
      * Invoke call from manager
      *
-     * @param _module           Module to interact with
-     * @param _encoded          Encoded byte data
+     * @param _delegatedManager      Manager to interact with
+     * @param _module                Module to interact with
+     * @param _encoded               Encoded byte data
      */
-    function _invokeManager(ISetToken _setToken, address _module, bytes memory _encoded) internal {
-        _manager(_setToken).interactManager(_module, _encoded);
+    function _invokeManager(IDelegatedManager _delegatedManager, address _module, bytes memory _encoded) internal {
+        _delegatedManager.interactManager(_module, _encoded);
     }
 
     /**
