@@ -155,6 +155,6 @@ abstract contract BaseGlobalExtension {
 
         delete setManagers[setToken];
 
-        ExtensionRemoved(address(setToken), address(delegatedManager));
+        emit ExtensionRemoved(address(setToken), address(delegatedManager));
     }
 }

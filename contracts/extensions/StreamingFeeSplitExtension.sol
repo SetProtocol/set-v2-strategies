@@ -135,7 +135,7 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
 
         _initializeExtension(setToken, _delegatedManager);
 
-        StreamingFeeSplitExtensionInitialized(address(setToken), address(_delegatedManager));
+        emit StreamingFeeSplitExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -158,7 +158,7 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
         _initializeExtension(setToken, _delegatedManager);
         _initializeModule(setToken, _delegatedManager, _settings);
 
-        StreamingFeeSplitExtensionInitialized(address(setToken), address(_delegatedManager));
+        emit StreamingFeeSplitExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**

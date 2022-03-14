@@ -148,7 +148,7 @@ contract IssuanceExtension is BaseGlobalExtension {
 
         _initializeExtension(setToken, _delegatedManager);
 
-        IssuanceExtensionInitialized(address(setToken), address(_delegatedManager));
+        emit IssuanceExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -187,7 +187,7 @@ contract IssuanceExtension is BaseGlobalExtension {
             _managerIssuanceHook
         );
 
-        IssuanceExtensionInitialized(address(setToken), address(_delegatedManager));
+        emit IssuanceExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**

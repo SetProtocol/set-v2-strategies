@@ -79,7 +79,7 @@ contract TradeExtension is BaseGlobalExtension {
 
         _initializeExtension(setToken, _delegatedManager);
 
-        TradeExtensionInitialized(address(setToken), address(_delegatedManager));
+        emit TradeExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
@@ -95,7 +95,7 @@ contract TradeExtension is BaseGlobalExtension {
         _initializeExtension(setToken, _delegatedManager);
         _initializeModule(setToken, _delegatedManager);
 
-        TradeExtensionInitialized(address(setToken), address(_delegatedManager));
+        emit TradeExtensionInitialized(address(setToken), address(_delegatedManager));
     }
 
     /**
