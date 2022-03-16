@@ -122,6 +122,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       perpV2Setup.vault.address,
       perpV2Setup.quoter.address,
       perpV2Setup.marketRegistry.address,
+      BigNumber.from(3),
       "contracts/protocol/integration/lib/PerpV2.sol:PerpV2",
       perpLib.address
     );
