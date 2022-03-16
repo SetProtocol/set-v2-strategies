@@ -1,5 +1,6 @@
 import "module-alias/register";
 
+import { solidityKeccak256 } from "ethers/lib/utils";
 import { BigNumber } from "ethers";
 import { Address, Account, Bytes } from "@utils/types";
 import { ADDRESS_ZERO, EXTENSION_STATE, ZERO } from "@utils/constants";
@@ -747,19 +748,22 @@ describe("DelegatedManager", () => {
 
   describe("#updateOwnerFeeSplit", async () => {
     let subjectNewFeeSplit: BigNumber;
-    let subjectCaller: Account;
+    let subjectOwnerCaller: Account;
+    let subjectMethodologistCaller: Account;
 
     beforeEach(async () => {
       subjectNewFeeSplit = ether(.1);
-      subjectCaller = owner;
+      subjectOwnerCaller = owner;
+      subjectMethodologistCaller = methodologist;
     });
 
-    async function subject(): Promise<any> {
-      return delegatedManager.connect(subjectCaller.wallet).updateOwnerFeeSplit(subjectNewFeeSplit);
+    async function subject(caller: Account): Promise<ContractTransaction> {
+      return await delegatedManager.connect(caller.wallet).updateOwnerFeeSplit(subjectNewFeeSplit);
     }
 
     it("should set the new owner fee split", async () => {
-      await subject();
+      await subject(subjectOwnerCaller);
+      await subject(subjectMethodologistCaller);
 
       const newFeeSplit =  await delegatedManager.ownerFeeSplit();
 
@@ -767,7 +771,8 @@ describe("DelegatedManager", () => {
     });
 
     it("should emit the correct OwnerFeeSplitUpdated event", async () => {
-      await expect(subject()).to.emit(delegatedManager, "OwnerFeeSplitUpdated").withArgs(subjectNewFeeSplit);
+      await subject(subjectOwnerCaller);
+      await expect(subject(subjectMethodologistCaller)).to.emit(delegatedManager, "OwnerFeeSplitUpdated").withArgs(subjectNewFeeSplit);
     });
 
     describe("when a fee split greater than 100% is passed", async () => {
@@ -776,17 +781,33 @@ describe("DelegatedManager", () => {
       });
 
       it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("Invalid fee split");
+        await subject(subjectOwnerCaller);
+        await expect(subject(subjectMethodologistCaller)).to.be.revertedWith("Invalid fee split");
       });
     });
 
-    describe("when the caller is not the owner", async () => {
+    context("when a single mutual upgrade party has called the method", async () => {
+      it("should log the proposed streaming fee hash in the mutualUpgrades mapping", async () => {
+        const txHash = await subject(subjectOwnerCaller);
+
+        const expectedHash = solidityKeccak256(
+          ["bytes", "address"],
+          [txHash.data, subjectOwnerCaller.address]
+        );
+
+        const isLogged = await delegatedManager.mutualUpgrades(expectedHash);
+
+        expect(isLogged).to.be.true;
+      });
+    });
+
+    describe("when the caller is not the owner or methodologist", async () => {
       beforeEach(async () => {
-        subjectCaller = await getRandomAccount();
+        subjectOwnerCaller = await getRandomAccount();
       });
 
       it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("Ownable: caller is not the owner");
+        await expect(subject(subjectOwnerCaller)).to.be.revertedWith("Must be authorized address");
       });
     });
   });

@@ -31,6 +31,8 @@ interface IDelegatedManager {
     function updateOwnerFeeSplit(uint256 _newFeeSplit) external;
 
     function updateOwnerFeeRecipient(address _newFeeRecipient) external;
+
+    function setMethodologist(address _newMethodologist) external;
     
     function transferOwnership(address _owner) external;
 

@@ -46,6 +46,7 @@ contract DelegatedManagerFactory {
     struct InitializeParams{
         address deployer;
         address owner;
+        address methodologist;
         IDelegatedManager manager;
         bool isPending;
     }
@@ -149,13 +150,12 @@ contract DelegatedManagerFactory {
 
         DelegatedManager manager = _deployManager(
             setToken,
-            _methodologist,
             _extensions,
             _operators,
             _assets
         );
 
-        _setInitializationState(setToken, address(manager), _owner);
+        _setInitializationState(setToken, address(manager), _owner, _methodologist);
 
         return (setToken, address(manager));
     }
@@ -195,13 +195,12 @@ contract DelegatedManagerFactory {
 
         DelegatedManager manager = _deployManager(
             _setToken,
-            _methodologist,
             _extensions,
             _operators,
             _assets
         );
 
-        _setInitializationState(_setToken, address(manager), _owner);
+        _setInitializationState(_setToken, address(manager), _owner, _methodologist);
 
         return address(manager);
     }
@@ -251,6 +250,7 @@ contract DelegatedManagerFactory {
         }
 
         manager.transferOwnership(initializeState[_setToken].owner);
+        manager.setMethodologist(initializeState[_setToken].methodologist);
 
         delete initializeState[_setToken];
 
@@ -297,7 +297,6 @@ contract DelegatedManagerFactory {
      * Deploys a DelegatedManager
      *
      * @param  _setToken         Instance of SetToken to migrate to the DelegatedManager system
-     * @param  _methodologist    Address to set as the DelegateManager's methodologist role
      * @param  _extensions       List of extensions authorized for the DelegateManager
      * @param  _operators        List of operators authorized for the DelegateManager
      * @param  _assets           List of assets DelegateManager can trade. When empty, asset allow list is not enforced
@@ -306,7 +305,6 @@ contract DelegatedManagerFactory {
      */
     function _deployManager(
         ISetToken _setToken,
-        address _methodologist,
         address[] memory _extensions,
         address[] memory _operators,
         address[] memory _assets
@@ -321,7 +319,7 @@ contract DelegatedManagerFactory {
         DelegatedManager newManager = new DelegatedManager(
             _setToken,
             address(this),
-            _methodologist,
+            address(this),
             _extensions,
             _operators,
             _assets,
@@ -347,15 +345,18 @@ contract DelegatedManagerFactory {
      * @param  _setToken         Instance of SetToken
      * @param  _manager          Address of DelegatedManager created for SetToken
      * @param  _owner            Address that will be given the `owner` DelegatedManager's role on initialization
+     * @param  _methodologist    Address that will be given the `methodologist` DelegatedManager's role on initialization
      */
     function _setInitializationState(
         ISetToken _setToken,
         address _manager,
-        address _owner
+        address _owner,
+        address _methodologist
     ) internal {
         initializeState[_setToken] = InitializeParams({
             deployer: msg.sender,
             owner: _owner,
+            methodologist: _methodologist,
             manager: IDelegatedManager(_manager),
             isPending: true
         });

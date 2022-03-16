@@ -223,7 +223,7 @@ describe("DelegatedManagerFactory", () => {
 
       expect(await delegatedManager.setToken()).eq(setTokenAddress);
       expect(await delegatedManager.factory()).eq(delegatedManagerFactory.address);
-      expect(await delegatedManager.methodologist()).eq(subjectMethodologist);
+      expect(await delegatedManager.methodologist()).eq(delegatedManagerFactory.address);
       expect(await delegatedManager.useAssetAllowlist()).eq(true);
     });
 
@@ -259,6 +259,7 @@ describe("DelegatedManagerFactory", () => {
 
       expect(initializeParams.deployer).eq(owner.address);
       expect(initializeParams.owner).eq(subjectOwner);
+      expect(initializeParams.methodologist).eq(subjectMethodologist);
       expect(initializeParams.isPending).eq(true);
       expect(initializeParams.manager).eq(createdContracts[1]);
     });
@@ -412,7 +413,7 @@ describe("DelegatedManagerFactory", () => {
 
       expect(await delegatedManager.setToken()).eq(subjectSetToken);
       expect(await delegatedManager.factory()).eq(delegatedManagerFactory.address);
-      expect(await delegatedManager.methodologist()).eq(subjectMethodologist);
+      expect(await delegatedManager.methodologist()).eq(delegatedManagerFactory.address);
       expect(await delegatedManager.useAssetAllowlist()).eq(true);
     });
 
@@ -432,6 +433,7 @@ describe("DelegatedManagerFactory", () => {
 
       expect(initializeParams.deployer).eq(owner.address);
       expect(initializeParams.owner).eq(subjectOwner);
+      expect(initializeParams.methodologist).eq(subjectMethodologist);
       expect(initializeParams.isPending).eq(true);
       expect(initializeParams.manager).eq(newManagerAddress);
     });
@@ -626,6 +628,17 @@ describe("DelegatedManagerFactory", () => {
         expect(newOwner).eq(initializeParams.owner);
       });
 
+      it("should transfer the methodologist role of DelegatedManager to the `methodologist` specified initializeState", async () => {
+        const oldMethodologist = await manager.methodologist();
+
+        await subject();
+
+        const newMethodologist = await manager.methodologist();
+
+        expect(oldMethodologist).not.eq(newMethodologist);
+        expect(newMethodologist).eq(initializeParams.methodologist);
+      });
+
       it("should delete the initializeState for the SetToken", async () => {
         await subject();
 
@@ -633,6 +646,7 @@ describe("DelegatedManagerFactory", () => {
 
         expect(finalInitializeParams.deployer).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.owner).eq(ADDRESS_ZERO);
+        expect(finalInitializeParams.methodologist).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.manager).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.isPending).eq(false);
       });
@@ -726,6 +740,17 @@ describe("DelegatedManagerFactory", () => {
         expect(newOwner).eq(initializeParams.owner);
       });
 
+      it("should transfer the methodologist role of DelegatedManager to the `methodologist` specified initializeState", async () => {
+        const oldMethodologist = await manager.methodologist();
+
+        await subject();
+
+        const newMethodologist = await manager.methodologist();
+
+        expect(oldMethodologist).not.eq(newMethodologist);
+        expect(newMethodologist).eq(initializeParams.methodologist);
+      });
+
       it("should delete the initializeState for the SetToken", async () => {
         await subject();
 
@@ -733,6 +758,7 @@ describe("DelegatedManagerFactory", () => {
 
         expect(finalInitializeParams.deployer).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.owner).eq(ADDRESS_ZERO);
+        expect(finalInitializeParams.methodologist).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.manager).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.isPending).eq(false);
       });

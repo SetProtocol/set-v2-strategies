@@ -91,9 +91,10 @@ describe("IssuanceExtension", () => {
     );
 
     ownerFeeSplit = ether(0.1);
-    await delegatedManager.updateOwnerFeeSplit(ownerFeeSplit);
+    await delegatedManager.connect(owner.wallet).updateOwnerFeeSplit(ownerFeeSplit);
+    await delegatedManager.connect(methodologist.wallet).updateOwnerFeeSplit(ownerFeeSplit);
     ownerFeeRecipient = owner.address;
-    await delegatedManager.updateOwnerFeeRecipient(ownerFeeRecipient);
+    await delegatedManager.connect(owner.wallet).updateOwnerFeeRecipient(ownerFeeRecipient);
 
     await setToken.setManager(delegatedManager.address);
 
@@ -695,6 +696,7 @@ describe("IssuanceExtension", () => {
     describe("when methodologist fees are 0", async () => {
       beforeEach(async () => {
         await delegatedManager.connect(owner.wallet).updateOwnerFeeSplit(ether(1));
+        await delegatedManager.connect(methodologist.wallet).updateOwnerFeeSplit(ether(1));
       });
 
       it("should not send fees to methodologist", async () => {
@@ -710,6 +712,7 @@ describe("IssuanceExtension", () => {
     describe("when owner fees are 0", async () => {
       beforeEach(async () => {
         await delegatedManager.connect(owner.wallet).updateOwnerFeeSplit(ZERO);
+        await delegatedManager.connect(methodologist.wallet).updateOwnerFeeSplit(ZERO);
       });
 
       it("should not send fees to owner fee recipient", async () => {
