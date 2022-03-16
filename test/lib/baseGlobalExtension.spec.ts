@@ -17,7 +17,7 @@ import {
   SetToken
 } from "@setprotocol/set-protocol-v2/utils/contracts";
 
-import { getSystemFixture } from "@setprotocol/set-protocol-v2/utils/test";
+import { getSystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/test";
 
 import {
   SystemFixture

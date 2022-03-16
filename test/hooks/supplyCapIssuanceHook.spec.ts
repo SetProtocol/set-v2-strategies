@@ -11,8 +11,8 @@ import {
   getWaffleExpect,
   getRandomAccount,
 } from "@utils/index";
-import { SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
-import { getSystemFixture } from "@setprotocol/set-protocol-v2/utils/test";
+import { SystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
+import { getSystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/test";
 import { BigNumber, ContractTransaction } from "ethers";
 
 const expect = getWaffleExpect();

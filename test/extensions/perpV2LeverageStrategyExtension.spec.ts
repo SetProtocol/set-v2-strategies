@@ -38,8 +38,8 @@ import {
 } from "../../utils/index";
 import { PerpV2PriceFeedMock } from "@utils/contracts";
 
-import { PerpV2Fixture, SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
-import { getPerpV2Fixture, getSystemFixture } from "@setprotocol/set-protocol-v2/utils/test";
+import { PerpV2Fixture, SystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
+import { getPerpV2Fixture, getSystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/test";
 
 import { BaseManager, PerpV2LeverageStrategyExtension } from "@utils/contracts/index";
 
