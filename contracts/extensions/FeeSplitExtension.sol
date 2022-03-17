@@ -22,13 +22,13 @@ pragma experimental ABIEncoderV2;
 import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 
+import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/PreciseUnitMath.sol";
+import { IIssuanceModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IIssuanceModule.sol";
+import { IStreamingFeeModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IStreamingFeeModule.sol";
 
 import { BaseExtension } from "../lib/BaseExtension.sol";
-import { IIssuanceModule } from "../interfaces/IIssuanceModule.sol";
 import { IBaseManager } from "../interfaces/IBaseManager.sol";
-import { ISetToken } from "../interfaces/ISetToken.sol";
-import { IStreamingFeeModule } from "../interfaces/IStreamingFeeModule.sol";
 import { TimeLockUpgrade } from "../lib/TimeLockUpgrade.sol";
 
 

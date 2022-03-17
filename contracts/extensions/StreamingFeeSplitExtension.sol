@@ -23,12 +23,12 @@ import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
+import { IStreamingFeeModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IStreamingFeeModuleV2.sol";
 import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/PreciseUnitMath.sol";
 
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { IManagerCore } from "../interfaces/IManagerCore.sol";
-import { IStreamingFeeModule } from "../interfaces/IStreamingFeeModuleV2.sol";
 
 /**
  * @title StreamingFeeSplitExtension

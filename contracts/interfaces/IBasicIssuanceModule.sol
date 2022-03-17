@@ -13,7 +13,7 @@
 */
 pragma solidity >=0.6.10;
 
-import { ISetToken } from "./ISetToken.sol";
+import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 interface IBasicIssuanceModule {
     function getRequiredComponentUnitsForIssue(

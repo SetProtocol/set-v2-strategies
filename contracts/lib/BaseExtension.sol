@@ -18,7 +18,8 @@
 
 pragma solidity 0.6.10;
 
-import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
+import { AddressArrayUtils } from "@setprotocol/set-protocol-v2/contracts/lib/AddressArrayUtils.sol";
+
 import { IBaseManager } from "../interfaces/IBaseManager.sol";
 
 /**

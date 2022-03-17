@@ -23,11 +23,11 @@ import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
+import { IIssuanceModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IIssuanceModule.sol";
 import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/PreciseUnitMath.sol";
 
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
-import { IIssuanceModule } from "../interfaces/IIssuanceModule.sol";
 import { IManagerCore } from "../interfaces/IManagerCore.sol";
 
 /**
