@@ -799,6 +799,14 @@ describe("DelegatedManager", () => {
 
         expect(isLogged).to.be.true;
       });
+
+      it("should not update fee split", async () => {
+        await subject(subjectOwnerCaller);
+
+        const feeSplit =  await delegatedManager.ownerFeeSplit();
+
+        expect(feeSplit).to.eq(ZERO);
+      });
     });
 
     describe("when the caller is not the owner or methodologist", async () => {
