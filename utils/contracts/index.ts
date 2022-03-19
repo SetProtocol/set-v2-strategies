@@ -12,8 +12,6 @@ export { MutualUpgradeV2Mock } from "../../typechain/MutualUpgradeV2Mock";
 export { PerpV2LeverageStrategyExtension } from "../../typechain/PerpV2LeverageStrategyExtension";
 export { FeeSplitExtension } from "../../typechain/FeeSplitExtension";
 export { PerpV2PriceFeedMock } from "../../typechain/PerpV2PriceFeedMock";
-// TODO: remove
-// export { StringArrayUtilsMock } from "../../typechain/StringArrayUtilsMock";
 export { SupplyCapIssuanceHook } from "../../typechain/SupplyCapIssuanceHook";
 export { TradeExtension } from "../../typechain/TradeExtension";
 export { IssuanceExtension } from "../../typechain/IssuanceExtension";

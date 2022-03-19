@@ -31,12 +31,11 @@ import { IPerpV2LeverageModule } from "@setprotocol/set-protocol-v2/contracts/in
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 import { IVault } from "@setprotocol/set-protocol-v2/contracts/interfaces/external/perp-v2/IVault.sol";
 import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/PreciseUnitMath.sol";
+import { StringArrayUtils } from "@setprotocol/set-protocol-v2/contracts/lib/StringArrayUtils.sol";
 
 import { BaseExtension } from "../lib/BaseExtension.sol";
 import { IBaseManager } from "../interfaces/IBaseManager.sol";
 import { IPriceFeed } from "../interfaces/IPriceFeed.sol";
-import { StringArrayUtils } from "../lib/StringArrayUtils.sol";
-
 
 
 /**
