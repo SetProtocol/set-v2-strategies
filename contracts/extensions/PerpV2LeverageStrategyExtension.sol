@@ -26,16 +26,16 @@ import { SafeCast } from "@openzeppelin/contracts/utils/SafeCast.sol";
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 import { SignedSafeMath } from "@openzeppelin/contracts/math/SignedSafeMath.sol";
 
-import { IAccountBalance } from "@setprotocol/set-protocol-v2/contracts/interfaces/IAccountBalance.sol";
+import { IAccountBalance } from "@setprotocol/set-protocol-v2/contracts/interfaces/external/perp-v2/IAccountBalance.sol";
 import { IPerpV2LeverageModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IPerpV2LeverageModule.sol";
-import { IPriceFeed } from "@setprotocol/set-protocol-v2/contracts/interfaces/IPriceFeed.sol";
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
-import { IVault } from "@setprotocol/set-protocol-v2/contracts/interfaces/IVault.sol";
+import { IVault } from "@setprotocol/set-protocol-v2/contracts/interfaces/external/perp-v2/IVault.sol";
 import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/PreciseUnitMath.sol";
-import { StringArrayUtils } from "@setprotocol/set-protocol-v2/contracts/lib/StringArrayUtils.sol";
 
 import { BaseExtension } from "../lib/BaseExtension.sol";
 import { IBaseManager } from "../interfaces/IBaseManager.sol";
+import { IPriceFeed } from "../interfaces/IPriceFeed.sol";
+import { StringArrayUtils } from "../lib/StringArrayUtils.sol";
 
 
 

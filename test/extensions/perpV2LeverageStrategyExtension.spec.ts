@@ -67,6 +67,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
   let customTargetLeverageRatio: any;
   let customMinLeverageRatio: any;
   let basePriceDecimalAdjustment: BigNumber;
+  let maxPerpPositionsPerSet: BigNumber;
 
   let leverageStrategyExtension: PerpV2LeverageStrategyExtension;
   let positionLib: PositionV2;
