@@ -70,6 +70,7 @@ describe("DelegatedManagerFactory", () => {
 
     delegatedManagerFactory = await deployer.factories.deployDelegatedManagerFactory(
       managerCore.address,
+      setV2Setup.controller.address,
       setV2Setup.factory.address
     );
 
@@ -124,16 +125,19 @@ describe("DelegatedManagerFactory", () => {
 
   describe("#constructor", async () => {
     let subjectManagerCore: Address;
+    let subjectController: Address;
     let subjectSetTokenFactory: Address;
 
     beforeEach(async () => {
       subjectManagerCore = managerCore.address;
+      subjectController = setV2Setup.controller.address;
       subjectSetTokenFactory = setV2Setup.factory.address;
     });
 
     async function subject(): Promise<DelegatedManagerFactory> {
       return await deployer.factories.deployDelegatedManagerFactory(
         subjectManagerCore,
+        subjectController,
         subjectSetTokenFactory
       );
     }
@@ -143,6 +147,13 @@ describe("DelegatedManagerFactory", () => {
 
       const actualManagerCore = await delegatedManager.managerCore();
       expect (actualManagerCore).to.eq(subjectManagerCore);
+    });
+
+    it("should set the correct Controller address", async () => {
+      const delegatedManager = await subject();
+
+      const actualController = await delegatedManager.controller();
+      expect (actualController).to.eq(subjectController);
     });
 
     it("should set the correct SetToken factory address", async () => {
@@ -223,7 +234,7 @@ describe("DelegatedManagerFactory", () => {
 
       expect(await delegatedManager.setToken()).eq(setTokenAddress);
       expect(await delegatedManager.factory()).eq(delegatedManagerFactory.address);
-      expect(await delegatedManager.methodologist()).eq(subjectMethodologist);
+      expect(await delegatedManager.methodologist()).eq(delegatedManagerFactory.address);
       expect(await delegatedManager.useAssetAllowlist()).eq(true);
     });
 
@@ -259,6 +270,7 @@ describe("DelegatedManagerFactory", () => {
 
       expect(initializeParams.deployer).eq(owner.address);
       expect(initializeParams.owner).eq(subjectOwner);
+      expect(initializeParams.methodologist).eq(subjectMethodologist);
       expect(initializeParams.isPending).eq(true);
       expect(initializeParams.manager).eq(createdContracts[1]);
     });
@@ -412,7 +424,7 @@ describe("DelegatedManagerFactory", () => {
 
       expect(await delegatedManager.setToken()).eq(subjectSetToken);
       expect(await delegatedManager.factory()).eq(delegatedManagerFactory.address);
-      expect(await delegatedManager.methodologist()).eq(subjectMethodologist);
+      expect(await delegatedManager.methodologist()).eq(delegatedManagerFactory.address);
       expect(await delegatedManager.useAssetAllowlist()).eq(true);
     });
 
@@ -432,6 +444,7 @@ describe("DelegatedManagerFactory", () => {
 
       expect(initializeParams.deployer).eq(owner.address);
       expect(initializeParams.owner).eq(subjectOwner);
+      expect(initializeParams.methodologist).eq(subjectMethodologist);
       expect(initializeParams.isPending).eq(true);
       expect(initializeParams.manager).eq(newManagerAddress);
     });
@@ -523,6 +536,16 @@ describe("DelegatedManagerFactory", () => {
 
       it("should revert", async() => {
         await expect(subject()).to.be.revertedWith("Must have at least 1 extension");
+      });
+    });
+
+    describe("when the SetToken is not controller-enabled", async () => {
+      beforeEach(() => {
+        subjectSetToken = otherAccount.address;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be controller-enabled SetToken");
       });
     });
   });
@@ -626,6 +649,17 @@ describe("DelegatedManagerFactory", () => {
         expect(newOwner).eq(initializeParams.owner);
       });
 
+      it("should transfer the methodologist role of DelegatedManager to the `methodologist` specified initializeState", async () => {
+        const oldMethodologist = await manager.methodologist();
+
+        await subject();
+
+        const newMethodologist = await manager.methodologist();
+
+        expect(oldMethodologist).not.eq(newMethodologist);
+        expect(newMethodologist).eq(initializeParams.methodologist);
+      });
+
       it("should delete the initializeState for the SetToken", async () => {
         await subject();
 
@@ -633,6 +667,7 @@ describe("DelegatedManagerFactory", () => {
 
         expect(finalInitializeParams.deployer).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.owner).eq(ADDRESS_ZERO);
+        expect(finalInitializeParams.methodologist).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.manager).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.isPending).eq(false);
       });
@@ -651,6 +686,21 @@ describe("DelegatedManagerFactory", () => {
 
         it("should revert", async() => {
           await expect(subject()).to.be.revertedWith("Must be ManagerCore-enabled manager");
+        });
+      });
+
+      describe("when a SetToken is in initializeTargets", async() => {
+        beforeEach(async () => {
+          subjectInitializeTargets = [setTokenAddress];
+
+          subjectInitializeBytecode = [setToken.interface.encodeFunctionData(
+            "setManager",
+            [otherAccount.address]
+          )];
+        });
+
+        it("should revert", async() => {
+          await expect(subject()).to.be.revertedWith("Target must not be SetToken");
         });
       });
     });
@@ -726,6 +776,17 @@ describe("DelegatedManagerFactory", () => {
         expect(newOwner).eq(initializeParams.owner);
       });
 
+      it("should transfer the methodologist role of DelegatedManager to the `methodologist` specified initializeState", async () => {
+        const oldMethodologist = await manager.methodologist();
+
+        await subject();
+
+        const newMethodologist = await manager.methodologist();
+
+        expect(oldMethodologist).not.eq(newMethodologist);
+        expect(newMethodologist).eq(initializeParams.methodologist);
+      });
+
       it("should delete the initializeState for the SetToken", async () => {
         await subject();
 
@@ -733,6 +794,7 @@ describe("DelegatedManagerFactory", () => {
 
         expect(finalInitializeParams.deployer).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.owner).eq(ADDRESS_ZERO);
+        expect(finalInitializeParams.methodologist).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.manager).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.isPending).eq(false);
       });
@@ -744,6 +806,21 @@ describe("DelegatedManagerFactory", () => {
 
         it("should revert", async() => {
           await expect(subject()).to.be.revertedWith("Must be ManagerCore-enabled manager");
+        });
+      });
+
+      describe("when a SetToken is in initializeTargets", async() => {
+        beforeEach(async () => {
+          subjectInitializeTargets = [setToken.address];
+
+          subjectInitializeBytecode = [setToken.interface.encodeFunctionData(
+            "setManager",
+            [otherAccount.address]
+          )];
+        });
+
+        it("should revert", async() => {
+          await expect(subject()).to.be.revertedWith("Target must not be SetToken");
         });
       });
     });

@@ -23,6 +23,7 @@ import { ManagerMock__factory } from "../../typechain/factories/ManagerMock__fac
 import { ChainlinkAggregatorMock__factory  } from "@setprotocol/set-protocol-v2/typechain";
 import { ContractCallerMock__factory } from "@setprotocol/set-protocol-v2/typechain";
 import { MutualUpgradeMock__factory } from "../../typechain/factories/MutualUpgradeMock__factory";
+import { MutualUpgradeV2Mock__factory } from "../../typechain/factories/MutualUpgradeV2Mock__factory";
 import { PerpV2PriceFeedMock__factory } from "../../typechain/factories/PerpV2PriceFeedMock__factory";
 import { StandardTokenMock__factory  } from "../../typechain/factories/StandardTokenMock__factory";
 import { StringArrayUtilsMock__factory  } from "../../typechain/factories/StringArrayUtilsMock__factory";
@@ -52,6 +53,10 @@ export default class DeployMocks {
 
   public async deployMutualUpgradeMock(owner: Address, methodologist: string): Promise<MutualUpgradeMock> {
     return await new MutualUpgradeMock__factory(this._deployerSigner).deploy(owner, methodologist);
+  }
+
+  public async deployMutualUpgradeV2Mock(owner: Address, methodologist: string): Promise<MutualUpgradeMock> {
+    return await new MutualUpgradeV2Mock__factory(this._deployerSigner).deploy(owner, methodologist);
   }
 
   public async deployStandardTokenMock(owner: Address, decimals: number): Promise<StandardTokenMock> {

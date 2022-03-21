@@ -28,6 +28,7 @@ import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/Prec
 
 import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
 import { IGlobalExtension } from "../interfaces/IGlobalExtension.sol";
+import { MutualUpgradeV2 } from "../lib/MutualUpgradeV2.sol";
 
 
 /**
@@ -42,7 +43,7 @@ import { IGlobalExtension } from "../interfaces/IGlobalExtension.sol";
  * a part of the asset whitelist, hence they are a semi-trusted party. It is recommended that the owner address
  * be managed by a multi-sig or some form of permissioning system.
  */
-contract DelegatedManager is Ownable {
+contract DelegatedManager is Ownable, MutualUpgradeV2 {
     using Address for address;
     using AddressArrayUtils for address[];
     using SafeERC20 for IERC20;
@@ -327,7 +328,7 @@ contract DelegatedManager is Ownable {
      *
      * @param _newFeeSplit           Percent in precise units (100% = 10**18) of fees that accrue to owner
      */
-    function updateOwnerFeeSplit(uint256 _newFeeSplit) external onlyOwner {
+    function updateOwnerFeeSplit(uint256 _newFeeSplit) external mutualUpgrade(owner(), methodologist) {
         require(_newFeeSplit <= PreciseUnitMath.preciseUnit(), "Invalid fee split");
 
         ownerFeeSplit = _newFeeSplit;
@@ -354,6 +355,8 @@ contract DelegatedManager is Ownable {
      * @param _newMethodologist           New methodologist address
      */
     function setMethodologist(address _newMethodologist) external onlyMethodologist {
+        require(_newMethodologist != address(0), "Null address passed");
+
         methodologist = _newMethodologist;
 
         emit MethodologistChanged(_newMethodologist);

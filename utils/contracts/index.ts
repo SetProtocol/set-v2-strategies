@@ -8,6 +8,7 @@ export { DelegatedManagerFactory } from "../../typechain/DelegatedManagerFactory
 export { ManagerCore } from "../../typechain/ManagerCore";
 export { ManagerMock } from "../../typechain/ManagerMock";
 export { MutualUpgradeMock } from "../../typechain/MutualUpgradeMock";
+export { MutualUpgradeV2Mock } from "../../typechain/MutualUpgradeV2Mock";
 export { PerpV2LeverageStrategyExtension } from "../../typechain/PerpV2LeverageStrategyExtension";
 export { FeeSplitExtension } from "../../typechain/FeeSplitExtension";
 export { PerpV2PriceFeedMock } from "../../typechain/PerpV2PriceFeedMock";

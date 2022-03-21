@@ -45,6 +45,7 @@ describe("ManagerCore", () => {
 
     delegatedManagerFactory = await deployer.factories.deployDelegatedManagerFactory(
       managerCore.address,
+      setV2Setup.controller.address,
       setV2Setup.factory.address
     );
   });

@@ -24,6 +24,7 @@ import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISe
 
 import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
 import { DelegatedManager } from "../manager/DelegatedManager.sol";
+import { IController } from "../interfaces/IController.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { ISetTokenCreator } from "../interfaces/ISetTokenCreator.sol";
@@ -46,6 +47,7 @@ contract DelegatedManagerFactory {
     struct InitializeParams{
         address deployer;
         address owner;
+        address methodologist;
         IDelegatedManager manager;
         bool isPending;
     }
@@ -79,8 +81,11 @@ contract DelegatedManagerFactory {
     // ManagerCore address
     IManagerCore public immutable managerCore;
 
+    // Controller address
+    IController public immutable controller;
+
     // SetTokenFactory address
-    ISetTokenCreator public setTokenFactory;
+    ISetTokenCreator public immutable setTokenFactory;
 
     // Mapping which stores manager creation metadata between creation and initialization steps
     mapping(ISetToken=>InitializeParams) public initializeState;
@@ -90,15 +95,18 @@ contract DelegatedManagerFactory {
     /**
      * @dev Sets managerCore and setTokenFactory address.
      * @param _managerCore                      Address of ManagerCore protocol contract
+     * @param _controller                       Address of Controller protocol contract
      * @param _setTokenFactory                  Address of SetTokenFactory protocol contract
      */
     constructor(
         IManagerCore _managerCore,
+        IController _controller,
         ISetTokenCreator _setTokenFactory
-    ) 
-        public 
+    )
+        public
     {
         managerCore = _managerCore;
+        controller = _controller;
         setTokenFactory = _setTokenFactory;
     }
 
@@ -149,13 +157,12 @@ contract DelegatedManagerFactory {
 
         DelegatedManager manager = _deployManager(
             setToken,
-            _methodologist,
             _extensions,
             _operators,
             _assets
         );
 
-        _setInitializationState(setToken, address(manager), _owner);
+        _setInitializationState(setToken, address(manager), _owner, _methodologist);
 
         return (setToken, address(manager));
     }
@@ -189,19 +196,19 @@ contract DelegatedManagerFactory {
         external
         returns (address)
     {
+        require(controller.isSet(address(_setToken)), "Must be controller-enabled SetToken");
         require(msg.sender == _setToken.manager(), "Must be manager");
 
         _validateManagerParameters(_setToken.getComponents(), _extensions, _assets);
 
         DelegatedManager manager = _deployManager(
             _setToken,
-            _methodologist,
             _extensions,
             _operators,
             _assets
         );
 
-        _setInitializationState(_setToken, address(manager), _owner);
+        _setInitializationState(_setToken, address(manager), _owner, _methodologist);
 
         return address(manager);
     }
@@ -234,15 +241,18 @@ contract DelegatedManagerFactory {
         require(msg.sender == initializeState[_setToken].deployer, "Only deployer can initialize manager");
         _initializeTargets.validatePairsWithArray(_initializeBytecode);
 
+        for (uint256 i = 0; i < _initializeTargets.length; i++) {
+            address target = _initializeTargets[i];
+            require(!controller.isSet(target), "Target must not be SetToken");
+
+            // Because we validate uniqueness of _initializeTargets only one transaction can be sent to each module or extension during this
+            // transaction. Due to this no modules/extension can be used for any SetToken transactions other than initializing these contracts
+            target.functionCallWithValue(_initializeBytecode[i], 0);
+        }
+
         IDelegatedManager manager = initializeState[_setToken].manager;
         manager.updateOwnerFeeSplit(_ownerFeeSplit);
         manager.updateOwnerFeeRecipient(_ownerFeeRecipient);
-
-        for (uint256 i = 0; i < _initializeTargets.length; i++) {
-            // Because we validate uniqueness of _initializeTargets only one transaction can be sent to each module or extension during this
-            // transaction. Due to this no modules/extension can be used for any SetToken transactions other than initializing these contracts
-            _initializeTargets[i].functionCallWithValue(_initializeBytecode[i], 0);
-        }
 
         // If the SetToken was factory-deployed & factory is its current `manager`, transfer
         // managership to the new DelegatedManager
@@ -251,6 +261,7 @@ contract DelegatedManagerFactory {
         }
 
         manager.transferOwnership(initializeState[_setToken].owner);
+        manager.setMethodologist(initializeState[_setToken].methodologist);
 
         delete initializeState[_setToken];
 
@@ -297,7 +308,6 @@ contract DelegatedManagerFactory {
      * Deploys a DelegatedManager
      *
      * @param  _setToken         Instance of SetToken to migrate to the DelegatedManager system
-     * @param  _methodologist    Address to set as the DelegateManager's methodologist role
      * @param  _extensions       List of extensions authorized for the DelegateManager
      * @param  _operators        List of operators authorized for the DelegateManager
      * @param  _assets           List of assets DelegateManager can trade. When empty, asset allow list is not enforced
@@ -306,7 +316,6 @@ contract DelegatedManagerFactory {
      */
     function _deployManager(
         ISetToken _setToken,
-        address _methodologist,
         address[] memory _extensions,
         address[] memory _operators,
         address[] memory _assets
@@ -321,7 +330,7 @@ contract DelegatedManagerFactory {
         DelegatedManager newManager = new DelegatedManager(
             _setToken,
             address(this),
-            _methodologist,
+            address(this),
             _extensions,
             _operators,
             _assets,
@@ -347,15 +356,18 @@ contract DelegatedManagerFactory {
      * @param  _setToken         Instance of SetToken
      * @param  _manager          Address of DelegatedManager created for SetToken
      * @param  _owner            Address that will be given the `owner` DelegatedManager's role on initialization
+     * @param  _methodologist    Address that will be given the `methodologist` DelegatedManager's role on initialization
      */
     function _setInitializationState(
         ISetToken _setToken,
         address _manager,
-        address _owner
+        address _owner,
+        address _methodologist
     ) internal {
         initializeState[_setToken] = InitializeParams({
             deployer: msg.sender,
             owner: _owner,
+            methodologist: _methodologist,
             manager: IDelegatedManager(_manager),
             isPending: true
         });
