@@ -15,8 +15,13 @@ export default class DeployFactories {
 
   public async deployDelegatedManagerFactory(
     managerCore: Address,
+    controller: Address,
     setTokenFactory: Address
   ): Promise<DelegatedManagerFactory> {
-    return await new DelegatedManagerFactory__factory(this._deployerSigner).deploy(managerCore, setTokenFactory);
+    return await new DelegatedManagerFactory__factory(this._deployerSigner).deploy(
+      managerCore,
+      controller,
+      setTokenFactory
+    );
   }
 }

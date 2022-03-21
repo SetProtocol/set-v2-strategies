@@ -24,6 +24,7 @@ import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISe
 
 import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
 import { DelegatedManager } from "../manager/DelegatedManager.sol";
+import { IController } from "../interfaces/IController.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { ISetTokenCreator } from "../interfaces/ISetTokenCreator.sol";
@@ -80,6 +81,9 @@ contract DelegatedManagerFactory {
     // ManagerCore address
     IManagerCore public immutable managerCore;
 
+    // Controller address
+    IController public immutable controller;
+
     // SetTokenFactory address
     ISetTokenCreator public setTokenFactory;
 
@@ -91,15 +95,18 @@ contract DelegatedManagerFactory {
     /**
      * @dev Sets managerCore and setTokenFactory address.
      * @param _managerCore                      Address of ManagerCore protocol contract
+     * @param _controller                       Address of Controller protocol contract
      * @param _setTokenFactory                  Address of SetTokenFactory protocol contract
      */
     constructor(
         IManagerCore _managerCore,
+        IController _controller,
         ISetTokenCreator _setTokenFactory
-    ) 
-        public 
+    )
+        public
     {
         managerCore = _managerCore;
+        controller = _controller;
         setTokenFactory = _setTokenFactory;
     }
 
@@ -189,6 +196,7 @@ contract DelegatedManagerFactory {
         external
         returns (address)
     {
+        require(controller.isSet(address(_setToken)), "Must be controller-enabled SetToken");
         require(msg.sender == _setToken.manager(), "Must be manager");
 
         _validateManagerParameters(_setToken.getComponents(), _extensions, _assets);
@@ -233,15 +241,18 @@ contract DelegatedManagerFactory {
         require(msg.sender == initializeState[_setToken].deployer, "Only deployer can initialize manager");
         _initializeTargets.validatePairsWithArray(_initializeBytecode);
 
+        for (uint256 i = 0; i < _initializeTargets.length; i++) {
+            address target = _initializeTargets[i];
+            require(!controller.isSet(target), "Target must not be SetToken");
+
+            // Because we validate uniqueness of _initializeTargets only one transaction can be sent to each module or extension during this
+            // transaction. Due to this no modules/extension can be used for any SetToken transactions other than initializing these contracts
+            target.functionCallWithValue(_initializeBytecode[i], 0);
+        }
+
         IDelegatedManager manager = initializeState[_setToken].manager;
         manager.updateOwnerFeeSplit(_ownerFeeSplit);
         manager.updateOwnerFeeRecipient(_ownerFeeRecipient);
-
-        for (uint256 i = 0; i < _initializeTargets.length; i++) {
-            // Because we validate uniqueness of _initializeTargets only one transaction can be sent to each module or extension during this
-            // transaction. Due to this no modules/extension can be used for any SetToken transactions other than initializing these contracts
-            _initializeTargets[i].functionCallWithValue(_initializeBytecode[i], 0);
-        }
 
         // If the SetToken was factory-deployed & factory is its current `manager`, transfer
         // managership to the new DelegatedManager
