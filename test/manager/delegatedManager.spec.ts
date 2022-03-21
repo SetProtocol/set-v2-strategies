@@ -744,6 +744,16 @@ describe("DelegatedManager", () => {
         await expect(subject()).to.be.revertedWith("Must be methodologist");
       });
     });
+
+    describe("when passed methodologist is the zero address", async () => {
+      beforeEach(async () => {
+        subjectNewMethodologist = ADDRESS_ZERO;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Null address passed");
+      });
+    });
   });
 
   describe("#updateOwnerFeeSplit", async () => {

@@ -355,6 +355,8 @@ contract DelegatedManager is Ownable, MutualUpgradeV2 {
      * @param _newMethodologist           New methodologist address
      */
     function setMethodologist(address _newMethodologist) external onlyMethodologist {
+        require(_newMethodologist != address(0), "Null address passed");
+
         methodologist = _newMethodologist;
 
         emit MethodologistChanged(_newMethodologist);

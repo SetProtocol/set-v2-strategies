@@ -44,9 +44,9 @@ abstract contract BaseGlobalExtension {
     /* ============ State Variables ============ */
 
     // Address of the ManagerCore
-    IManagerCore public managerCore;
+    IManagerCore public immutable managerCore;
 
-    // Mapping from Set Token to DelegatedManager 
+    // Mapping from Set Token to DelegatedManager
     mapping(ISetToken => IDelegatedManager) public setManagers;
 
     /* ============ Modifiers ============ */

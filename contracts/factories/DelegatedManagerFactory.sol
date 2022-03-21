@@ -85,7 +85,7 @@ contract DelegatedManagerFactory {
     IController public immutable controller;
 
     // SetTokenFactory address
-    ISetTokenCreator public setTokenFactory;
+    ISetTokenCreator public immutable setTokenFactory;
 
     // Mapping which stores manager creation metadata between creation and initialization steps
     mapping(ISetToken=>InitializeParams) public initializeState;
