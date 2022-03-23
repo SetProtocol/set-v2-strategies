@@ -26,13 +26,15 @@ import { AddressArrayUtils } from "./lib/AddressArrayUtils.sol";
  * @title ManagerCore
  * @author Set Protocol
  *
- *  Registry for governance approved DelegatedManagerFactories and DelegatedManagers.
+ *  Registry for governance approved GlobalExtensions, DelegatedManagerFactories, and DelegatedManagers.
  */
 contract ManagerCore is Ownable {
     using AddressArrayUtils for address[];
 
     /* ============ Events ============ */
 
+    event ExtensionAdded(address indexed _extension);
+    event ExtensionRemoved(address indexed _extension);
     event FactoryAdded(address indexed _factory);
     event FactoryRemoved(address indexed _factory);
     event ManagerAdded(address indexed _manager, address indexed _factory);
@@ -55,14 +57,18 @@ contract ManagerCore is Ownable {
 
     /* ============ State Variables ============ */
 
-    // List of enabled managers
-    address[] public managers;
+    // List of enabled extensions
+    address[] public extensions;
     // List of enabled factories of managers
     address[] public factories;
+    // List of enabled managers
+    address[] public managers;
 
-    // Mapping to check whether address is valid Manager or Factory
-    mapping(address => bool) public isManager;
+    // Mapping to check whether address is valid Extension, Factory, or Manager
+    mapping(address => bool) public isExtension;
     mapping(address => bool) public isFactory;
+    mapping(address => bool) public isManager;
+
 
     // Return true if the ManagerCore is initialized
     bool public isInitialized;
@@ -97,33 +103,33 @@ contract ManagerCore is Ownable {
     }
 
     /**
-     * PRIVILEGED FACTORY FUNCTION. Adds a newly deployed manager as an enabled manager.
+     * PRIVILEGED GOVERNANCE FUNCTION. Allows governance to add an extension
      *
-     * @param _manager               Address of the manager contract to add
+     * @param _extension               Address of the extension contract to add
      */
-    function addManager(address _manager) external onlyInitialized onlyFactory {
-        require(!isManager[_manager], "Manager already exists");
+    function addExtension(address _extension) external onlyInitialized onlyOwner {
+        require(!isExtension[_extension], "Extension already exists");
 
-        isManager[_manager] = true;
+        isExtension[_extension] = true;
 
-        managers.push(_manager);
+        extensions.push(_extension);
 
-        emit ManagerAdded(_manager, msg.sender);
+        emit ExtensionAdded(_extension);
     }
 
     /**
-     * PRIVILEGED GOVERNANCE FUNCTION. Allows governance to remove a manager
+     * PRIVILEGED GOVERNANCE FUNCTION. Allows governance to remove an extension
      *
-     * @param _manager               Address of the manager contract to remove
+     * @param _extension               Address of the extension contract to remove
      */
-    function removeManager(address _manager) external onlyInitialized onlyOwner {
-        require(isManager[_manager], "Manager does not exist");
+    function removeExtension(address _extension) external onlyInitialized onlyOwner {
+        require(isExtension[_extension], "Extension does not exist");
 
-        managers.removeStorage(_manager);
+        extensions.removeStorage(_extension);
 
-        isManager[_manager] = false;
+        isExtension[_extension] = false;
 
-        emit ManagerRemoved(_manager);
+        emit ExtensionRemoved(_extension);
     }
 
     /**
@@ -156,13 +162,47 @@ contract ManagerCore is Ownable {
         emit FactoryRemoved(_factory);
     }
 
+    /**
+     * PRIVILEGED FACTORY FUNCTION. Adds a newly deployed manager as an enabled manager.
+     *
+     * @param _manager               Address of the manager contract to add
+     */
+    function addManager(address _manager) external onlyInitialized onlyFactory {
+        require(!isManager[_manager], "Manager already exists");
+
+        isManager[_manager] = true;
+
+        managers.push(_manager);
+
+        emit ManagerAdded(_manager, msg.sender);
+    }
+
+    /**
+     * PRIVILEGED GOVERNANCE FUNCTION. Allows governance to remove a manager
+     *
+     * @param _manager               Address of the manager contract to remove
+     */
+    function removeManager(address _manager) external onlyInitialized onlyOwner {
+        require(isManager[_manager], "Manager does not exist");
+
+        managers.removeStorage(_manager);
+
+        isManager[_manager] = false;
+
+        emit ManagerRemoved(_manager);
+    }
+
     /* ============ External Getter Functions ============ */
 
-    function getManagers() external view returns (address[] memory) {
-        return managers;
+    function getExtensions() external view returns (address[] memory) {
+        return extensions;
     }
 
     function getFactories() external view returns (address[] memory) {
         return factories;
+    }
+
+    function getManagers() external view returns (address[] memory) {
+        return managers;
     }
 }

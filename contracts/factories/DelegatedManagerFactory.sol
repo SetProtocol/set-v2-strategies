@@ -220,34 +220,32 @@ contract DelegatedManagerFactory {
      * NOTE: When migrating to this manager system from an existing SetToken, the SetToken's current manager address
      * must be reset to point at the newly deployed DelegatedManager contract in a separate, final transaction.
      *
-     * NOTE: Modules must be passed before corresponding extensions in _initializeTargets otherwise initializeExtension will revert.
-     *
      * @param  _setToken                Instance of the SetToken
      * @param  _ownerFeeSplit           Percent of fees in precise units (10^16 = 1%) sent to operator, rest to methodologist
      * @param  _ownerFeeRecipient       Address which receives owner's share of fees when they're distributed
-     * @param  _initializeTargets       List of addresses of any extensions or modules which need to be initialized
+     * @param  _extensions              List of addresses of extensions which need to be initialized
      * @param  _initializeBytecode      List of bytecode encoded calls to relevant target's initialize function
      */
     function initialize(
         ISetToken _setToken,
         uint256 _ownerFeeSplit,
         address _ownerFeeRecipient,
-        address[] memory _initializeTargets,
+        address[] memory _extensions,
         bytes[] memory _initializeBytecode
     )
         external
     {
         require(initializeState[_setToken].isPending, "Manager must be awaiting initialization");
         require(msg.sender == initializeState[_setToken].deployer, "Only deployer can initialize manager");
-        _initializeTargets.validatePairsWithArray(_initializeBytecode);
+        _extensions.validatePairsWithArray(_initializeBytecode);
 
-        for (uint256 i = 0; i < _initializeTargets.length; i++) {
-            address target = _initializeTargets[i];
-            require(!controller.isSet(target), "Target must not be SetToken");
+        for (uint256 i = 0; i < _extensions.length; i++) {
+            address extension = _extensions[i];
+            require(managerCore.isExtension(extension), "Target must be ManagerCore-enabled Extension");
 
-            // Because we validate uniqueness of _initializeTargets only one transaction can be sent to each module or extension during this
-            // transaction. Due to this no modules/extension can be used for any SetToken transactions other than initializing these contracts
-            target.functionCallWithValue(_initializeBytecode[i], 0);
+            // Because we validate uniqueness of _extensions only one transaction can be sent to each extension during this
+            // transaction. Due to this no extension can be used for any SetToken transactions other than initializing these contracts
+            extension.functionCallWithValue(_initializeBytecode[i], 0);
         }
 
         IDelegatedManager manager = initializeState[_setToken].manager;

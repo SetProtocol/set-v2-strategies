@@ -41,6 +41,7 @@ describe("BaseGlobalExtension", () => {
   let managerCore: ManagerCore;
   let delegatedManager: DelegatedManager;
   let baseExtensionMock: BaseGlobalExtensionMock;
+  let mockModule: Account;
 
   before(async () => {
     [
@@ -49,6 +50,7 @@ describe("BaseGlobalExtension", () => {
       otherAccount,
       factory,
       operator,
+      mockModule,
     ] = await getAccounts();
 
     deployer = new DeployHelper(owner.wallet);
@@ -77,7 +79,7 @@ describe("BaseGlobalExtension", () => {
 
     managerCore = await deployer.managerCore.deployManagerCore();
 
-    baseExtensionMock = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address);
+    baseExtensionMock = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address, mockModule.address);
 
     // Deploy DelegatedManager
     delegatedManager = await deployer.manager.deployDelegatedManager(
