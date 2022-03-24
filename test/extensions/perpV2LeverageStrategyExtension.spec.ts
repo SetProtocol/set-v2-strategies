@@ -14,9 +14,11 @@ import {
 
 import { ADDRESS_ZERO, ZERO, ONE_DAY_IN_SECONDS, TWO } from "../../utils/constants";
 import {
-  PerpV2LeverageModule,
+  PositionV2,
+  PerpV2LibraryV2,
+  PerpV2Positions,
+  PerpV2LeverageModuleV2,
   SetToken,
-  PerpV2,
   SlippageIssuanceModule,
   ContractCallerMock
 } from "@setprotocol/set-protocol-v2/utils/contracts";
@@ -67,10 +69,13 @@ describe("PerpV2LeverageStrategyExtension", () => {
   let basePriceDecimalAdjustment: BigNumber;
 
   let leverageStrategyExtension: PerpV2LeverageStrategyExtension;
-  let perpV2LeverageModule: PerpV2LeverageModule;
-  let perpLib: PerpV2;
+  let positionLib: PositionV2;
+  let perpLib: PerpV2LibraryV2;
+  let perpPositionsLib: PerpV2Positions;
+  let perpV2LeverageModule: PerpV2LeverageModuleV2;
   let issuanceModule: SlippageIssuanceModule;
   let baseManager: BaseManager;
+  let maxPerpPositionsPerSet: BigNumber;
 
   let perpV2PriceFeedMock: PerpV2PriceFeedMock;
 
@@ -116,15 +121,25 @@ describe("PerpV2LeverageStrategyExtension", () => {
       systemSetup.controller.address
     );
 
-    perpLib = await deployer.setDeployer.libraries.deployPerpV2();
-    perpV2LeverageModule = await deployer.setDeployer.modules.deployPerpV2LeverageModule(
+    maxPerpPositionsPerSet = TWO;
+
+    // Deploy libraries
+    positionLib = await deployer.setDeployer.libraries.deployPositionV2();
+    perpLib = await deployer.setDeployer.libraries.deployPerpV2LibraryV2();
+    perpPositionsLib = await deployer.setDeployer.libraries.deployPerpV2Positions();
+
+    perpV2LeverageModule = await deployer.setDeployer.modules.deployPerpV2LeverageModuleV2(
       systemSetup.controller.address,
       perpV2Setup.vault.address,
       perpV2Setup.quoter.address,
       perpV2Setup.marketRegistry.address,
-      BigNumber.from(3),
-      "contracts/protocol/integration/lib/PerpV2.sol:PerpV2",
-      perpLib.address
+      maxPerpPositionsPerSet,
+      "contracts/protocol/lib/PositionV2.sol:PositionV2",
+      positionLib.address,
+      "contracts/protocol/integration/lib/PerpV2LibraryV2.sol:PerpV2LibraryV2",
+      perpLib.address,
+      "contracts/protocol/integration/lib/PerpV2Positions.sol:PerpV2Positions",
+      perpPositionsLib.address,
     );
 
     await systemSetup.controller.addModule(issuanceModule.address);
