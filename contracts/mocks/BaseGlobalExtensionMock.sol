@@ -102,6 +102,9 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
     {}
 
     function removeExtension() external override {
-        _removeExtension();
+        IDelegatedManager delegatedManager = IDelegatedManager(msg.sender);
+        ISetToken setToken = delegatedManager.setToken();
+
+        _removeExtension(setToken, delegatedManager);
     }
 }

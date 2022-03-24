@@ -147,14 +147,11 @@ abstract contract BaseGlobalExtension {
     /**
      * ONLY MANAGER: Internal function to delete SetToken/Manager state from extension
      */
-    function _removeExtension() internal {
-        IDelegatedManager delegatedManager = IDelegatedManager(msg.sender);
-        ISetToken setToken = delegatedManager.setToken();
+    function _removeExtension(ISetToken _setToken, IDelegatedManager _delegatedManager) internal {
+        require(msg.sender == address(_manager(_setToken)), "Must be Manager");
 
-        require(msg.sender == address(_manager(setToken)), "Must be Manager");
+        delete setManagers[_setToken];
 
-        delete setManagers[setToken];
-
-        emit ExtensionRemoved(address(setToken), address(delegatedManager));
+        emit ExtensionRemoved(address(_setToken), address(_delegatedManager));
     }
 }
