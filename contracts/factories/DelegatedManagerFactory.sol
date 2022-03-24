@@ -221,7 +221,7 @@ contract DelegatedManagerFactory {
      * must be reset to point at the newly deployed DelegatedManager contract in a separate, final transaction.
      *
      * @param  _setToken                Instance of the SetToken
-     * @param  _ownerFeeSplit           Percent of fees in precise units (10^16 = 1%) sent to operator, rest to methodologist
+     * @param  _ownerFeeSplit           Percent of fees in precise units (10^16 = 1%) sent to owner, rest to methodologist
      * @param  _ownerFeeRecipient       Address which receives owner's share of fees when they're distributed
      * @param  _extensions              List of addresses of extensions which need to be initialized
      * @param  _initializeBytecode      List of bytecode encoded calls to relevant target's initialize function
@@ -256,11 +256,13 @@ contract DelegatedManagerFactory {
             extension.functionCallWithValue(_initializeBytecode[i], 0);
         }
 
-        manager.updateOwnerFeeSplit(_ownerFeeSplit);
-        manager.updateOwnerFeeRecipient(_ownerFeeRecipient);
-
-        manager.transferOwnership(initializeState[_setToken].owner);
-        manager.setMethodologist(initializeState[_setToken].methodologist);
+        _setManagerState(
+            manager,
+            initializeState[_setToken].owner,
+            initializeState[_setToken].methodologist,
+            _ownerFeeSplit,
+            _ownerFeeRecipient
+        );
 
         delete initializeState[_setToken];
 
@@ -304,7 +306,8 @@ contract DelegatedManagerFactory {
     }
 
     /**
-     * Deploys a DelegatedManager
+     * Deploys a DelegatedManager. Sets owner and methodologist roles to address(this) and the resulting manager address is
+     * saved to the ManagerCore.
      *
      * @param  _setToken         Instance of SetToken to migrate to the DelegatedManager system
      * @param  _extensions       List of extensions authorized for the DelegateManager
@@ -370,6 +373,29 @@ contract DelegatedManagerFactory {
             manager: IDelegatedManager(_manager),
             isPending: true
         });
+    }
+
+    /**
+     * Initialize fee settings on DelegatedManager and transfer `owner` and `methodologist` roles.
+     *
+     * @param  _manager                 Instance of DelegatedManager
+     * @param  _owner                   Address that will be given the `owner` DelegatedManager's role
+     * @param  _methodologist           Address that will be given the `methodologist` DelegatedManager's role
+     * @param  _ownerFeeSplit           Percent of fees in precise units (10^16 = 1%) sent to owner, rest to methodologist
+     * @param  _ownerFeeRecipient       Address which receives owner's share of fees when they're distributed
+     */
+    function _setManagerState(
+        IDelegatedManager _manager,
+        address _owner,
+        address _methodologist,
+        uint256 _ownerFeeSplit,
+        address _ownerFeeRecipient
+    ) internal {
+        _manager.updateOwnerFeeSplit(_ownerFeeSplit);
+        _manager.updateOwnerFeeRecipient(_ownerFeeRecipient);
+
+        _manager.transferOwnership(_owner);
+        _manager.setMethodologist(_methodologist);
     }
 
     /**
