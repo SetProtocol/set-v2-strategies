@@ -96,7 +96,7 @@ describe("TradeExtension", () => {
 
     await setToken.setManager(delegatedManager.address);
 
-    await managerCore.initialize([factory.address]);
+    await managerCore.initialize([tradeExtension.address], [factory.address]);
     await managerCore.connect(factory.wallet).addManager(delegatedManager.address);
   });
 

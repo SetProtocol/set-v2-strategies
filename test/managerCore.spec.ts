@@ -4,7 +4,8 @@ import { Account, Address } from "@utils/types";
 import { ADDRESS_ZERO } from "@utils/constants";
 import {
   DelegatedManagerFactory,
-  ManagerCore
+  ManagerCore,
+  BaseGlobalExtensionMock
 } from "@utils/contracts/index";
 import DeployHelper from "@utils/deploys";
 import {
@@ -28,12 +29,13 @@ describe("ManagerCore", () => {
 
   let managerCore: ManagerCore;
   let delegatedManagerFactory: DelegatedManagerFactory;
+  let mockExtension: BaseGlobalExtensionMock;
 
   before(async () => {
     [
       owner,
       mockDelegatedManagerFactory,
-      mockManager
+      mockManager,
     ] = await getAccounts();
 
     deployer = new DeployHelper(owner.wallet);
@@ -42,6 +44,8 @@ describe("ManagerCore", () => {
     await setV2Setup.initialize();
 
     managerCore = await deployer.managerCore.deployManagerCore();
+
+    mockExtension = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address);
 
     delegatedManagerFactory = await deployer.factories.deployDelegatedManagerFactory(
       managerCore.address,
@@ -73,16 +77,35 @@ describe("ManagerCore", () => {
 
   describe("#initialize", async () => {
     let subjectCaller: Account;
+    let subjectExtensions: Address[];
     let subjectFactories: Address[];
 
     beforeEach(async () => {
       subjectCaller = owner;
+      subjectExtensions = [mockExtension.address];
       subjectFactories = [delegatedManagerFactory.address];
     });
 
     async function subject(): Promise<any> {
-      return await managerCore.connect(subjectCaller.wallet).initialize(subjectFactories);
+      return await managerCore.connect(subjectCaller.wallet).initialize(
+        subjectExtensions,
+        subjectFactories
+      );
     }
+
+    it("should have set the correct extensions length of 1", async () => {
+      await subject();
+
+      const extensions = await managerCore.getExtensions();
+      expect(extensions.length).to.eq(1);
+    });
+
+    it("should have a valid extension", async () => {
+      await subject();
+
+      const validExtension = await managerCore.isExtension(mockExtension.address);
+      expect(validExtension).to.eq(true);
+    });
 
     it("should have set the correct factories length of 1", async () => {
       await subject();
@@ -142,7 +165,7 @@ describe("ManagerCore", () => {
     let subjectCaller: Account;
 
     beforeEach(async () => {
-      managerCore.initialize([]);
+      managerCore.initialize([], []);
       managerCore.addFactory(mockDelegatedManagerFactory.address);
 
       subjectManagerCore = managerCore;
@@ -210,7 +233,7 @@ describe("ManagerCore", () => {
     let subjectCaller: Account;
 
     beforeEach(async () => {
-      await managerCore.initialize([]);
+      await managerCore.initialize([], []);
       await managerCore.addFactory(mockDelegatedManagerFactory.address);
       await managerCore.connect(mockDelegatedManagerFactory.wallet).addManager(mockManager.address);
 
@@ -278,7 +301,7 @@ describe("ManagerCore", () => {
     let subjectManagerCore: ManagerCore;
 
     beforeEach(async () => {
-      await managerCore.initialize([]);
+      await managerCore.initialize([], []);
 
       subjectFactory = delegatedManagerFactory.address;
       subjectCaller = owner;
@@ -344,7 +367,7 @@ describe("ManagerCore", () => {
     let subjectManagerCore: ManagerCore;
 
     beforeEach(async () => {
-      await managerCore.initialize([delegatedManagerFactory.address]);
+      await managerCore.initialize([], [delegatedManagerFactory.address]);
 
       subjectFactory = delegatedManagerFactory.address;
       subjectCaller = owner;
@@ -400,6 +423,138 @@ describe("ManagerCore", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Factory does not exist");
+      });
+    });
+  });
+
+  describe("#addExtension", async () => {
+    let subjectExtension: Address;
+    let subjectCaller: Account;
+    let subjectManagerCore: ManagerCore;
+
+    beforeEach(async () => {
+      await managerCore.initialize([], []);
+
+      subjectExtension = mockExtension.address;
+      subjectCaller = owner;
+      subjectManagerCore = managerCore;
+    });
+
+    async function subject(): Promise<any> {
+      return await subjectManagerCore.connect(subjectCaller.wallet).addExtension(subjectExtension);
+    }
+
+    it("should be stored in the extensions array", async () => {
+      await subject();
+
+      const extensions = await managerCore.getExtensions();
+      expect(extensions.length).to.eq(1);
+    });
+
+    it("should be returned as a valid extension", async () => {
+      await subject();
+
+      const validExtension = await managerCore.isExtension(mockExtension.address);
+      expect(validExtension).to.eq(true);
+    });
+
+    it("should emit the ExtensionAdded event", async () => {
+      await expect(subject()).to.emit(managerCore, "ExtensionAdded").withArgs(subjectExtension);
+    });
+
+    describe("when the ManagerCore is not initialized", async () => {
+      beforeEach(async () => {
+        subjectManagerCore = await deployer.managerCore.deployManagerCore();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Contract must be initialized.");
+      });
+    });
+
+    describe("when the sender is not the owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+    });
+
+    describe("when the extension already exists", async () => {
+      beforeEach(async () => {
+        await subject();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Extension already exists");
+      });
+    });
+  });
+
+  describe("#removeExtension", async () => {
+    let subjectExtension: Address;
+    let subjectCaller: Account;
+    let subjectManagerCore: ManagerCore;
+
+    beforeEach(async () => {
+      await managerCore.initialize([mockExtension.address], []);
+
+      subjectExtension = mockExtension.address;
+      subjectCaller = owner;
+      subjectManagerCore = managerCore;
+    });
+
+    async function subject(): Promise<any> {
+      return await subjectManagerCore.connect(subjectCaller.wallet).removeExtension(subjectExtension);
+    }
+
+    it("should remove extension from extensions array", async () => {
+      await subject();
+
+      const extensions = await managerCore.getExtensions();
+      expect(extensions.length).to.eq(0);
+    });
+
+    it("should return false as a valid extension", async () => {
+      await subject();
+
+      const validExtension = await managerCore.isExtension(mockExtension.address);
+      expect(validExtension).to.eq(false);
+    });
+
+    it("should emit the ExtensionRemoved event", async () => {
+      await expect(subject()).to.emit(managerCore, "ExtensionRemoved").withArgs(subjectExtension);
+    });
+
+    describe("when the ManagerCore is not initialized", async () => {
+      beforeEach(async () => {
+        subjectManagerCore = await deployer.managerCore.deployManagerCore();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Contract must be initialized.");
+      });
+    });
+
+    describe("when the sender is not the owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+    });
+
+    describe("when the extension does not exist", async () => {
+      beforeEach(async () => {
+        await subject();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Extension does not exist");
       });
     });
   });

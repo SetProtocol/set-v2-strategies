@@ -74,7 +74,7 @@ describe("DelegatedManagerFactory", () => {
       setV2Setup.factory.address
     );
 
-    await managerCore.initialize([delegatedManagerFactory.address]);
+    await managerCore.initialize([mockFeeExtension.address, mockIssuanceExtension.address], [delegatedManagerFactory.address]);
   });
 
   // Helper function to run a setup execution of either `createSetAndManager` or `createManager`
