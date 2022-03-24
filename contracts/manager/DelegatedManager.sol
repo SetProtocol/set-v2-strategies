@@ -175,6 +175,7 @@ contract DelegatedManager is Ownable, MutualUpgradeV2 {
         factory = _factory;
         methodologist = _methodologist;
         useAssetAllowlist = _useAssetAllowlist;
+        emit UseAssetAllowlistUpdated(_useAssetAllowlist);
 
         _addExtensions(_extensions);
         _addOperators(_operators);
