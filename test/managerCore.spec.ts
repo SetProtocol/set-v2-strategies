@@ -79,16 +79,35 @@ describe("ManagerCore", () => {
 
   describe("#initialize", async () => {
     let subjectCaller: Account;
+    let subjectExtensions: Address[];
     let subjectFactories: Address[];
 
     beforeEach(async () => {
       subjectCaller = owner;
+      subjectExtensions = [mockExtension.address];
       subjectFactories = [delegatedManagerFactory.address];
     });
 
     async function subject(): Promise<any> {
-      return await managerCore.connect(subjectCaller.wallet).initialize(subjectFactories);
+      return await managerCore.connect(subjectCaller.wallet).initialize(
+        subjectExtensions,
+        subjectFactories
+      );
     }
+
+    it("should have set the correct extensions length of 1", async () => {
+      await subject();
+
+      const extensions = await managerCore.getExtensions();
+      expect(extensions.length).to.eq(1);
+    });
+
+    it("should have a valid extension", async () => {
+      await subject();
+
+      const validExtension = await managerCore.isExtension(mockExtension.address);
+      expect(validExtension).to.eq(true);
+    });
 
     it("should have set the correct factories length of 1", async () => {
       await subject();
@@ -148,7 +167,7 @@ describe("ManagerCore", () => {
     let subjectCaller: Account;
 
     beforeEach(async () => {
-      managerCore.initialize([]);
+      managerCore.initialize([], []);
       managerCore.addFactory(mockDelegatedManagerFactory.address);
 
       subjectManagerCore = managerCore;
@@ -216,7 +235,7 @@ describe("ManagerCore", () => {
     let subjectCaller: Account;
 
     beforeEach(async () => {
-      await managerCore.initialize([]);
+      await managerCore.initialize([], []);
       await managerCore.addFactory(mockDelegatedManagerFactory.address);
       await managerCore.connect(mockDelegatedManagerFactory.wallet).addManager(mockManager.address);
 
@@ -284,7 +303,7 @@ describe("ManagerCore", () => {
     let subjectManagerCore: ManagerCore;
 
     beforeEach(async () => {
-      await managerCore.initialize([]);
+      await managerCore.initialize([], []);
 
       subjectFactory = delegatedManagerFactory.address;
       subjectCaller = owner;
@@ -350,7 +369,7 @@ describe("ManagerCore", () => {
     let subjectManagerCore: ManagerCore;
 
     beforeEach(async () => {
-      await managerCore.initialize([delegatedManagerFactory.address]);
+      await managerCore.initialize([], [delegatedManagerFactory.address]);
 
       subjectFactory = delegatedManagerFactory.address;
       subjectCaller = owner;
@@ -416,7 +435,7 @@ describe("ManagerCore", () => {
     let subjectManagerCore: ManagerCore;
 
     beforeEach(async () => {
-      await managerCore.initialize([]);
+      await managerCore.initialize([], []);
 
       subjectExtension = mockExtension.address;
       subjectCaller = owner;
@@ -482,8 +501,7 @@ describe("ManagerCore", () => {
     let subjectManagerCore: ManagerCore;
 
     beforeEach(async () => {
-      await managerCore.initialize([]);
-      await managerCore.addExtension(mockExtension.address);
+      await managerCore.initialize([mockExtension.address], []);
 
       subjectExtension = mockExtension.address;
       subjectCaller = owner;

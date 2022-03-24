@@ -95,7 +95,7 @@ describe("DelegatedManager", () => {
     // Transfer ownership to DelegatedManager
     await setToken.setManager(delegatedManager.address);
 
-    await managerCore.initialize([factory.address]);
+    await managerCore.initialize([baseExtension.address], [factory.address]);
     await managerCore.connect(factory.wallet).addManager(delegatedManager.address);
   });
 

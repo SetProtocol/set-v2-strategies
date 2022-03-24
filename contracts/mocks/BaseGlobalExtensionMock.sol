@@ -21,9 +21,9 @@ pragma solidity 0.6.10;
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
-import { ModuleMock } from "./ModuleMock.sol";
-import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
+import { IManagerCore } from "../interfaces/IManagerCore.sol";
+import { ModuleMock } from "./ModuleMock.sol";
 
 contract BaseGlobalExtensionMock is BaseGlobalExtension {
 
@@ -67,6 +67,7 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
         ISetToken setToken = _delegatedManager.setToken();
 
         _initializeExtension(setToken, _delegatedManager);
+
         bytes memory callData = abi.encodeWithSignature("initialize(address)", setToken);
         _invokeManager(_delegatedManager, address(module), callData);
     }

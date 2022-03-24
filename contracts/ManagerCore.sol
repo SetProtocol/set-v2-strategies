@@ -79,9 +79,11 @@ contract ManagerCore is Ownable {
      * Initializes any predeployed factories. Note: This function can only be called by
      * the owner once to batch initialize the initial system contracts.
      *
+     * @param _extensions            List of extensions to add
      * @param _factories             List of factories to add
      */
     function initialize(
+        address[] memory _extensions,
         address[] memory _factories
     )
         external
@@ -89,9 +91,15 @@ contract ManagerCore is Ownable {
     {
         require(!isInitialized, "ManagerCore is already initialized");
 
+        extensions = _extensions;
         factories = _factories;
 
-        // Loop through and initialize isFactory mapping
+        // Loop through and initialize isExtension and isFactory mapping
+        for (uint256 i = 0; i < _extensions.length; i++) {
+            address extension = _extensions[i];
+            require(extension != address(0), "Zero address submitted.");
+            isExtension[extension] = true;
+        }
         for (uint256 i = 0; i < _factories.length; i++) {
             address factory = _factories[i];
             require(factory != address(0), "Zero address submitted.");

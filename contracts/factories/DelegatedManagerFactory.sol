@@ -239,6 +239,14 @@ contract DelegatedManagerFactory {
         require(msg.sender == initializeState[_setToken].deployer, "Only deployer can initialize manager");
         _extensions.validatePairsWithArray(_initializeBytecode);
 
+        IDelegatedManager manager = initializeState[_setToken].manager;
+
+        // If the SetToken was factory-deployed & factory is its current `manager`, transfer
+        // managership to the new DelegatedManager
+        if (_setToken.manager() == address(this)) {
+            _setToken.setManager(address(manager));
+        }
+
         for (uint256 i = 0; i < _extensions.length; i++) {
             address extension = _extensions[i];
             require(managerCore.isExtension(extension), "Target must be ManagerCore-enabled Extension");
@@ -248,15 +256,8 @@ contract DelegatedManagerFactory {
             extension.functionCallWithValue(_initializeBytecode[i], 0);
         }
 
-        IDelegatedManager manager = initializeState[_setToken].manager;
         manager.updateOwnerFeeSplit(_ownerFeeSplit);
         manager.updateOwnerFeeRecipient(_ownerFeeRecipient);
-
-        // If the SetToken was factory-deployed & factory is its current `manager`, transfer
-        // managership to the new DelegatedManager
-        if (_setToken.manager() == address(this)) {
-            _setToken.setManager(address(manager));
-        }
 
         manager.transferOwnership(initializeState[_setToken].owner);
         manager.setMethodologist(initializeState[_setToken].methodologist);

@@ -7,7 +7,8 @@ import {
   DelegatedManagerFactory,
   DelegatedManager,
   BaseGlobalExtensionMock,
-  ManagerCore
+  ManagerCore,
+  ModuleMock,
 } from "@utils/contracts/index";
 import DeployHelper from "@utils/deploys";
 import {
@@ -15,7 +16,6 @@ import {
   ether,
   getAccounts,
   getWaffleExpect,
-  getRandomAddress,
 } from "@utils/index";
 
 import { ProtocolUtils } from "@utils/common";
@@ -47,6 +47,8 @@ describe("DelegatedManagerFactory", () => {
   let delegatedManagerFactory: DelegatedManagerFactory;
   let mockFeeExtension: BaseGlobalExtensionMock;
   let mockIssuanceExtension: BaseGlobalExtensionMock;
+  let mockFeeModule: ModuleMock;
+  let mockIssuanceModule: ModuleMock;
 
   cacheBeforeEach(async () => {
     [
@@ -63,10 +65,15 @@ describe("DelegatedManagerFactory", () => {
     setV2Setup = getSystemFixture(owner.address);
     await setV2Setup.initialize();
 
+    mockFeeModule = await deployer.mocks.deployModuleMock(setV2Setup.controller.address);
+    mockIssuanceModule = await deployer.mocks.deployModuleMock(setV2Setup.controller.address);
+    await setV2Setup.controller.addModule(mockFeeModule.address);
+    await setV2Setup.controller.addModule(mockIssuanceModule.address);
+
     managerCore = await deployer.managerCore.deployManagerCore();
 
-    mockFeeExtension = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address);
-    mockIssuanceExtension = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address);
+    mockFeeExtension = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address, mockFeeModule.address);
+    mockIssuanceExtension = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address, mockIssuanceModule.address);
 
     delegatedManagerFactory = await deployer.factories.deployDelegatedManagerFactory(
       managerCore.address,
@@ -74,15 +81,20 @@ describe("DelegatedManagerFactory", () => {
       setV2Setup.factory.address
     );
 
-    await managerCore.initialize([delegatedManagerFactory.address]);
+    await managerCore.initialize(
+      [mockFeeExtension.address, mockIssuanceExtension.address],
+      [delegatedManagerFactory.address]
+    );
   });
 
   // Helper function to run a setup execution of either `createSetAndManager` or `createManager`
-  async function create(module: Address, extension: Address, existingSetToken?: Address): Promise<ContractTransaction> {
+  async function create(existingSetToken?: Address): Promise<ContractTransaction> {
     const tokens = [setV2Setup.dai.address, setV2Setup.wbtc.address];
     const operators = [operatorOne.address, operatorTwo.address];
     const otherAccountAddress = otherAccount.address;
     const methodologistAddress = methodologist.address;
+    const modules = [mockFeeModule.address, mockIssuanceModule.address];
+    const extensions = [mockFeeExtension.address, mockIssuanceExtension.address];
 
     if (existingSetToken === undefined) {
       return await delegatedManagerFactory.createSetAndManager(
@@ -92,10 +104,10 @@ describe("DelegatedManagerFactory", () => {
         "TT",
         otherAccountAddress,
         methodologistAddress,
-        [module],
+        modules,
         operators,
         tokens,
-        [extension]
+        extensions
       );
     }
 
@@ -105,22 +117,27 @@ describe("DelegatedManagerFactory", () => {
       methodologistAddress,
       operators,
       tokens,
-      [extension]
+      extensions
     );
   }
 
   // Helper function to generate bytecode packets for factory initialization call
-  async function generateBytecode(setToken: Address, manager: Address): Promise<string[]> {
-    const moduleBytecode = setV2Setup.issuanceModule.interface.encodeFunctionData("initialize", [
-      setToken,
-      await getRandomAddress()
-    ]);
-
-    const extensionBytecode = mockIssuanceExtension.interface.encodeFunctionData("initializeExtension", [
+  async function generateBytecode(manager: Address, issuanceModuleInitialzied: Boolean): Promise<string[]> {
+    const feeExtensionBytecode = mockFeeExtension.interface.encodeFunctionData("initializeModuleAndExtension", [
       manager
     ]);
 
-    return [moduleBytecode, extensionBytecode];
+    if (issuanceModuleInitialzied) {
+      const issuanceExtensionBytecode = mockIssuanceExtension.interface.encodeFunctionData("initializeExtension", [
+        manager
+      ]);
+      return [feeExtensionBytecode, issuanceExtensionBytecode];
+    } else {
+      const issuanceExtensionBytecode = mockIssuanceExtension.interface.encodeFunctionData("initializeModuleAndExtension", [
+        manager
+      ]);
+      return [feeExtensionBytecode, issuanceExtensionBytecode];
+    }
   }
 
   describe("#constructor", async () => {
@@ -551,8 +568,6 @@ describe("DelegatedManagerFactory", () => {
   });
 
   describe("initialize", () => {
-    let module: Address;
-    let extension: Address;
     let manager: DelegatedManager;
     let initializeParams: any;
     let setToken: SetToken;
@@ -562,15 +577,14 @@ describe("DelegatedManagerFactory", () => {
     let subjectSetToken: Address;
     let subjectOwnerFeeSplit: BigNumber;
     let subjectOwnerFeeRecipient: Address;
-    let subjectInitializeTargets: Address[];
+    let subjectExtensions: Address[];
     let subjectInitializeBytecode: string[];
 
     beforeEach(() => {
       subjectCaller = owner;
       subjectOwnerFeeSplit = ether(.5);
       subjectOwnerFeeRecipient = otherAccount.address;
-      subjectInitializeTargets = [];
-      subjectInitializeBytecode = [];
+      subjectExtensions = [mockFeeExtension.address, mockIssuanceExtension.address];
     });
 
     async function subject(): Promise<ContractTransaction> {
@@ -578,19 +592,16 @@ describe("DelegatedManagerFactory", () => {
         subjectSetToken,
         subjectOwnerFeeSplit,
         subjectOwnerFeeRecipient,
-        subjectInitializeTargets,
+        subjectExtensions,
         subjectInitializeBytecode
       );
     }
 
     describe("when the SetToken was created by the factory", () => {
       cacheBeforeEach(async () => {
-        module = setV2Setup.issuanceModule.address;
-        extension = mockIssuanceExtension.address;
+        const tx = await create();
 
-        const tx = await create(module, extension);
         setTokenAddress = await protocolUtils.getCreatedSetTokenAddress(tx.hash);
-
         initializeParams = await delegatedManagerFactory.initializeState(setTokenAddress);
         manager = await deployer.manager.getDelegatedManager(initializeParams.manager);
         setToken = await deployer.setV2.getSetToken(setTokenAddress);
@@ -599,20 +610,21 @@ describe("DelegatedManagerFactory", () => {
       });
 
       beforeEach(async () => {
-        subjectInitializeTargets = [module, extension];
-        subjectInitializeBytecode = await generateBytecode(setTokenAddress, initializeParams.manager);
+        subjectInitializeBytecode = await generateBytecode(initializeParams.manager, false);
       });
 
-      it("should initialize the module", async() => {
+      it("should initialize the modules", async() => {
         await subject();
 
-        expect(await setToken.moduleStates(module)).eq(MODULE_STATE.INITIALIZED);
+        expect(await setToken.moduleStates(mockFeeModule.address)).eq(MODULE_STATE.INITIALIZED);
+        expect(await setToken.moduleStates(mockIssuanceModule.address)).eq(MODULE_STATE.INITIALIZED);
       });
 
-      it("should initialize the extension", async() => {
+      it("should initialize the extensions", async() => {
         await subject();
 
-        expect(await manager.isInitializedExtension(extension)).eq(true);
+        expect(await manager.isInitializedExtension(mockFeeExtension.address)).eq(true);
+        expect(await manager.isInitializedExtension(mockIssuanceExtension.address)).eq(true);
       });
 
       it("should set the ownerFeeSplit on the DelegatedManager", async() => {
@@ -678,69 +690,42 @@ describe("DelegatedManagerFactory", () => {
           initializeParams.manager
         );
       });
-
-      describe("when the factory is not approved by the ManagerCore", async() => {
-        beforeEach(async () => {
-          await managerCore.connect(owner.wallet).removeManager(manager.address);
-        });
-
-        it("should revert", async() => {
-          await expect(subject()).to.be.revertedWith("Must be ManagerCore-enabled manager");
-        });
-      });
-
-      describe("when a SetToken is in initializeTargets", async() => {
-        beforeEach(async () => {
-          subjectInitializeTargets = [setTokenAddress];
-
-          subjectInitializeBytecode = [setToken.interface.encodeFunctionData(
-            "setManager",
-            [otherAccount.address]
-          )];
-        });
-
-        it("should revert", async() => {
-          await expect(subject()).to.be.revertedWith("Target must not be SetToken");
-        });
-      });
     });
 
     describe("when a SetToken is being migrated to a DelegatedManager", async () => {
       cacheBeforeEach(async () => {
-        module = setV2Setup.issuanceModule.address;
-        extension = mockIssuanceExtension.address;
-
         setToken = await setV2Setup.createSetToken(
           [setV2Setup.dai.address],
           [ether(1)],
-          [setV2Setup.issuanceModule.address]
+          [mockFeeModule.address, mockIssuanceModule.address]
         );
 
-        await create(module, extension, setToken.address);
+        // Initialize only the IssuanceModule, to check ability of factory to handle initializeExtension
+        await mockIssuanceModule.initialize(setToken.address);
+
+        await create(setToken.address);
 
         initializeParams = await delegatedManagerFactory.initializeState(setToken.address);
         manager = await deployer.manager.getDelegatedManager(initializeParams.manager);
-        setToken = await deployer.setV2.getSetToken(setToken.address);
 
         subjectSetToken = setToken.address;
       });
 
       beforeEach(async () => {
-        const extensionBytecode = (await generateBytecode(setToken.address, manager.address))[1];
-        subjectInitializeTargets = [extension];
-        subjectInitializeBytecode = [extensionBytecode];
+        subjectInitializeBytecode = await generateBytecode(initializeParams.manager, true);
       });
 
       it("should initialize the module", async() => {
         await subject();
 
-        expect(await setToken.moduleStates(module)).eq(MODULE_STATE.PENDING);
+        expect(await setToken.moduleStates(mockFeeModule.address)).eq(MODULE_STATE.PENDING);
       });
 
-      it("should initialize the extension", async() => {
+      it("should initialize the extensions", async() => {
         await subject();
 
-        expect(await manager.isInitializedExtension(extension)).eq(true);
+        expect(await manager.isInitializedExtension(mockFeeExtension.address)).eq(true);
+        expect(await manager.isInitializedExtension(mockIssuanceExtension.address)).eq(true);
       });
 
       it("should set the ownerFeeSplit on the DelegatedManager", async() => {
@@ -798,31 +783,6 @@ describe("DelegatedManagerFactory", () => {
         expect(finalInitializeParams.manager).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.isPending).eq(false);
       });
-
-      describe("when the factory is not approved by the ManagerCore", async() => {
-        beforeEach(async () => {
-          await managerCore.connect(owner.wallet).removeManager(manager.address);
-        });
-
-        it("should revert", async() => {
-          await expect(subject()).to.be.revertedWith("Must be ManagerCore-enabled manager");
-        });
-      });
-
-      describe("when a SetToken is in initializeTargets", async() => {
-        beforeEach(async () => {
-          subjectInitializeTargets = [setToken.address];
-
-          subjectInitializeBytecode = [setToken.interface.encodeFunctionData(
-            "setManager",
-            [otherAccount.address]
-          )];
-        });
-
-        it("should revert", async() => {
-          await expect(subject()).to.be.revertedWith("Target must not be SetToken");
-        });
-      });
     });
 
     describe("when the initialization state is not pending", async() => {
@@ -831,9 +791,41 @@ describe("DelegatedManagerFactory", () => {
       });
     });
 
+    describe("when the factory is not approved by the ManagerCore", async() => {
+      beforeEach(async () => {
+        await create();
+
+        await managerCore.connect(owner.wallet).removeManager(manager.address);
+      });
+
+      it("should revert", async() => {
+        await expect(subject()).to.be.revertedWith("Must be ManagerCore-enabled manager");
+      });
+    });
+
+    describe("when an input Extension is not approved by the ManagerCore", async() => {
+      let mockUnapprovedExtension: BaseGlobalExtensionMock;
+
+      beforeEach(async () => {
+        await create();
+
+        mockUnapprovedExtension = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address, mockFeeModule.address);
+        subjectExtensions = [mockUnapprovedExtension.address];
+
+        subjectInitializeBytecode = [mockUnapprovedExtension.interface.encodeFunctionData(
+          "initializeExtension",
+          [manager.address]
+        )];
+      });
+
+      it("should revert", async() => {
+        await expect(subject()).to.be.revertedWith("Target must be ManagerCore-enabled Extension");
+      });
+    });
+
     describe("when the caller is not the deployer", async() => {
       beforeEach(async() => {
-        await create(module, extension);
+        await create();
         subjectCaller = otherAccount;
       });
 
@@ -842,14 +834,14 @@ describe("DelegatedManagerFactory", () => {
       });
     });
 
-    describe("when initializeTargets and initializeBytecodes do not have the same length", async() => {
+    describe("when extensions and initializeBytecodes do not have the same length", async() => {
       beforeEach(async () => {
-        await create(module, extension);
+        await create();
         subjectInitializeBytecode = [];
       });
 
       it("should revert", async() => {
-        await expect(subject()).to.be.revertedWith("Array length must be > 0");
+        await expect(subject()).to.be.revertedWith("Array length mismatch");
       });
     });
   });
