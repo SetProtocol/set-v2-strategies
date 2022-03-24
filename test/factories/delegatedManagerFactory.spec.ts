@@ -16,6 +16,7 @@ import {
   ether,
   getAccounts,
   getWaffleExpect,
+  getRandomAccount,
 } from "@utils/index";
 
 import { ProtocolUtils } from "@utils/common";
@@ -573,7 +574,7 @@ describe("DelegatedManagerFactory", () => {
     });
   });
 
-  describe("initialize", () => {
+  describe("#initialize", () => {
     let manager: DelegatedManager;
     let initializeParams: any;
     let setToken: SetToken;
@@ -827,6 +828,25 @@ describe("DelegatedManagerFactory", () => {
 
       it("should revert", async() => {
         await expect(subject()).to.be.revertedWith("Target must be ManagerCore-enabled Extension");
+      });
+    });
+
+    describe("when an initializeBytecode targets the wrong DelegatedManager", async() => {
+      let otherDelegatedManager: Account;
+
+      beforeEach(async () => {
+        await create();
+        otherDelegatedManager = await getRandomAccount();
+
+        subjectExtensions = [mockFeeExtension.address];
+        subjectInitializeBytecode = [mockFeeExtension.interface.encodeFunctionData(
+          "initializeExtension",
+          [otherDelegatedManager.address]
+        )];
+      });
+
+      it("should revert", async() => {
+        await expect(subject()).to.be.revertedWith("Must target correct DelegatedManager");
       });
     });
 

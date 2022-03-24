@@ -29,6 +29,8 @@ import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { ISetTokenCreator } from "../interfaces/ISetTokenCreator.sol";
 
+import "hardhat/console.sol";
+
 /**
  * @title DelegatedManagerFactory
  * @author Set Protocol
@@ -231,7 +233,7 @@ contract DelegatedManagerFactory {
         uint256 _ownerFeeSplit,
         address _ownerFeeRecipient,
         address[] memory _extensions,
-        bytes[] calldata _initializeBytecode
+        bytes[] memory _initializeBytecode
     )
         external
     {
@@ -251,16 +253,18 @@ contract DelegatedManagerFactory {
             address extension = _extensions[i];
             require(managerCore.isExtension(extension), "Target must be ManagerCore-enabled Extension");
 
-            bytes calldata initializeBytecode = _initializeBytecode[i];
+            bytes memory initializeBytecode = _initializeBytecode[i];
 
-            address inputManager = abi.decode(initializeBytecode[4:37], (address));
+            // Each input initialzieBytecode is a varible length bytes array which consists of a 32 byte prefix for the
+            // length parameter, a 4 byte function selector, a 32 byte DelegatedManager address, and any additional parameters
+            // as shown below:
+            // [32 bytes - length parameter, 4 bytes - function selector, 32 bytes - DelegatedManager address, additional parameters]
+            // It is required that the input DelegatedManager address is the DelegatedManager address corresponding to the caller
+            address inputManager;
+            assembly {
+                inputManager := mload(add(initializeBytecode, 36))
+            }
             require(inputManager == address(manager), "Must target correct DelegatedManager");
-
-            // address firstArg;
-            // assembly {
-            //     firstArg := mload(add(initializeBytecode, 4))
-            // }
-            // require(firstArg == address(manager), "Must target correct DelegatedManager");
 
             // Because we validate uniqueness of _extensions only one transaction can be sent to each extension during this
             // transaction. Due to this no extension can be used for any SetToken transactions other than initializing these contracts

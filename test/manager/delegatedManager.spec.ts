@@ -17,6 +17,7 @@ import {
 import { SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
 import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2/utils/test";
 import { ContractTransaction } from "ethers";
+import { getLastBlockTransaction } from "@utils/test/testingUtils";
 
 const expect = getWaffleExpect();
 
@@ -163,9 +164,11 @@ describe("DelegatedManager", () => {
       expect(isApprovedExtension).to.eq(EXTENSION_STATE["PENDING"]);
     });
 
-    // it("should emit the correct ExtensionAdded events", async () => {
-    //   await expect(subject()).to.emit(delegatedManager, "ExtensionAdded").withArgs(baseExtension.address);
-    // });
+    it("should emit the correct ExtensionAdded events", async () => {
+      const delegatedManager = await subject();
+
+      await expect(getLastBlockTransaction()).to.emit(delegatedManager, "ExtensionAdded").withArgs(baseExtension.address);
+    });
 
     it("should set the correct Operators approvals and arrays", async () => {
       const delegatedManager = await subject();
@@ -179,10 +182,12 @@ describe("DelegatedManager", () => {
       expect(isApprovedOperatorTwo).to.be.true;
     });
 
-    // it("should emit the correct OperatorAdded events", async () => {
-    //   await expect(subject()).to.emit(delegatedManager, "OperatorAdded").withArgs(operatorOne.address);
-    //   await expect(subject()).to.emit(delegatedManager, "OperatorAdded").withArgs(operatorTwo.address);
-    // });
+    it("should emit the correct OperatorAdded events", async () => {
+      const delegatedManager = await subject();
+
+      await expect(getLastBlockTransaction()).to.emit(delegatedManager, "OperatorAdded").withArgs(operatorOne.address);
+      await expect(getLastBlockTransaction()).to.emit(delegatedManager, "OperatorAdded").withArgs(operatorTwo.address);
+    });
 
     it("should set the correct Allowed assets approvals and arrays", async () => {
       const delegatedManager = await subject();
@@ -196,10 +201,12 @@ describe("DelegatedManager", () => {
       expect(isApprovedWETH).to.be.true;
     });
 
-    // it("should emit the correct AllowedAssetAdded events", async () => {
-    //   await expect(subject()).to.emit(delegatedManager, "AllowedAssetAdded").withArgs(setV2Setup.usdc.address);
-    //   await expect(subject()).to.emit(delegatedManager, "AllowedAssetAdded").withArgs(setV2Setup.weth.address);
-    // });
+    it("should emit the correct AllowedAssetAdded events", async () => {
+      const delegatedManager = await subject();
+
+      await expect(getLastBlockTransaction()).to.emit(delegatedManager, "AllowedAssetAdded").withArgs(setV2Setup.usdc.address);
+      await expect(getLastBlockTransaction()).to.emit(delegatedManager, "AllowedAssetAdded").withArgs(setV2Setup.weth.address);
+    });
 
     it("should indicate whether to use the asset allow list", async () => {
       const delegatedManager = await subject();
@@ -209,9 +216,11 @@ describe("DelegatedManager", () => {
       expect(useAllowList).to.be.true;
     });
 
-    // it("should emit the correct UseAssetAllowlistUpdated event", async () => {
-    //   await expect(subject()).to.emit(delegatedManager, "UseAssetAllowlistUpdated").withArgs(true);
-    // });
+    it("should emit the correct UseAssetAllowlistUpdated event", async () => {
+      const delegatedManager = await subject();
+
+      await expect(getLastBlockTransaction()).to.emit(delegatedManager, "UseAssetAllowlistUpdated").withArgs(true);
+    });
   });
 
   describe("#initializeExtension", async () => {
