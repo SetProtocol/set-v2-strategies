@@ -6,9 +6,9 @@ import {
 import { SetToken } from "@setprotocol/set-protocol-v2/typechain/SetToken";
 import { SetToken__factory } from "@setprotocol/set-protocol-v2/dist/typechain/factories/SetToken__factory";
 import { DebtIssuanceModule } from "@setprotocol/set-protocol-v2/typechain/DebtIssuanceModule";
-import { DebtIssuanceModule__factory } from "@setprotocol/set-protocol-v2/typechain/factories/DebtIssuanceModule__factory";
+import { DebtIssuanceModule__factory } from "@setprotocol/set-protocol-v2/dist/typechain/factories/DebtIssuanceModule__factory";
 import { IssuanceModule } from "@setprotocol/set-protocol-v2/typechain/IssuanceModule";
-import { IssuanceModule__factory } from "@setprotocol/set-protocol-v2/typechain/factories/IssuanceModule__factory";
+import { IssuanceModule__factory } from "@setprotocol/set-protocol-v2/dist/typechain/factories/IssuanceModule__factory";
 
 export default class DeploySetV2 {
   private _deployerSigner: Signer;
