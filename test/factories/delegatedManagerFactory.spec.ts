@@ -30,7 +30,7 @@ import { SetToken } from "@setprotocol/set-protocol-v2/utils/contracts";
 
 const expect = getWaffleExpect();
 
-describe("DelegatedManagerFactory", () => {
+describe.only("DelegatedManagerFactory", () => {
   let owner: Account;
   let methodologist: Account;
   let otherAccount: Account;
@@ -688,21 +688,6 @@ describe("DelegatedManagerFactory", () => {
           await expect(subject()).to.be.revertedWith("Must be ManagerCore-enabled manager");
         });
       });
-
-      describe("when a SetToken is in initializeTargets", async() => {
-        beforeEach(async () => {
-          subjectInitializeTargets = [setTokenAddress];
-
-          subjectInitializeBytecode = [setToken.interface.encodeFunctionData(
-            "setManager",
-            [otherAccount.address]
-          )];
-        });
-
-        it("should revert", async() => {
-          await expect(subject()).to.be.revertedWith("Target must not be SetToken");
-        });
-      });
     });
 
     describe("when a SetToken is being migrated to a DelegatedManager", async () => {
@@ -808,21 +793,6 @@ describe("DelegatedManagerFactory", () => {
           await expect(subject()).to.be.revertedWith("Must be ManagerCore-enabled manager");
         });
       });
-
-      describe("when a SetToken is in initializeTargets", async() => {
-        beforeEach(async () => {
-          subjectInitializeTargets = [setToken.address];
-
-          subjectInitializeBytecode = [setToken.interface.encodeFunctionData(
-            "setManager",
-            [otherAccount.address]
-          )];
-        });
-
-        it("should revert", async() => {
-          await expect(subject()).to.be.revertedWith("Target must not be SetToken");
-        });
-      });
     });
 
     describe("when the initialization state is not pending", async() => {
@@ -850,6 +820,58 @@ describe("DelegatedManagerFactory", () => {
 
       it("should revert", async() => {
         await expect(subject()).to.be.revertedWith("Array length must be > 0");
+      });
+    });
+
+    describe.only("when the initializeTargets include a module not tracked on the controller", async() => {
+      beforeEach(async () => {
+        module = setV2Setup.issuanceModule.address;
+        extension = mockIssuanceExtension.address;
+
+        const tx = await create(module, extension);
+        setTokenAddress = await protocolUtils.getCreatedSetTokenAddress(tx.hash);
+
+        initializeParams = await delegatedManagerFactory.initializeState(setTokenAddress);
+        manager = await deployer.manager.getDelegatedManager(initializeParams.manager);
+        setToken = await deployer.setV2.getSetToken(setTokenAddress);
+
+        await setV2Setup.controller.removeModule(module);
+
+        const initializeBytecodes = await generateBytecode(setTokenAddress, initializeParams.manager);
+
+        subjectSetToken = setTokenAddress;
+        subjectInitializeTargets = [module];
+        subjectInitializeBytecode = [initializeBytecodes[0]];
+      });
+
+      it("should revert", async() => {
+        await expect(subject()).to.be.revertedWith("Target must be module or extension");
+      });
+    });
+
+    describe.only("when the initializeTargets include an extension not tracked on the ManagerCore", async() => {
+      beforeEach(async () => {
+        module = setV2Setup.issuanceModule.address;
+        extension = mockIssuanceExtension.address;
+
+        const tx = await create(module, extension);
+        setTokenAddress = await protocolUtils.getCreatedSetTokenAddress(tx.hash);
+
+        initializeParams = await delegatedManagerFactory.initializeState(setTokenAddress);
+        manager = await deployer.manager.getDelegatedManager(initializeParams.manager);
+        setToken = await deployer.setV2.getSetToken(setTokenAddress);
+
+        await managerCore.removeExtension(extension);
+
+        const initializeBytecodes = await generateBytecode(setTokenAddress, initializeParams.manager);
+
+        subjectSetToken = setTokenAddress;
+        subjectInitializeTargets = [extension];
+        subjectInitializeBytecode = [initializeBytecodes[1]];
+      });
+
+      it("should revert", async() => {
+        await expect(subject()).to.be.revertedWith("Target must be module or extension");
       });
     });
   });

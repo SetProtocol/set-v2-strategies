@@ -243,7 +243,7 @@ contract DelegatedManagerFactory {
 
         for (uint256 i = 0; i < _initializeTargets.length; i++) {
             address target = _initializeTargets[i];
-            require(!controller.isSet(target), "Target must not be SetToken");
+            require(controller.isModule(target) || managerCore.isExtension(target), "Target must be module or extension");
 
             // Because we validate uniqueness of _initializeTargets only one transaction can be sent to each module or extension during this
             // transaction. Due to this no modules/extension can be used for any SetToken transactions other than initializing these contracts
