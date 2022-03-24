@@ -122,20 +122,26 @@ describe("DelegatedManagerFactory", () => {
   }
 
   // Helper function to generate bytecode packets for factory initialization call
-  async function generateBytecode(manager: Address, issuanceModuleInitialzied: Boolean): Promise<string[]> {
-    const feeExtensionBytecode = mockFeeExtension.interface.encodeFunctionData("initializeModuleAndExtension", [
-      manager
-    ]);
+  async function generateBytecode(manager: Address, modulesInitialized: Boolean): Promise<string[]> {
+    if (modulesInitialized) {
+      const feeExtensionBytecode = mockFeeExtension.interface.encodeFunctionData("initializeExtension", [
+        manager
+      ]);
 
-    if (issuanceModuleInitialzied) {
       const issuanceExtensionBytecode = mockIssuanceExtension.interface.encodeFunctionData("initializeExtension", [
         manager
       ]);
+
       return [feeExtensionBytecode, issuanceExtensionBytecode];
     } else {
+      const feeExtensionBytecode = mockFeeExtension.interface.encodeFunctionData("initializeModuleAndExtension", [
+        manager
+      ]);
+
       const issuanceExtensionBytecode = mockIssuanceExtension.interface.encodeFunctionData("initializeModuleAndExtension", [
         manager
       ]);
+
       return [feeExtensionBytecode, issuanceExtensionBytecode];
     }
   }
@@ -700,9 +706,6 @@ describe("DelegatedManagerFactory", () => {
           [mockFeeModule.address, mockIssuanceModule.address]
         );
 
-        // Initialize only the IssuanceModule, to check ability of factory to handle initializeExtension
-        await mockIssuanceModule.initialize(setToken.address);
-
         await create(setToken.address);
 
         initializeParams = await delegatedManagerFactory.initializeState(setToken.address);
@@ -713,12 +716,6 @@ describe("DelegatedManagerFactory", () => {
 
       beforeEach(async () => {
         subjectInitializeBytecode = await generateBytecode(initializeParams.manager, true);
-      });
-
-      it("should initialize the module", async() => {
-        await subject();
-
-        expect(await setToken.moduleStates(mockFeeModule.address)).eq(MODULE_STATE.PENDING);
       });
 
       it("should initialize the extensions", async() => {
@@ -782,6 +779,16 @@ describe("DelegatedManagerFactory", () => {
         expect(finalInitializeParams.methodologist).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.manager).eq(ADDRESS_ZERO);
         expect(finalInitializeParams.isPending).eq(false);
+      });
+
+      describe("when the caller tries to initializeModuleAndExtension", async() => {
+        beforeEach(async () => {
+          subjectInitializeBytecode = await generateBytecode(initializeParams.manager, false);
+        });
+
+        it("should revert", async() => {
+          await expect(subject()).to.be.revertedWith("Must be the SetToken manager");
+        });
       });
     });
 
