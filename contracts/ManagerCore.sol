@@ -99,11 +99,13 @@ contract ManagerCore is Ownable {
             address extension = _extensions[i];
             require(extension != address(0), "Zero address submitted.");
             isExtension[extension] = true;
+            emit ExtensionAdded(extension);
         }
         for (uint256 i = 0; i < _factories.length; i++) {
             address factory = _factories[i];
             require(factory != address(0), "Zero address submitted.");
             isFactory[factory] = true;
+            emit FactoryAdded(factory);
         }
 
         // Set to true to only allow initialization once

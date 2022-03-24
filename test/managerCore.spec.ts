@@ -109,6 +109,10 @@ describe("ManagerCore", () => {
       expect(validExtension).to.eq(true);
     });
 
+    it("should emit the ExtensionAdded event", async () => {
+      await expect(subject()).to.emit(managerCore, "ExtensionAdded").withArgs(mockExtension.address);
+    });
+
     it("should have set the correct factories length of 1", async () => {
       await subject();
 
@@ -121,6 +125,10 @@ describe("ManagerCore", () => {
 
       const validFactory = await managerCore.isFactory(delegatedManagerFactory.address);
       expect(validFactory).to.eq(true);
+    });
+
+    it("should emit the FactoryAdded event", async () => {
+      await expect(subject()).to.emit(managerCore, "FactoryAdded").withArgs(delegatedManagerFactory.address);
     });
 
     it("should initialize the ManagerCore", async () => {
@@ -137,6 +145,16 @@ describe("ManagerCore", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+    });
+
+    describe("when zero address passed for extension", async () => {
+      beforeEach(async () => {
+        subjectExtensions = [ADDRESS_ZERO];
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Zero address submitted.");
       });
     });
 
