@@ -231,7 +231,7 @@ contract DelegatedManagerFactory {
         uint256 _ownerFeeSplit,
         address _ownerFeeRecipient,
         address[] memory _extensions,
-        bytes[] memory _initializeBytecode
+        bytes[] calldata _initializeBytecode
     )
         external
     {
@@ -251,9 +251,20 @@ contract DelegatedManagerFactory {
             address extension = _extensions[i];
             require(managerCore.isExtension(extension), "Target must be ManagerCore-enabled Extension");
 
+            bytes calldata initializeBytecode = _initializeBytecode[i];
+
+            address inputManager = abi.decode(initializeBytecode[4:37], (address));
+            require(inputManager == address(manager), "Must target correct DelegatedManager");
+
+            // address firstArg;
+            // assembly {
+            //     firstArg := mload(add(initializeBytecode, 4))
+            // }
+            // require(firstArg == address(manager), "Must target correct DelegatedManager");
+
             // Because we validate uniqueness of _extensions only one transaction can be sent to each extension during this
             // transaction. Due to this no extension can be used for any SetToken transactions other than initializing these contracts
-            extension.functionCallWithValue(_initializeBytecode[i], 0);
+            extension.functionCallWithValue(initializeBytecode, 0);
         }
 
         _setManagerState(
