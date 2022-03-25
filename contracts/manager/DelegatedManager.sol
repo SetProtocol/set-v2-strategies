@@ -1,5 +1,5 @@
 /*
-    Copyright 2021 Set Labs Inc.
+    Copyright 2022 Set Labs Inc.
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -175,6 +175,7 @@ contract DelegatedManager is Ownable, MutualUpgradeV2 {
         factory = _factory;
         methodologist = _methodologist;
         useAssetAllowlist = _useAssetAllowlist;
+        emit UseAssetAllowlistUpdated(_useAssetAllowlist);
 
         _addExtensions(_extensions);
         _addOperators(_operators);
@@ -234,7 +235,7 @@ contract DelegatedManager is Ownable, MutualUpgradeV2 {
     }
 
     /**
-     * ONLY OWNER: Remove an existing extension(s) tracked by the DelegatedManager. Removed extensions are
+     * ONLY OWNER: Remove existing extension(s) tracked by the DelegatedManager. Removed extensions are
      * placed in NONE state.
      *
      * @param _extensions           Old extension to remove
@@ -383,7 +384,7 @@ contract DelegatedManager is Ownable, MutualUpgradeV2 {
     }
 
     /**
-     * ONLY OWNER: Remove a new module from the SetToken.
+     * ONLY OWNER: Remove a module from the SetToken.
      *
      * @param _module           Module to remove
      */

@@ -1,5 +1,5 @@
 /*
-    Copyright 2021 Set Labs Inc.
+    Copyright 2022 Set Labs Inc.
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { IManagerCore } from "../interfaces/IManagerCore.sol";
 
 /**
- * @title BaseExtension
+ * @title BaseGlobalExtension
  * @author Set Protocol
  *
  * Abstract class that houses common global extension-related functions. Global extensions must
@@ -147,14 +147,11 @@ abstract contract BaseGlobalExtension {
     /**
      * ONLY MANAGER: Internal function to delete SetToken/Manager state from extension
      */
-    function _removeExtension() internal {
-        IDelegatedManager delegatedManager = IDelegatedManager(msg.sender);
-        ISetToken setToken = delegatedManager.setToken();
+    function _removeExtension(ISetToken _setToken, IDelegatedManager _delegatedManager) internal {
+        require(msg.sender == address(_manager(_setToken)), "Must be Manager");
 
-        require(msg.sender == address(_manager(setToken)), "Must be Manager");
+        delete setManagers[_setToken];
 
-        delete setManagers[setToken];
-
-        emit ExtensionRemoved(address(setToken), address(delegatedManager));
+        emit ExtensionRemoved(address(_setToken), address(_delegatedManager));
     }
 }

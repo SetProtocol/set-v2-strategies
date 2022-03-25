@@ -99,10 +99,13 @@ contract TradeExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the TradeExtension 
+     * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the TradeExtension
      */
     function removeExtension() external override {
-        _removeExtension();
+        IDelegatedManager delegatedManager = IDelegatedManager(msg.sender);
+        ISetToken setToken = delegatedManager.setToken();
+
+        _removeExtension(setToken, delegatedManager);
     }
 
     /**
@@ -132,7 +135,7 @@ contract TradeExtension is BaseGlobalExtension {
         onlyAllowedAsset(_setToken, _receiveToken)
     {
         bytes memory callData = abi.encodeWithSignature(
-            "trade(address,string,address,uint256,address,uint256,bytes)", 
+            "trade(address,string,address,uint256,address,uint256,bytes)",
             _setToken,
             _exchangeName,
             _sendToken,

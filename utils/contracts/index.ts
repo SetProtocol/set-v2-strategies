@@ -7,6 +7,7 @@ export { DelegatedManager } from "../../typechain/DelegatedManager";
 export { DelegatedManagerFactory } from "../../typechain/DelegatedManagerFactory";
 export { ManagerCore } from "../../typechain/ManagerCore";
 export { ManagerMock } from "../../typechain/ManagerMock";
+export { ModuleMock } from "../../typechain/ModuleMock";
 export { MutualUpgradeMock } from "../../typechain/MutualUpgradeMock";
 export { MutualUpgradeV2Mock } from "../../typechain/MutualUpgradeV2Mock";
 export { PerpV2LeverageStrategyExtension } from "../../typechain/PerpV2LeverageStrategyExtension";

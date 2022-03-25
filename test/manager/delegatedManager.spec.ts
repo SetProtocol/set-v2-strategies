@@ -17,6 +17,7 @@ import {
 import { SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
 import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2/utils/test";
 import { ContractTransaction } from "ethers";
+import { getLastBlockTransaction } from "@utils/test/testingUtils";
 
 const expect = getWaffleExpect();
 
@@ -38,6 +39,7 @@ describe("DelegatedManager", () => {
   let managerCore: ManagerCore;
   let delegatedManager: DelegatedManager;
   let baseExtension: BaseGlobalExtensionMock;
+  let mockModule: Account;
 
   before(async () => {
     [
@@ -48,7 +50,8 @@ describe("DelegatedManager", () => {
       operatorOne,
       operatorTwo,
       fakeExtension,
-      newManager
+      newManager,
+      mockModule
     ] = await getAccounts();
 
     deployer = new DeployHelper(owner.wallet);
@@ -77,7 +80,7 @@ describe("DelegatedManager", () => {
 
     managerCore = await deployer.managerCore.deployManagerCore();
 
-    baseExtension = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address);
+    baseExtension = await deployer.mocks.deployBaseGlobalExtensionMock(managerCore.address, mockModule.address);
 
     // Deploy DelegatedManager
     delegatedManager = await deployer.manager.deployDelegatedManager(
@@ -93,7 +96,7 @@ describe("DelegatedManager", () => {
     // Transfer ownership to DelegatedManager
     await setToken.setManager(delegatedManager.address);
 
-    await managerCore.initialize([factory.address]);
+    await managerCore.initialize([baseExtension.address], [factory.address]);
     await managerCore.connect(factory.wallet).addManager(delegatedManager.address);
   });
 
@@ -161,6 +164,12 @@ describe("DelegatedManager", () => {
       expect(isApprovedExtension).to.eq(EXTENSION_STATE["PENDING"]);
     });
 
+    it("should emit the correct ExtensionAdded events", async () => {
+      const delegatedManager = await subject();
+
+      await expect(getLastBlockTransaction()).to.emit(delegatedManager, "ExtensionAdded").withArgs(baseExtension.address);
+    });
+
     it("should set the correct Operators approvals and arrays", async () => {
       const delegatedManager = await subject();
 
@@ -171,6 +180,13 @@ describe("DelegatedManager", () => {
       expect(JSON.stringify(actualOperatorsArray)).to.eq(JSON.stringify(subjectOperators));
       expect(isApprovedOperatorOne).to.be.true;
       expect(isApprovedOperatorTwo).to.be.true;
+    });
+
+    it("should emit the correct OperatorAdded events", async () => {
+      const delegatedManager = await subject();
+
+      await expect(getLastBlockTransaction()).to.emit(delegatedManager, "OperatorAdded").withArgs(operatorOne.address);
+      await expect(getLastBlockTransaction()).to.emit(delegatedManager, "OperatorAdded").withArgs(operatorTwo.address);
     });
 
     it("should set the correct Allowed assets approvals and arrays", async () => {
@@ -185,12 +201,25 @@ describe("DelegatedManager", () => {
       expect(isApprovedWETH).to.be.true;
     });
 
+    it("should emit the correct AllowedAssetAdded events", async () => {
+      const delegatedManager = await subject();
+
+      await expect(getLastBlockTransaction()).to.emit(delegatedManager, "AllowedAssetAdded").withArgs(setV2Setup.usdc.address);
+      await expect(getLastBlockTransaction()).to.emit(delegatedManager, "AllowedAssetAdded").withArgs(setV2Setup.weth.address);
+    });
+
     it("should indicate whether to use the asset allow list", async () => {
       const delegatedManager = await subject();
 
       const useAllowList = await delegatedManager.useAssetAllowlist();
 
       expect(useAllowList).to.be.true;
+    });
+
+    it("should emit the correct UseAssetAllowlistUpdated event", async () => {
+      const delegatedManager = await subject();
+
+      await expect(getLastBlockTransaction()).to.emit(delegatedManager, "UseAssetAllowlistUpdated").withArgs(true);
     });
   });
 

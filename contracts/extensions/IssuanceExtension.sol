@@ -34,8 +34,12 @@ import { IManagerCore } from "../interfaces/IManagerCore.sol";
  * @title IssuanceExtension
  * @author Set Protocol
  *
- * Smart contract global extension which provides DelegatedManager owner and methodologist the ability to accrue and split 
+ * Smart contract global extension which provides DelegatedManager owner and methodologist the ability to accrue and split
  * issuance and redemption fees. Owner may configure the fee split percentages.
+ *
+ * Notes
+ * - the fee split is set on the Delegated Manager contract
+ * - when fees distributed via this contract will be inclusive of all fee types that have already been accrued
  */
 contract IssuanceExtension is BaseGlobalExtension {
     using Address for address;
@@ -119,16 +123,16 @@ contract IssuanceExtension is BaseGlobalExtension {
         uint256 _managerRedeemFee,
         address _feeRecipient,
         address _managerIssuanceHook
-    ) 
-        external 
-        onlyOwnerAndValidManager(_delegatedManager) 
+    )
+        external
+        onlyOwnerAndValidManager(_delegatedManager)
     {
         require(_delegatedManager.isInitializedExtension(address(this)), "Extension must be initialized");
 
         _initializeModule(
             _delegatedManager.setToken(),
             _delegatedManager,
-            _maxManagerFee, 
+            _maxManagerFee,
             _managerIssueFee,
             _managerRedeemFee,
             _feeRecipient,
@@ -168,7 +172,7 @@ contract IssuanceExtension is BaseGlobalExtension {
         uint256 _managerRedeemFee,
         address _feeRecipient,
         address _managerIssuanceHook
-    ) 
+    )
         external
         onlyOwnerAndValidManager(_delegatedManager)
     {
@@ -180,7 +184,7 @@ contract IssuanceExtension is BaseGlobalExtension {
         _initializeModule(
             setToken,
             _delegatedManager,
-            _maxManagerFee, 
+            _maxManagerFee,
             _managerIssueFee,
             _managerRedeemFee,
             _feeRecipient,
@@ -191,10 +195,13 @@ contract IssuanceExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the IssuanceExtension 
+     * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the IssuanceExtension
      */
     function removeExtension() external override {
-        _removeExtension();
+        IDelegatedManager delegatedManager = IDelegatedManager(msg.sender);
+        ISetToken setToken = delegatedManager.setToken();
+
+        _removeExtension(setToken, delegatedManager);
     }
 
     /**
@@ -260,11 +267,11 @@ contract IssuanceExtension is BaseGlobalExtension {
         uint256 _managerRedeemFee,
         address _feeRecipient,
         address _managerIssuanceHook
-    ) 
+    )
         internal
     {
         bytes memory callData = abi.encodeWithSignature(
-            "initialize(address,uint256,uint256,uint256,address,address)", 
+            "initialize(address,uint256,uint256,uint256,address,address)",
             _setToken,
             _maxManagerFee,
             _managerIssueFee,

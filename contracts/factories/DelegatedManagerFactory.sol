@@ -220,39 +220,26 @@ contract DelegatedManagerFactory {
      * NOTE: When migrating to this manager system from an existing SetToken, the SetToken's current manager address
      * must be reset to point at the newly deployed DelegatedManager contract in a separate, final transaction.
      *
-     * NOTE: Modules must be passed before corresponding extensions in _initializeTargets otherwise initializeExtension will revert.
-     *
      * @param  _setToken                Instance of the SetToken
-     * @param  _ownerFeeSplit           Percent of fees in precise units (10^16 = 1%) sent to operator, rest to methodologist
+     * @param  _ownerFeeSplit           Percent of fees in precise units (10^16 = 1%) sent to owner, rest to methodologist
      * @param  _ownerFeeRecipient       Address which receives owner's share of fees when they're distributed
-     * @param  _initializeTargets       List of addresses of any extensions or modules which need to be initialized
+     * @param  _extensions              List of addresses of extensions which need to be initialized
      * @param  _initializeBytecode      List of bytecode encoded calls to relevant target's initialize function
      */
     function initialize(
         ISetToken _setToken,
         uint256 _ownerFeeSplit,
         address _ownerFeeRecipient,
-        address[] memory _initializeTargets,
+        address[] memory _extensions,
         bytes[] memory _initializeBytecode
     )
         external
     {
         require(initializeState[_setToken].isPending, "Manager must be awaiting initialization");
         require(msg.sender == initializeState[_setToken].deployer, "Only deployer can initialize manager");
-        _initializeTargets.validatePairsWithArray(_initializeBytecode);
-
-        for (uint256 i = 0; i < _initializeTargets.length; i++) {
-            address target = _initializeTargets[i];
-            require(!controller.isSet(target), "Target must not be SetToken");
-
-            // Because we validate uniqueness of _initializeTargets only one transaction can be sent to each module or extension during this
-            // transaction. Due to this no modules/extension can be used for any SetToken transactions other than initializing these contracts
-            target.functionCallWithValue(_initializeBytecode[i], 0);
-        }
+        _extensions.validatePairsWithArray(_initializeBytecode);
 
         IDelegatedManager manager = initializeState[_setToken].manager;
-        manager.updateOwnerFeeSplit(_ownerFeeSplit);
-        manager.updateOwnerFeeRecipient(_ownerFeeRecipient);
 
         // If the SetToken was factory-deployed & factory is its current `manager`, transfer
         // managership to the new DelegatedManager
@@ -260,8 +247,15 @@ contract DelegatedManagerFactory {
             _setToken.setManager(address(manager));
         }
 
-        manager.transferOwnership(initializeState[_setToken].owner);
-        manager.setMethodologist(initializeState[_setToken].methodologist);
+        _initializeExtensions(manager, _extensions, _initializeBytecode);
+
+        _setManagerState(
+            manager,
+            initializeState[_setToken].owner,
+            initializeState[_setToken].methodologist,
+            _ownerFeeSplit,
+            _ownerFeeRecipient
+        );
 
         delete initializeState[_setToken];
 
@@ -305,7 +299,8 @@ contract DelegatedManagerFactory {
     }
 
     /**
-     * Deploys a DelegatedManager
+     * Deploys a DelegatedManager. Sets owner and methodologist roles to address(this) and the resulting manager address is
+     * saved to the ManagerCore.
      *
      * @param  _setToken         Instance of SetToken to migrate to the DelegatedManager system
      * @param  _extensions       List of extensions authorized for the DelegateManager
@@ -350,6 +345,42 @@ contract DelegatedManagerFactory {
     }
 
     /**
+     * Initialize extensions on the DelegatedManager. Checks that extensions are tracked on the ManagerCore and that the
+     * provided bytecode targets the input manager.
+     *
+     * @param  _manager                  Instance of DelegatedManager
+     * @param  _extensions               List of addresses of extensions to initialize
+     * @param  _initializeBytecode       List of bytecode encoded calls to relevant extensions's initialize function
+     */
+    function _initializeExtensions(
+        IDelegatedManager _manager,
+        address[] memory _extensions,
+        bytes[] memory _initializeBytecode
+    ) internal {
+        for (uint256 i = 0; i < _extensions.length; i++) {
+            address extension = _extensions[i];
+            require(managerCore.isExtension(extension), "Target must be ManagerCore-enabled Extension");
+
+            bytes memory initializeBytecode = _initializeBytecode[i];
+
+            // Each input initializeBytecode is a varible length bytes array which consists of a 32 byte prefix for the
+            // length parameter, a 4 byte function selector, a 32 byte DelegatedManager address, and any additional parameters
+            // as shown below:
+            // [32 bytes - length parameter, 4 bytes - function selector, 32 bytes - DelegatedManager address, additional parameters]
+            // It is required that the input DelegatedManager address is the DelegatedManager address corresponding to the caller
+            address inputManager;
+            assembly {
+                inputManager := mload(add(initializeBytecode, 36))
+            }
+            require(inputManager == address(_manager), "Must target correct DelegatedManager");
+
+            // Because we validate uniqueness of _extensions only one transaction can be sent to each extension during this
+            // transaction. Due to this no extension can be used for any SetToken transactions other than initializing these contracts
+            extension.functionCallWithValue(initializeBytecode, 0);
+        }
+    }
+
+    /**
      * Stores temporary creation metadata during the contract creation step. Data is retrieved, read and
      * finally deleted during `initialize`.
      *
@@ -371,6 +402,29 @@ contract DelegatedManagerFactory {
             manager: IDelegatedManager(_manager),
             isPending: true
         });
+    }
+
+    /**
+     * Initialize fee settings on DelegatedManager and transfer `owner` and `methodologist` roles.
+     *
+     * @param  _manager                 Instance of DelegatedManager
+     * @param  _owner                   Address that will be given the `owner` DelegatedManager's role
+     * @param  _methodologist           Address that will be given the `methodologist` DelegatedManager's role
+     * @param  _ownerFeeSplit           Percent of fees in precise units (10^16 = 1%) sent to owner, rest to methodologist
+     * @param  _ownerFeeRecipient       Address which receives owner's share of fees when they're distributed
+     */
+    function _setManagerState(
+        IDelegatedManager _manager,
+        address _owner,
+        address _methodologist,
+        uint256 _ownerFeeSplit,
+        address _ownerFeeRecipient
+    ) internal {
+        _manager.updateOwnerFeeSplit(_ownerFeeSplit);
+        _manager.updateOwnerFeeRecipient(_ownerFeeRecipient);
+
+        _manager.transferOwnership(_owner);
+        _manager.setMethodologist(_methodologist);
     }
 
     /**

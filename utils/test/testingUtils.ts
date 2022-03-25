@@ -72,6 +72,10 @@ export async function getLastBlockTimestamp(): Promise<BigNumber> {
   return BigNumber.from((await provider.getBlock("latest")).timestamp);
 }
 
+export async function getLastBlockTransaction(): Promise<any> {
+  return (await provider.getBlockWithTransactions("latest")).transactions[0];
+}
+
 export async function mineBlockAsync(): Promise<any> {
   await sendJSONRpcRequestAsync("evm_mine", []);
 }

@@ -12,7 +12,7 @@
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
-    
+
     SPDX-License-Identifier: Apache License, Version 2.0
 */
 
@@ -34,8 +34,12 @@ import { IStreamingFeeModule } from "../interfaces/IStreamingFeeModuleV2.sol";
  * @title StreamingFeeSplitExtension
  * @author Set Protocol
  *
- * Smart contract global extension which provides DelegatedManager owner and methodologist the ability to accrue and split 
+ * Smart contract global extension which provides DelegatedManager owner and methodologist the ability to accrue and split
  * streaming fees. Owner may configure the fee split percentages.
+ *
+ * Notes
+ * - the fee split is set on the Delegated Manager contract
+ * - when fees distributed via this contract will be inclusive of all fee types
  */
 contract StreamingFeeSplitExtension is BaseGlobalExtension {
     using Address for address;
@@ -114,9 +118,9 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     function initializeModule(
         IDelegatedManager _delegatedManager,
         IStreamingFeeModule.FeeState memory _settings
-    ) 
-        external 
-        onlyOwnerAndValidManager(_delegatedManager) 
+    )
+        external
+        onlyOwnerAndValidManager(_delegatedManager)
     {
         require(_delegatedManager.isInitializedExtension(address(this)), "Extension must be initialized");
 
@@ -147,8 +151,8 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     function initializeModuleAndExtension(
         IDelegatedManager _delegatedManager,
         IStreamingFeeModule.FeeState memory _settings
-    ) 
-        external 
+    )
+        external
         onlyOwnerAndValidManager(_delegatedManager)
     {
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
@@ -162,10 +166,13 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the StreamingFeeSplitExtension 
+     * ONLY MANAGER: Remove an existing SetToken and DelegatedManager tracked by the StreamingFeeSplitExtension
      */
     function removeExtension() external override {
-        _removeExtension();
+        IDelegatedManager delegatedManager = IDelegatedManager(msg.sender);
+        ISetToken setToken = delegatedManager.setToken();
+
+        _removeExtension(setToken, delegatedManager);
     }
 
     /**
@@ -211,11 +218,11 @@ contract StreamingFeeSplitExtension is BaseGlobalExtension {
         ISetToken _setToken,
         IDelegatedManager _delegatedManager,
         IStreamingFeeModule.FeeState memory _settings
-    ) 
+    )
         internal
     {
         bytes memory callData = abi.encodeWithSignature(
-            "initialize(address,(address,uint256,uint256,uint256))", 
+            "initialize(address,(address,uint256,uint256,uint256))",
             _setToken,
             _settings);
         _invokeManager(_delegatedManager, address(streamingFeeModule), callData);

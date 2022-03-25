@@ -1,5 +1,5 @@
 /*
-    Copyright 2020 Set Labs Inc.
+    Copyright 2022 Set Labs Inc.
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -21,14 +21,27 @@ pragma solidity 0.6.10;
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
-import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
+import { IManagerCore } from "../interfaces/IManagerCore.sol";
+import { ModuleMock } from "./ModuleMock.sol";
 
 contract BaseGlobalExtensionMock is BaseGlobalExtension {
 
+    /* ============ State Variables ============ */
+
+    ModuleMock public immutable module;
+
     /* ============ Constructor ============ */
 
-    constructor(IManagerCore _managerCore) public BaseGlobalExtension(_managerCore) {}
+    constructor(
+        IManagerCore _managerCore,
+        ModuleMock _module
+    )
+        public
+        BaseGlobalExtension(_managerCore)
+    {
+        module = _module;
+    }
 
     /* ============ External Functions ============ */
 
@@ -41,6 +54,22 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
         require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
 
         _initializeExtension(_delegatedManager.setToken(), _delegatedManager);
+    }
+
+    function initializeModuleAndExtension(
+        IDelegatedManager _delegatedManager
+    )
+        external
+        onlyOwnerAndValidManager(_delegatedManager)
+    {
+        require(_delegatedManager.isPendingExtension(address(this)), "Extension must be pending");
+
+        ISetToken setToken = _delegatedManager.setToken();
+
+        _initializeExtension(setToken, _delegatedManager);
+
+        bytes memory callData = abi.encodeWithSignature("initialize(address)", setToken);
+        _invokeManager(_delegatedManager, address(module), callData);
     }
 
     function testInvokeManager(ISetToken _setToken, address _module, bytes calldata _encoded) external {
@@ -73,6 +102,9 @@ contract BaseGlobalExtensionMock is BaseGlobalExtension {
     {}
 
     function removeExtension() external override {
-        _removeExtension();
+        IDelegatedManager delegatedManager = IDelegatedManager(msg.sender);
+        ISetToken setToken = delegatedManager.setToken();
+
+        _removeExtension(setToken, delegatedManager);
     }
 }
