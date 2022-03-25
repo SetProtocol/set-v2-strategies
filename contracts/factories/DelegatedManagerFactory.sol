@@ -29,8 +29,6 @@ import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { IManagerCore } from "../interfaces/IManagerCore.sol";
 import { ISetTokenCreator } from "../interfaces/ISetTokenCreator.sol";
 
-import "hardhat/console.sol";
-
 /**
  * @title DelegatedManagerFactory
  * @author Set Protocol
