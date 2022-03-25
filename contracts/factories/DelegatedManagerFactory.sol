@@ -247,27 +247,7 @@ contract DelegatedManagerFactory {
             _setToken.setManager(address(manager));
         }
 
-        for (uint256 i = 0; i < _extensions.length; i++) {
-            address extension = _extensions[i];
-            require(managerCore.isExtension(extension), "Target must be ManagerCore-enabled Extension");
-
-            bytes memory initializeBytecode = _initializeBytecode[i];
-
-            // Each input initializeBytecode is a varible length bytes array which consists of a 32 byte prefix for the
-            // length parameter, a 4 byte function selector, a 32 byte DelegatedManager address, and any additional parameters
-            // as shown below:
-            // [32 bytes - length parameter, 4 bytes - function selector, 32 bytes - DelegatedManager address, additional parameters]
-            // It is required that the input DelegatedManager address is the DelegatedManager address corresponding to the caller
-            address inputManager;
-            assembly {
-                inputManager := mload(add(initializeBytecode, 36))
-            }
-            require(inputManager == address(manager), "Must target correct DelegatedManager");
-
-            // Because we validate uniqueness of _extensions only one transaction can be sent to each extension during this
-            // transaction. Due to this no extension can be used for any SetToken transactions other than initializing these contracts
-            extension.functionCallWithValue(initializeBytecode, 0);
-        }
+        _initializeExtensions(manager, _extensions, _initializeBytecode);
 
         _setManagerState(
             manager,
@@ -362,6 +342,42 @@ contract DelegatedManagerFactory {
         );
 
         return newManager;
+    }
+
+    /**
+     * Initialize extensions on the DelegatedManager. Checks that extensions are tracked on the ManagerCore and that the
+     * provided bytecode targets the input manager.
+     *
+     * @param  _manager                  Instance of DelegatedManager
+     * @param  _extensions               List of addresses of extensions to initialize
+     * @param  _initializeBytecode       List of bytecode encoded calls to relevant extensions's initialize function
+     */
+    function _initializeExtensions(
+        IDelegatedManager _manager,
+        address[] memory _extensions,
+        bytes[] memory _initializeBytecode
+    ) internal {
+        for (uint256 i = 0; i < _extensions.length; i++) {
+            address extension = _extensions[i];
+            require(managerCore.isExtension(extension), "Target must be ManagerCore-enabled Extension");
+
+            bytes memory initializeBytecode = _initializeBytecode[i];
+
+            // Each input initializeBytecode is a varible length bytes array which consists of a 32 byte prefix for the
+            // length parameter, a 4 byte function selector, a 32 byte DelegatedManager address, and any additional parameters
+            // as shown below:
+            // [32 bytes - length parameter, 4 bytes - function selector, 32 bytes - DelegatedManager address, additional parameters]
+            // It is required that the input DelegatedManager address is the DelegatedManager address corresponding to the caller
+            address inputManager;
+            assembly {
+                inputManager := mload(add(initializeBytecode, 36))
+            }
+            require(inputManager == address(_manager), "Must target correct DelegatedManager");
+
+            // Because we validate uniqueness of _extensions only one transaction can be sent to each extension during this
+            // transaction. Due to this no extension can be used for any SetToken transactions other than initializing these contracts
+            extension.functionCallWithValue(initializeBytecode, 0);
+        }
     }
 
     /**
