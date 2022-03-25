@@ -245,16 +245,6 @@ describe("ManagerCore", () => {
         await expect(subject()).to.be.revertedWith("Contract must be initialized.");
       });
     });
-
-    describe("when zero address passed for a manager", async () => {
-      beforeEach(async () => {
-        subjectManager = ADDRESS_ZERO;
-      });
-
-      it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("Zero address submitted.");
-      });
-    });
   });
 
   describe("#removeManager", async () => {

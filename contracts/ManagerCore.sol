@@ -168,7 +168,6 @@ contract ManagerCore is Ownable {
      * @param _manager               Address of the manager contract to add
      */
     function addManager(address _manager) external onlyInitialized onlyFactory {
-        require(_manager != address(0), "Zero address submitted.");
         require(!isManager[_manager], "Manager already exists");
 
         isManager[_manager] = true;
