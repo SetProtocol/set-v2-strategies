@@ -22,11 +22,11 @@ pragma experimental ABIEncoderV2;
 import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 
 import { AddressArrayUtils } from "@setprotocol/set-protocol-v2/contracts/lib/AddressArrayUtils.sol";
+import { IController } from "@setprotocol/set-protocol-v2/contracts/interfaces/IController.sol";
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 import { ISetTokenCreator } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetTokenCreator.sol";
 
 import { DelegatedManager } from "../manager/DelegatedManager.sol";
-import { IController } from "../interfaces/IController.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { IManagerCore } from "../interfaces/IManagerCore.sol";
 
