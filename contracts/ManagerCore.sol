@@ -96,16 +96,10 @@ contract ManagerCore is Ownable {
 
         // Loop through and initialize isExtension and isFactory mapping
         for (uint256 i = 0; i < _extensions.length; i++) {
-            address extension = _extensions[i];
-            require(extension != address(0), "Zero address submitted.");
-            isExtension[extension] = true;
-            emit ExtensionAdded(extension);
+            _addExtension(_extensions[i]);
         }
         for (uint256 i = 0; i < _factories.length; i++) {
-            address factory = _factories[i];
-            require(factory != address(0), "Zero address submitted.");
-            isFactory[factory] = true;
-            emit FactoryAdded(factory);
+            _addFactory(_factories[i]);
         }
 
         // Set to true to only allow initialization once
@@ -120,11 +114,9 @@ contract ManagerCore is Ownable {
     function addExtension(address _extension) external onlyInitialized onlyOwner {
         require(!isExtension[_extension], "Extension already exists");
 
-        isExtension[_extension] = true;
+        _addExtension(_extension);
 
         extensions.push(_extension);
-
-        emit ExtensionAdded(_extension);
     }
 
     /**
@@ -150,11 +142,9 @@ contract ManagerCore is Ownable {
     function addFactory(address _factory) external onlyInitialized onlyOwner {
         require(!isFactory[_factory], "Factory already exists");
 
-        isFactory[_factory] = true;
+        _addFactory(_factory);
 
         factories.push(_factory);
-
-        emit FactoryAdded(_factory);
     }
 
     /**
@@ -178,6 +168,7 @@ contract ManagerCore is Ownable {
      * @param _manager               Address of the manager contract to add
      */
     function addManager(address _manager) external onlyInitialized onlyFactory {
+        require(_manager != address(0), "Zero address submitted.");
         require(!isManager[_manager], "Manager already exists");
 
         isManager[_manager] = true;
@@ -214,5 +205,33 @@ contract ManagerCore is Ownable {
 
     function getManagers() external view returns (address[] memory) {
         return managers;
+    }
+
+    /* ============ Internal Functions ============ */
+
+    /**
+     * Add an extension tracked on the ManagerCore
+     *
+     * @param _extension               Address of the extension contract to add
+     */
+    function _addExtension(address _extension) internal {
+        require(_extension != address(0), "Zero address submitted.");
+
+        isExtension[_extension] = true;
+
+        emit ExtensionAdded(_extension);
+    }
+
+    /**
+     * Add a factory tracked on the ManagerCore
+     *
+     * @param _factory               Address of the factory contract to add
+     */
+    function _addFactory(address _factory) internal {
+        require(_factory != address(0), "Zero address submitted.");
+
+        isFactory[_factory] = true;
+
+        emit FactoryAdded(_factory);
     }
 }

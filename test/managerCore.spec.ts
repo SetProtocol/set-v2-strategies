@@ -245,6 +245,16 @@ describe("ManagerCore", () => {
         await expect(subject()).to.be.revertedWith("Contract must be initialized.");
       });
     });
+
+    describe("when zero address passed for a manager", async () => {
+      beforeEach(async () => {
+        subjectManager = ADDRESS_ZERO;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Zero address submitted.");
+      });
+    });
   });
 
   describe("#removeManager", async () => {
@@ -367,6 +377,16 @@ describe("ManagerCore", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+    });
+
+    describe("when zero address passed for a factory", async () => {
+      beforeEach(async () => {
+        subjectFactory = ADDRESS_ZERO;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Zero address submitted.");
       });
     });
 
@@ -499,6 +519,16 @@ describe("ManagerCore", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Ownable: caller is not the owner");
+      });
+    });
+
+    describe("when zero address passed for an extension", async () => {
+      beforeEach(async () => {
+        subjectExtension = ADDRESS_ZERO;
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Zero address submitted.");
       });
     });
 

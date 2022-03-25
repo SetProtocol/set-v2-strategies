@@ -253,7 +253,7 @@ contract DelegatedManagerFactory {
 
             bytes memory initializeBytecode = _initializeBytecode[i];
 
-            // Each input initialzieBytecode is a varible length bytes array which consists of a 32 byte prefix for the
+            // Each input initializeBytecode is a varible length bytes array which consists of a 32 byte prefix for the
             // length parameter, a 4 byte function selector, a 32 byte DelegatedManager address, and any additional parameters
             // as shown below:
             // [32 bytes - length parameter, 4 bytes - function selector, 32 bytes - DelegatedManager address, additional parameters]
