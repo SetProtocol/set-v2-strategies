@@ -22,8 +22,8 @@ pragma experimental ABIEncoderV2;
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 
-import { IManagerIssuanceHook } from "../interfaces/IManagerIssuanceHook.sol";
-import { ISetToken } from "../interfaces/ISetToken.sol";
+import { IManagerIssuanceHook } from "@setprotocol/set-protocol-v2/contracts/interfaces/IManagerIssuanceHook.sol";
+import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 
 /**

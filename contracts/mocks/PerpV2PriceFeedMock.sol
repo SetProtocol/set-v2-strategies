@@ -40,7 +40,7 @@ contract PerpV2PriceFeedMock {
         price = _price;
     }
 
-    
+
     /**
      * Returns the index price of the token.
      */

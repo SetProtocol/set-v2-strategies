@@ -20,9 +20,10 @@ pragma solidity 0.6.10;
 
 import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 
-import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
+import { AddressArrayUtils } from "@setprotocol/set-protocol-v2/contracts/lib/AddressArrayUtils.sol";
+import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
+
 import { IAdapter } from "../interfaces/IAdapter.sol";
-import { ISetToken } from "../interfaces/ISetToken.sol";
 
 
 /**

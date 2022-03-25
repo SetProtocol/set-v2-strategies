@@ -20,7 +20,7 @@ pragma solidity 0.6.10;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
-import { AddressArrayUtils } from "./lib/AddressArrayUtils.sol";
+import { AddressArrayUtils } from "@setprotocol/set-protocol-v2/contracts/lib/AddressArrayUtils.sol";
 
 /**
  * @title ManagerCore

@@ -1,23 +1,20 @@
 import { Signer, BigNumber } from "ethers";
 import { Address } from "../types";
 import {
-  AddressArrayUtilsMock,
   BaseExtensionMock,
   BaseGlobalExtensionMock,
   ManagerMock,
   ModuleMock,
   MutualUpgradeMock,
-  StandardTokenMock,
-  StringArrayUtilsMock,
   PerpV2PriceFeedMock
 } from "../contracts/index";
 
 import {
   ChainlinkAggregatorMock,
-  ContractCallerMock
+  ContractCallerMock,
+  StandardTokenMock
 } from "@setprotocol/set-protocol-v2/typechain";
 
-import { AddressArrayUtilsMock__factory } from "../../typechain/factories/AddressArrayUtilsMock__factory";
 import { BaseExtensionMock__factory } from "../../typechain/factories/BaseExtensionMock__factory";
 import { BaseGlobalExtensionMock__factory } from "../../typechain/factories/BaseGlobalExtensionMock__factory";
 import { ManagerMock__factory } from "../../typechain/factories/ManagerMock__factory";
@@ -27,8 +24,7 @@ import { ContractCallerMock__factory } from "@setprotocol/set-protocol-v2/dist/t
 import { MutualUpgradeMock__factory } from "../../typechain/factories/MutualUpgradeMock__factory";
 import { MutualUpgradeV2Mock__factory } from "../../typechain/factories/MutualUpgradeV2Mock__factory";
 import { PerpV2PriceFeedMock__factory } from "../../typechain/factories/PerpV2PriceFeedMock__factory";
-import { StandardTokenMock__factory  } from "../../typechain/factories/StandardTokenMock__factory";
-import { StringArrayUtilsMock__factory  } from "../../typechain/factories/StringArrayUtilsMock__factory";
+import { StandardTokenMock__factory  } from "@setprotocol/set-protocol-v2/dist/typechain";
 
 export default class DeployMocks {
   private _deployerSigner: Signer;
@@ -53,10 +49,6 @@ export default class DeployMocks {
     return await new ModuleMock__factory(this._deployerSigner).deploy(controller);
   }
 
-  public async deployAddressArrayUtilsMock(): Promise<AddressArrayUtilsMock> {
-    return await new AddressArrayUtilsMock__factory(this._deployerSigner).deploy();
-  }
-
   public async deployMutualUpgradeMock(owner: Address, methodologist: string): Promise<MutualUpgradeMock> {
     return await new MutualUpgradeMock__factory(this._deployerSigner).deploy(owner, methodologist);
   }
@@ -77,10 +69,6 @@ export default class DeployMocks {
 
   public async deployChainlinkAggregatorMock(decimals: number): Promise<ChainlinkAggregatorMock> {
     return await new ChainlinkAggregatorMock__factory(this._deployerSigner).deploy(decimals);
-  }
-
-  public async deployStringArrayUtilsMock(): Promise<StringArrayUtilsMock> {
-    return await new StringArrayUtilsMock__factory(this._deployerSigner).deploy();
   }
 
   public async deployContractCallerMock(): Promise<ContractCallerMock> {

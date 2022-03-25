@@ -23,10 +23,10 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
+import { AddressArrayUtils } from "@setprotocol/set-protocol-v2/contracts/lib/AddressArrayUtils.sol";
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/PreciseUnitMath.sol";
 
-import { AddressArrayUtils } from "../lib/AddressArrayUtils.sol";
 import { IGlobalExtension } from "../interfaces/IGlobalExtension.sol";
 import { MutualUpgradeV2 } from "../lib/MutualUpgradeV2.sol";
 
