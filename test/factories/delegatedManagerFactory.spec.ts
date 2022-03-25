@@ -20,13 +20,13 @@ import {
 } from "@utils/index";
 
 import { ProtocolUtils } from "@utils/common";
-import { SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
-import { MODULE_STATE } from "@setprotocol/set-protocol-v2/utils/constants";
+import { SystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
+import { MODULE_STATE } from "@setprotocol/set-protocol-v2/dist/utils/constants";
 
 import {
   getSystemFixture,
   getProtocolUtils
-} from "@setprotocol/set-protocol-v2/utils/test";
+} from "@setprotocol/set-protocol-v2/dist/utils/test";
 import { SetToken } from "@setprotocol/set-protocol-v2/utils/contracts";
 
 const expect = getWaffleExpect();

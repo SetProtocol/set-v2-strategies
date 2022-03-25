@@ -4,11 +4,11 @@ import {
 } from "../types";
 
 import { SetToken } from "@setprotocol/set-protocol-v2/typechain/SetToken";
-import { SetToken__factory } from "@setprotocol/set-protocol-v2/typechain/factories/SetToken__factory";
+import { SetToken__factory } from "@setprotocol/set-protocol-v2/dist/typechain/factories/SetToken__factory";
 import { DebtIssuanceModule } from "@setprotocol/set-protocol-v2/typechain/DebtIssuanceModule";
-import { DebtIssuanceModule__factory } from "@setprotocol/set-protocol-v2/typechain/factories/DebtIssuanceModule__factory";
+import { DebtIssuanceModule__factory } from "@setprotocol/set-protocol-v2/dist/typechain/factories/DebtIssuanceModule__factory";
 import { DebtIssuanceModuleV2 } from "@setprotocol/set-protocol-v2/typechain/DebtIssuanceModuleV2";
-import { DebtIssuanceModuleV2__factory } from "@setprotocol/set-protocol-v2/typechain/factories/DebtIssuanceModuleV2__factory";
+import { DebtIssuanceModuleV2__factory } from "@setprotocol/set-protocol-v2/dist/typechain/factories/DebtIssuanceModuleV2__factory";
 
 export default class DeploySetV2 {
   private _deployerSigner: Signer;

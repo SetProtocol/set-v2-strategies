@@ -3,7 +3,7 @@ import {
 } from "hardhat/builtin-tasks/task-names";
 
 import { subtask } from "hardhat/config";
-import { addGasToAbiMethods } from "@setprotocol/set-protocol-v2/utils/tasks";
+import { addGasToAbiMethods } from "@setprotocol/set-protocol-v2/dist/utils/tasks";
 
 // Injects network block limit (minus 1 million) in the abi so
 // ethers uses it instead of running gas estimation.

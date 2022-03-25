@@ -14,8 +14,8 @@ import {
   getWaffleExpect,
   getRandomAddress
 } from "@utils/index";
-import { SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
-import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2/utils/test";
+import { SystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
+import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2/dist/utils/test";
 import { ContractTransaction } from "ethers";
 import { getLastBlockTransaction } from "@utils/test/testingUtils";
 

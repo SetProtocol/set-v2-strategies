@@ -28,9 +28,9 @@ import {
   getTransactionTimestamp
 } from "@utils/index";
 import { getStreamingFee, getStreamingFeeInflationAmount } from "@utils/common";
-import { SystemFixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
-import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2/utils/test";
-import { ZERO } from "@setprotocol/set-protocol-v2/utils/constants";
+import { SystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
+import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2/dist/utils/test";
+import { ZERO } from "@setprotocol/set-protocol-v2/dist/utils/constants";
 
 const expect = getWaffleExpect();
 

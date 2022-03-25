@@ -22,8 +22,8 @@ import { BaseExtensionMock__factory } from "../../typechain/factories/BaseExtens
 import { BaseGlobalExtensionMock__factory } from "../../typechain/factories/BaseGlobalExtensionMock__factory";
 import { ManagerMock__factory } from "../../typechain/factories/ManagerMock__factory";
 import { ModuleMock__factory } from "../../typechain/factories/ModuleMock__factory";
-import { ChainlinkAggregatorMock__factory  } from "@setprotocol/set-protocol-v2/typechain";
-import { ContractCallerMock__factory } from "@setprotocol/set-protocol-v2/typechain";
+import { ChainlinkAggregatorMock__factory  } from "@setprotocol/set-protocol-v2/dist/typechain";
+import { ContractCallerMock__factory } from "@setprotocol/set-protocol-v2/dist/typechain";
 import { MutualUpgradeMock__factory } from "../../typechain/factories/MutualUpgradeMock__factory";
 import { MutualUpgradeV2Mock__factory } from "../../typechain/factories/MutualUpgradeV2Mock__factory";
 import { PerpV2PriceFeedMock__factory } from "../../typechain/factories/PerpV2PriceFeedMock__factory";
