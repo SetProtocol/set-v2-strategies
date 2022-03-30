@@ -325,7 +325,8 @@ contract DelegatedManager is Ownable, MutualUpgradeV2 {
     }
 
     /**
-     * ONLY OWNER: Update percent of fees that are sent to owner
+     * MUTUAL UPGRADE: Update percent of fees that are sent to owner. Owner and Methodologist must each call this function to execute
+     * the update. If Owner and Methodologist point to the same address, the update can be executed in a single call.
      *
      * @param _newFeeSplit           Percent in precise units (100% = 10**18) of fees that accrue to owner
      */
