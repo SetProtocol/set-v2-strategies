@@ -27,7 +27,7 @@ import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 import { SignedSafeMath } from "@openzeppelin/contracts/math/SignedSafeMath.sol";
 
 import { IAccountBalance } from "@setprotocol/set-protocol-v2/contracts/interfaces/external/perp-v2/IAccountBalance.sol";
-import { IPerpV2LeverageModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IPerpV2LeverageModule.sol";
+import { IPerpV2LeverageModuleV2 } from "@setprotocol/set-protocol-v2/contracts/interfaces/IPerpV2LeverageModuleV2.sol";
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 import { IVault } from "@setprotocol/set-protocol-v2/contracts/interfaces/external/perp-v2/IVault.sol";
 import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/PreciseUnitMath.sol";
@@ -71,7 +71,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     struct ActionInfo {
         int256 baseBalance;                                 // Balance of virtual base asset from Perp in precise units (10e18). E.g. vWBTC = 10e18
         int256 quoteBalance;                                // Balance of virtual quote asset from Perp in precise units (10e18). E.g. vUSD = 10e18
-        IPerpV2LeverageModule.AccountInfo accountInfo;      // Info on perpetual account including, collateral balance, owedRealizedPnl and pendingFunding
+        IPerpV2LeverageModuleV2.AccountInfo accountInfo;      // Info on perpetual account including, collateral balance, owedRealizedPnl and pendingFunding
         int256 basePositionValue;                           // Valuation in USD adjusted for decimals in precise units (10e18)
         int256 quoteValue;                                  // Valuation in USD adjusted for decimals in precise units (10e18)
         int256 basePrice;                                   // Price of base asset in precise units (10e18) from PerpV2 Oracle
@@ -88,7 +88,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
     struct ContractSettings {
         ISetToken setToken;                             // Instance of leverage token
-        IPerpV2LeverageModule perpV2LeverageModule;     // Instance of Perp V2 leverage module
+        IPerpV2LeverageModuleV2 perpV2LeverageModule;     // Instance of Perp V2 leverage module
         IAccountBalance perpV2AccountBalance;           // Instance of Perp V2 AccountBalance contract used to fetch position balances
         IPriceFeed baseUSDPriceOracle;                  // PerpV2 oracle that returns TWAP price for base asset in USD. IPriceFeed is a PerpV2 specific interface
                                                         // to interact with differnt oracle providers, e.g. Band Protocol and Chainlink, for different assets
@@ -399,7 +399,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      */
     function deposit(uint256 _collateralUnits) external onlyOperator {
         bytes memory depositCalldata = abi.encodeWithSelector(
-            IPerpV2LeverageModule.deposit.selector,
+            IPerpV2LeverageModuleV2.deposit.selector,
             address(strategy.setToken),
             _collateralUnits
         );
@@ -414,7 +414,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
      */
     function withdraw(uint256 _collateralUnits) external onlyOperator {
         bytes memory withdrawCalldata = abi.encodeWithSelector(
-            IPerpV2LeverageModule.withdraw.selector,
+            IPerpV2LeverageModuleV2.withdraw.selector,
             address(strategy.setToken),
             _collateralUnits
         );
@@ -673,7 +673,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
         uint256 oppositeBoundUnits = _calculateOppositeBoundUnits(baseRebalanceUnits, _leverageInfo.action, _leverageInfo.slippageTolerance);
 
         bytes memory tradeCallData = abi.encodeWithSelector(
-            IPerpV2LeverageModule.trade.selector,
+            IPerpV2LeverageModuleV2.trade.selector,
             address(strategy.setToken),
             strategy.virtualBaseAddress,
             baseRebalanceUnits,
