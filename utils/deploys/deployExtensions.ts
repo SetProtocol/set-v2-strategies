@@ -1,17 +1,24 @@
 import { Signer, BigNumber } from "ethers";
 import {
   Address,
-  PerpV2ContractSettings,
-  PerpV2MethodologySettings,
-  PerpV2ExecutionSettings,
-  PerpV2IncentiveSettings,
-  PerpV2ExchangeSettings
+  PerpV2LeverageContractSettings,
+  PerpV2LeverageMethodologySettings,
+  PerpV2LeverageExecutionSettings,
+  PerpV2LeverageIncentiveSettings,
+  PerpV2LeverageExchangeSettings,
+  PerpV2BasisContractSettings,
+  PerpV2BasisMethodologySettings,
+  PerpV2BasisExecutionSettings,
+  PerpV2BasisIncentiveSettings,
+  PerpV2BasisExchangeSettings
 } from "../types";
 import {
+  DeltaNeutralBasisTradingStrategyExtension,
   PerpV2LeverageStrategyExtension,
   FeeSplitExtension
 } from "../contracts/index";
 
+import { DeltaNeutralBasisTradingStrategyExtension__factory } from "../../typechain/factories/DeltaNeutralBasisTradingStrategyExtension__factory";
 import { PerpV2LeverageStrategyExtension__factory } from "../../typechain/factories/PerpV2LeverageStrategyExtension__factory";
 import { FeeSplitExtension__factory } from "../../typechain/factories/FeeSplitExtension__factory";
 
@@ -24,13 +31,31 @@ export default class DeployExtensions {
 
   public async deployPerpV2LeverageStrategyExtension(
     manager: Address,
-    contractSettings: PerpV2ContractSettings,
-    methodologySettings: PerpV2MethodologySettings,
-    executionSettings: PerpV2ExecutionSettings,
-    incentiveSettings: PerpV2IncentiveSettings,
-    exchangeSettings: PerpV2ExchangeSettings
+    contractSettings: PerpV2LeverageContractSettings,
+    methodologySettings: PerpV2LeverageMethodologySettings,
+    executionSettings: PerpV2LeverageExecutionSettings,
+    incentiveSettings: PerpV2LeverageIncentiveSettings,
+    exchangeSettings: PerpV2LeverageExchangeSettings
   ): Promise<PerpV2LeverageStrategyExtension> {
     return await new PerpV2LeverageStrategyExtension__factory(this._deployerSigner).deploy(
+      manager,
+      contractSettings,
+      methodologySettings,
+      executionSettings,
+      incentiveSettings,
+      exchangeSettings,
+    );
+  }
+
+  public async deployDeltaNeutralBasisTradingStrategyExtension(
+    manager: Address,
+    contractSettings: PerpV2BasisContractSettings,
+    methodologySettings: PerpV2BasisMethodologySettings,
+    executionSettings: PerpV2BasisExecutionSettings,
+    incentiveSettings: PerpV2BasisIncentiveSettings,
+    exchangeSettings: PerpV2BasisExchangeSettings
+  ): Promise<DeltaNeutralBasisTradingStrategyExtension> {
+    return await new DeltaNeutralBasisTradingStrategyExtension__factory(this._deployerSigner).deploy(
       manager,
       contractSettings,
       methodologySettings,

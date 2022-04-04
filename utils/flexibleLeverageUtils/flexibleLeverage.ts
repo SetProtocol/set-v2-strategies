@@ -33,6 +33,23 @@ export function calculateNewLeverageRatioPerpV2(
   return currentLeverageRatio.gt(0) ? nlr : nlr.mul(-1);
 }
 
+export function calculateNewLeverageRatioPerpV2Basis(
+  currentLeverageRatio: BigNumber,
+  methodology: {
+    targetLeverageRatio: BigNumber;
+    minLeverageRatio: BigNumber;
+    maxLeverageRatio: BigNumber;
+    recenteringSpeed: BigNumber;
+  }
+): BigNumber {
+  const a = preciseMul(methodology.targetLeverageRatio.abs(), methodology.recenteringSpeed);
+  const b = preciseMul(ether(1).sub(methodology.recenteringSpeed), currentLeverageRatio.abs());
+  const c = a.add(b);
+  const d = c.lt(methodology.maxLeverageRatio.abs()) ? c : methodology.maxLeverageRatio.abs();
+  const nlr = methodology.minLeverageRatio.abs().gte(d) ? methodology.minLeverageRatio.abs() : d;
+  return currentLeverageRatio.gt(0) ? nlr : nlr.mul(-1);
+}
+
 export function calculateCollateralRebalanceUnits(
   currentLeverageRatio: BigNumber,
   newLeverageRatio: BigNumber,
