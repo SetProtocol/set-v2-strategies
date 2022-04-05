@@ -188,13 +188,18 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         int256 _minLeverageRatio,
         int256 _maxLeverageRatio,
         uint256 _recenteringSpeed,
-        uint256 _rebalanceInterval
+        uint256 _rebalanceInterval,
+        uint256 _reinvestInterval
     );
     event ExecutionSettingsUpdated(
         uint256 _twapCooldownPeriod,
         uint256 _slippageTolerance
     );
     event ExchangeSettingsUpdated(
+        string _exchangeName,
+        bytes _buyExactSpotTradeData,
+        bytes _sellExactSpotTradeData,
+        bytes _buySpotQuoteExactInputPath,
         uint256 _twapMaxTradeSize,
         uint256 _incentivizedTwapMaxTradeSize
     );
@@ -356,7 +361,6 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         );
     }
 
-
     function ripcord() external onlyEOA {
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
             incentive.incentivizedSlippageTolerance,
@@ -448,7 +452,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
             methodology.minLeverageRatio,
             methodology.maxLeverageRatio,
             methodology.recenteringSpeed,
-            methodology.rebalanceInterval
+            methodology.rebalanceInterval,
+            methodology.reinvestInterval
         );
     }
 
@@ -488,6 +493,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         );
     }
 
+    // Todo: Confirm this.
     /**
      * OPERATOR ONLY: Set exchange settings and check new settings are valid.Updating exchange settings during rebalances is allowed, as it is not possible
      * to enter an unexpected state while doing so. Note: Need to pass in existing parameters if only changing a few settings.
@@ -505,6 +511,10 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         exchange.incentivizedTwapMaxTradeSize = _newExchangeSettings.incentivizedTwapMaxTradeSize;
 
         emit ExchangeSettingsUpdated(
+            _newExchangeSettings.exchangeName,
+            _newExchangeSettings.buyExactSpotTradeData,
+            _newExchangeSettings.sellExactSpotTradeData,
+            _newExchangeSettings.buySpotQuoteExactInputPath,
             _newExchangeSettings.twapMaxTradeSize,
             _newExchangeSettings.incentivizedTwapMaxTradeSize
         );
@@ -729,6 +739,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         int256 baseRebalanceUnits = _chunkRebalanceNotional.preciseDiv(_leverageInfo.action.setTotalSupply.toInt256());
         uint256 oppositeBoundUnits = _calculateOppositeBoundUnits(baseRebalanceUnits.neg(), _leverageInfo.action, _leverageInfo.slippageTolerance).div(1000000000000);
 
+        // Todo: Fix this for disengage.
         _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, true, false);
 
         uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(strategy.basisTradingModule.collateralToken())).toUint256();

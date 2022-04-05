@@ -2357,7 +2357,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       describe.skip("when not engaged", async () => { });
     });
 
-    describe.skip("#setMethodologySettings", async () => {
+    describe("#setMethodologySettings", async () => {
       let subjectMethodologySettings: PerpV2BasisMethodologySettings;
       let subjectCaller: Account;
 
@@ -2401,6 +2401,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             subjectMethodologySettings.maxLeverageRatio,
             subjectMethodologySettings.recenteringSpeed,
             subjectMethodologySettings.rebalanceInterval,
+            subjectMethodologySettings.reinvestInterval
           );
         });
 
@@ -2439,7 +2440,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       });
     });
 
-    describe.skip("#setExecutionSettings", async () => {
+    describe("#setExecutionSettings", async () => {
       let subjectExecutionSettings: PerpV2BasisExecutionSettings;
       let subjectCaller: Account;
 
@@ -2459,6 +2460,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       describe("when rebalance is not in progress", () => {
         cacheBeforeEach(initializeRootScopeContracts);
         beforeEach(initializeSubjectVariables);
+
         it("should set the correct execution parameters", async () => {
           await subject();
           const execution = await leverageStrategyExtension.getExecution();
@@ -2508,7 +2510,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       });
     });
 
-    describe.skip("#setIncentiveSettings", async () => {
+    describe("#setIncentiveSettings", async () => {
       let subjectIncentiveSettings: PerpV2BasisIncentiveSettings;
       let subjectCaller: Account;
 
@@ -2517,7 +2519,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           incentivizedTwapCooldownPeriod: BigNumber.from(30),
           incentivizedSlippageTolerance: ether(0.1),
           etherReward: ether(5),
-          incentivizedLeverageRatio: ether(3.2),
+          incentivizedLeverageRatio: ether(-1.3),
         };
         subjectCaller = owner;
       };
@@ -2584,7 +2586,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       });
     });
 
-    describe.skip("#setExchangeSettings", async () => {
+    describe("#setExchangeSettings", async () => {
       let subjectExchangeSettings: PerpV2BasisExchangeSettings;
       let subjectCaller: Account;
 
@@ -2610,12 +2612,20 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         await subject();
         const exchange = await leverageStrategyExtension.getExchangeSettings();
 
+        expect(exchange.exchangeName).to.eq(subjectExchangeSettings.exchangeName);
+        expect(exchange.buyExactSpotTradeData).to.eq(subjectExchangeSettings.buyExactSpotTradeData);
+        expect(exchange.sellExactSpotTradeData).to.eq(subjectExchangeSettings.sellExactSpotTradeData);
+        expect(exchange.buySpotQuoteExactInputPath).to.eq(subjectExchangeSettings.buySpotQuoteExactInputPath);
         expect(exchange.twapMaxTradeSize).to.eq(subjectExchangeSettings.twapMaxTradeSize);
         expect(exchange.incentivizedTwapMaxTradeSize).to.eq(subjectExchangeSettings.incentivizedTwapMaxTradeSize);
       });
 
       it("should emit ExchangeSettingsUpdated event", async () => {
         await expect(subject()).to.emit(leverageStrategyExtension, "ExchangeSettingsUpdated").withArgs(
+          subjectExchangeSettings.exchangeName,
+          subjectExchangeSettings.buyExactSpotTradeData,
+          subjectExchangeSettings.sellExactSpotTradeData,
+          subjectExchangeSettings.buySpotQuoteExactInputPath,
           subjectExchangeSettings.twapMaxTradeSize,
           subjectExchangeSettings.incentivizedTwapMaxTradeSize
         );
