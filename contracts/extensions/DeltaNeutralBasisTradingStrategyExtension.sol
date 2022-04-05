@@ -619,7 +619,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     function getCurrentEtherIncentive() external view returns(uint256) {
         int256 currentLeverageRatio = getCurrentLeverageRatio();
 
-        if (currentLeverageRatio >= incentive.incentivizedLeverageRatio) {
+        // Todo: This fix needs to be applied to the perp leverage strategy extension contract as well.
+        if (currentLeverageRatio.abs() >= incentive.incentivizedLeverageRatio.abs()) {
             // If ETH reward is below the balance on this contract, then return ETH balance on contract instead
             return incentive.etherReward < address(this).balance ? incentive.etherReward : address(this).balance;
         } else {

@@ -2642,7 +2642,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       });
     });
 
-    describe.skip("#withdrawEtherBalance", async () => {
+    describe("#withdrawEtherBalance", async () => {
       let etherReward: BigNumber;
       let subjectCaller: Account;
 
@@ -2711,7 +2711,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       });
     });
 
-    describe.skip("#getCurrentEtherIncentive", async () => {
+    describe("#getCurrentEtherIncentive", async () => {
       cacheBeforeEach(async () => {
         await initializeRootScopeContracts();
         // Engage to initial leverage
@@ -2724,10 +2724,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       }
 
       describe("when above incentivized leverage ratio", async () => {
-        beforeEach(async () => {
+        cacheBeforeEach(async () => {
+          // Send ETHER to contract
           await owner.wallet.sendTransaction({ to: leverageStrategyExtension.address, value: ether(1) });
-          await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(650));
-          await perpV2PriceFeedMock.setPrice(BigNumber.from(650).mul(10 ** 8));
+
+          // Set oracle prices
+          await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1150));
+          await perpV2PriceFeedMock.setPrice(BigNumber.from(1150).mul(10 ** 8));
         });
 
         it("should return the correct value", async () => {
@@ -2753,8 +2756,8 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
       describe("when below incentivized leverage ratio", async () => {
         beforeEach(async () => {
-          await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(2000));
-          await perpV2PriceFeedMock.setPrice(BigNumber.from(2000).mul(10 ** 8));
+          await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(900));
+          await perpV2PriceFeedMock.setPrice(BigNumber.from(900).mul(10 ** 8));
         });
 
         it("should return the correct value", async () => {
