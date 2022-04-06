@@ -419,13 +419,13 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     function reinvest() external onlyOperator {
-        _validateReinvest();
-
         // Uses the same slippage tolerance and twap max trade size as rebalancing
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
             execution.slippageTolerance,
             exchange.twapMaxTradeSize
         );
+
+        _validateReinvest();
 
         _withdrawFundingAndAccrueFees(PreciseUnitMath.MAX_UINT_256);
 
@@ -861,23 +861,28 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
         uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
 
+        console.logUint(defaultUsdcUnits);
         // Todo: should we update timestamp here?
         if (defaultUsdcUnits == 0) { return (0, 0); }
 
         uint256 setTotalSupply = strategy.setToken.totalSupply();
-        uint256 usdcAmountInNotional = defaultUsdcUnits.preciseMul(setTotalSupply);
+        uint256 usdcAmountInNotional = defaultUsdcUnits.preciseMul(setTotalSupply).div(2);  // 50%
         uint256 spotAmountOutNotional = strategy.quoter.quoteExactInput(exchange.buySpotQuoteExactInputPath, usdcAmountInNotional);
         uint256 baseUnits = spotAmountOutNotional.preciseDiv(setTotalSupply);
 
         // We do slippage checks because we don't wanna get sandwiched attack by someone removing liquidity and giving us the worst price possible.
         // Todo: Is this trade vulnerable to that?
+        console.log("executing dex trade");
         _executeDexTrade(baseUnits, defaultUsdcUnits, true, false);
 
         // Deposit rest
         defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
+
+        console.logUint(defaultUsdcUnits);
         if (defaultUsdcUnits > 0) { _deposit(defaultUsdcUnits); }
 
         // Open perp position
+        console.log("executing perp trade");
         _executePerpTrade(baseUnits.toInt256().neg(), _leverageInfo);
 
         return (usdcAmountInNotional, spotAmountOutNotional);

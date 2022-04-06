@@ -2367,19 +2367,12 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       });
     });
 
-    describe.skip("#reinvest", async () => {
+    describe("#reinvest", async () => {
       let subjectCaller: Account;
 
       cacheBeforeEach(async () => {
         // set funding rate to NON-ZERO, to allow funding to accrue which would be reinvested
         await perpV2Setup.clearingHouseConfig.setMaxFundingRate(BigNumber.from(0.1e6));
-
-        await leverageStrategyExtension.engage();
-
-        // Set index price below mark price to accrue positive funding to short position
-        await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(950));
-        await perpV2PriceFeedMock.setPrice(BigNumber.from(950).mul(10 ** 8));
-        await increaseTimeAsync(ONE_DAY_IN_SECONDS);
       });
 
       beforeEach(async () => {
@@ -2390,79 +2383,104 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         return await leverageStrategyExtension.connect(subjectCaller.wallet).reinvest();
       }
 
-      it("verify initial testing state", async () => {
-        const pendingFunding = await perpV2Setup.exchange.getAllPendingFundingPayment(setToken.address);
-        expect(pendingFunding.mul(-1)).to.gt(ZERO);
-      });
+      describe("when engaged", async () => {
+        let performanceFeePercentage: BigNumber;
 
-      it("should withdraw tracked settled funding from Perpetual protocol", async () => {
-        const trackedSettledFunding = await perpBasisTradingModule.settledFunding(setToken.address);
-        const pendingFunding = await perpV2Setup.exchange.getAllPendingFundingPayment(setToken.address);
-        const initialTrackedSettledFunding = trackedSettledFunding.add(pendingFunding.mul(-1));
-        console.log(initialTrackedSettledFunding.toString());
-        const initialCollateralBalance = await perpV2Setup.vault.getBalance(setToken.address);
+        cacheBeforeEach(async () => {
+          await leverageStrategyExtension.engage();
 
-        await subject();
+          // Set index price below mark price to accrue positive funding to short position
+          await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(990));
+          await perpV2PriceFeedMock.setPrice(BigNumber.from(990).mul(10 ** 8));
+          await increaseTimeAsync(ONE_DAY_IN_SECONDS.mul(7));
 
-        const currentTrackedSettledFunding = await perpBasisTradingModule.settledFunding(setToken.address);
-        const currentCollateralBalance = await perpV2Setup.vault.getBalance(setToken.address);
+          performanceFeePercentage = (await perpBasisTradingModule.feeSettings(setToken.address)).performanceFeePercentage;
+        });
 
-        expect(currentTrackedSettledFunding).to.be.lt(ether(0.000001));
-        expect(initialCollateralBalance.sub(currentCollateralBalance)).to.eq(initialTrackedSettledFunding.div(BigNumber.from(10).pow(12)));
-      });
+        it("verify initial testing state", async () => {
+          const pendingFunding = await perpV2Setup.exchange.getAllPendingFundingPayment(setToken.address);
+          expect(pendingFunding.mul(-1)).to.gt(ZERO);
+        });
 
-      it("should reinvest into perp position", async () => {
-        const initialPositions = await perpBasisTradingModule.getPositionNotionalInfo(setToken.address);
-        const trackedSettledFunding = await perpBasisTradingModule.settledFunding(setToken.address);
-        const pendingFunding = await perpV2Setup.exchange.getAllPendingFundingPayment(setToken.address);
-        const initialTrackedSettledFunding = trackedSettledFunding.add(pendingFunding.mul(-1));
-        console.log(initialTrackedSettledFunding.toString());
-        console.log(initialTrackedSettledFunding.toString());
-        const usdAmountInvested = initialTrackedSettledFunding.div(BigNumber.from(10).pow(12)).div(2);
-        // const amountOutOnDex = await uniV3Setup.quoter.callStatic.quoteExactInput(exchange.buySpotQuoteExactInputPath, usdAmountInvested);
-        console.log((await perpV2Setup.usdc.balanceOf(owner.address)).toString(), usdAmountInvested.toString());
-        const amountOutOnDex = await uniV3Setup.quoter.callStatic.quoteExactInputSingle(
-          perpV2Setup.usdc.address,
-          systemSetup.weth.address,
-          3000,
-          usdAmountInvested,
-          0
-        );
+        it("should withdraw tracked settled funding from Perpetual protocol", async () => {
+          const trackedSettledFunding = await perpBasisTradingModule.settledFunding(setToken.address);
+          const pendingFunding = await perpV2Setup.exchange.getAllPendingFundingPayment(setToken.address);
+          const initialTrackedSettledFunding = trackedSettledFunding.add(pendingFunding.mul(-1));
+          const fundingWithdrawnNetFees = initialTrackedSettledFunding.sub(preciseMul(initialTrackedSettledFunding, performanceFeePercentage));
 
-        await subject();
+          // Doesn't contain owedRealizedPnl
+          const initialVaultCollateralBalance = await perpV2Setup.vault.getBalance(setToken.address);
 
-        const currentPositions = await perpBasisTradingModule.getPositionNotionalInfo(setToken.address);
-        const expectedBaseBalance = initialPositions[0].baseBalance.add(amountOutOnDex.mul(-1));
-
-        expect(currentPositions[0].baseBalance).eq(expectedBaseBalance);
-        expect(currentPositions[0].baseToken).eq(strategy.spotAssetAddress);
-      });
-
-      it("should reinvest into spot position", async () => {
-        const setSupply = await setToken.totalSupply();
-        const iniitalPostionUnit = await setToken.getDefaultPositionRealUnit(strategy.spotAssetAddress);
-        const usdAmountInvested = (await perpBasisTradingModule.settledFunding(setToken.address)).div(BigNumber.from(10).pow(12)).div(2);
-        const amountOutOnDex = await uniV3Setup.quoter.callStatic.quoteExactInput(exchange.buySpotQuoteExactInputPath, usdAmountInvested);
-
-        await subject();
-
-        const currentPositionUnit = await setToken.getDefaultPositionRealUnit(strategy.spotAssetAddress);
-        const expectedNewPositionUnit = iniitalPostionUnit.add(preciseDiv(amountOutOnDex, setSupply));
-
-        expect(currentPositionUnit).to.eq(expectedNewPositionUnit);
-      });
-
-      describe("when reinvest interval has NOT elapsed", async () => {
-        beforeEach(async () => {
           await subject();
+
+          const currentTrackedSettledFunding = await perpBasisTradingModule.settledFunding(setToken.address);
+          const currentVaultCollateralBalance = await perpV2Setup.vault.getBalance(setToken.address);
+
+          expect(currentTrackedSettledFunding).to.be.lt(ether(0.000001));
+          // Depositing back half to PerpV2.
+          expect(
+            currentVaultCollateralBalance.sub(initialVaultCollateralBalance)
+          ).closeTo(fundingWithdrawnNetFees.div(BigNumber.from(10).pow(12)).div(2), 300);
         });
 
-        it("should revert", async () => {
-          await expect(subject()).to.be.revertedWith("Reinvestment interval not elapsed");
+        it("should reinvest into perp position", async () => {
+          const initialPositions = await perpBasisTradingModule.getPositionNotionalInfo(setToken.address);
+
+          const trackedSettledFunding = await perpBasisTradingModule.settledFunding(setToken.address);
+          const pendingFunding = await perpV2Setup.exchange.getAllPendingFundingPayment(setToken.address);
+          const initialTrackedSettledFunding = trackedSettledFunding.add(pendingFunding.mul(-1));
+          const fundingWithdrawnNetFees = initialTrackedSettledFunding.sub(preciseMul(initialTrackedSettledFunding, performanceFeePercentage));
+
+          const usdAmountInvested = fundingWithdrawnNetFees.div(BigNumber.from(10).pow(12)).div(2);
+          // .155427105277853193
+          const amountOutOnDex = await uniV3Setup.quoter.callStatic.quoteExactInput(exchange.buySpotQuoteExactInputPath, usdAmountInvested);
+
+          await subject();
+
+          const currentPositions = await perpBasisTradingModule.getPositionNotionalInfo(setToken.address);
+          const expectedBaseBalance = initialPositions[0].baseBalance.add(amountOutOnDex.mul(-1));
+
+          expect(currentPositions[0].baseBalance).closeTo(expectedBaseBalance, ether(0.0001).toNumber());
+          expect(currentPositions[0].baseToken).eq(strategy.virtualBaseAddress);
+        });
+
+        it("should reinvest into spot position", async () => {
+          const setSupply = await setToken.totalSupply();
+          const iniitalSpotPostionUnit = await setToken.getDefaultPositionRealUnit(strategy.spotAssetAddress);
+
+          const trackedSettledFunding = await perpBasisTradingModule.settledFunding(setToken.address);
+          const pendingFunding = await perpV2Setup.exchange.getAllPendingFundingPayment(setToken.address);
+          const initialTrackedSettledFunding = trackedSettledFunding.add(pendingFunding.mul(-1));
+          const fundingWithdrawnNetFees = initialTrackedSettledFunding.sub(preciseMul(initialTrackedSettledFunding, performanceFeePercentage));
+
+          const usdAmountInvested = fundingWithdrawnNetFees.div(BigNumber.from(10).pow(12)).div(2);
+          // .155427105277853193
+          const amountOutOnDex = await uniV3Setup.quoter.callStatic.quoteExactInput(exchange.buySpotQuoteExactInputPath, usdAmountInvested);
+
+          await subject();
+
+          const currentSpotPositionUnit = await setToken.getDefaultPositionRealUnit(strategy.spotAssetAddress);
+          const expectedNewPositionUnit = iniitalSpotPostionUnit.add(preciseDiv(amountOutOnDex, setSupply));
+
+          expect(currentSpotPositionUnit).to.closeTo(expectedNewPositionUnit, ether(0.000001).toNumber());
+        });
+
+        describe("when reinvest interval has NOT elapsed", async () => {
+          beforeEach(async () => {
+            await subject();
+          });
+
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Reinvestment interval not elapsed");
+          });
         });
       });
 
-      describe.skip("when not engaged", async () => { });
+      describe("when not engaged", async () => {
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Current leverage ratio must NOT be 0");
+        });
+      });
     });
 
     describe("#setMethodologySettings", async () => {
