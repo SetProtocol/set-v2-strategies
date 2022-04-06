@@ -262,6 +262,9 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
         _validateExchangeSettings(_exchange);
         _validateNonExchangeSettings(methodology, execution, incentive);
+
+        // Set reinvest interval
+        lastReinvestTimestamp = block.timestamp;
     }
 
     /* ============ External Functions ============ */
@@ -579,10 +582,12 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         LeverageInfo memory leverageInfo = LeverageInfo({
             action: actionInfo,
             currentLeverageRatio: currentLeverageRatio,
-            slippageTolerance: isRipcord ? incentive.incentivizedSlippageTolerance : execution.slippageTolerance,
+            slippageTolerance: isRipcord ?
+                incentive.incentivizedSlippageTolerance
+                : execution.slippageTolerance,
             twapMaxTradeSize: isRipcord ?
-                exchange.incentivizedTwapMaxTradeSize :
-                exchange.twapMaxTradeSize
+                exchange.incentivizedTwapMaxTradeSize
+                : exchange.twapMaxTradeSize
         });
 
         (size, ) = _calculateChunkRebalanceNotional(leverageInfo, newLeverageRatio);
@@ -1233,34 +1238,33 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         view
         returns(ShouldRebalance)
     {
-        // If none of the below conditions are satisfied, then should not rebalance
-        ShouldRebalance shouldRebalanceEnum = ShouldRebalance.NONE;
-
         // Get absolute value of current leverage ratio
         uint256 currentLeverageRatioAbs = _currentLeverageRatio.abs();
 
         // If above ripcord threshold, then check if incentivized cooldown period has elapsed
         if (currentLeverageRatioAbs >= incentive.incentivizedLeverageRatio.abs()) {
             if (lastTradeTimestamp.add(incentive.incentivizedTwapCooldownPeriod) < block.timestamp) {
-                shouldRebalanceEnum = ShouldRebalance.RIPCORD;
+                return ShouldRebalance.RIPCORD;
             }
-        } else {
-            // If TWAP, then check if the cooldown period has elapsed
-            if (twapLeverageRatio != 0) {
-                if (lastTradeTimestamp.add(execution.twapCooldownPeriod) < block.timestamp) {
-                    shouldRebalanceEnum = ShouldRebalance.ITERATE_REBALANCE;
-                }
-            } else {
-                // If not TWAP, then check if the rebalance interval has elapsed OR current leverage is above max leverage OR current leverage is below
-                // min leverage
-                if (
-                    block.timestamp.sub(lastTradeTimestamp) > methodology.rebalanceInterval
-                    || currentLeverageRatioAbs > _maxLeverageRatio.abs()
-                    || currentLeverageRatioAbs < _minLeverageRatio.abs()
-                ) {
-                    shouldRebalanceEnum = ShouldRebalance.REBALANCE;
-                }
+            return ShouldRebalance.NONE;
+        }
+
+        // If TWAP, then check if the cooldown period has elapsed
+        if (twapLeverageRatio != 0) {
+            if (lastTradeTimestamp.add(execution.twapCooldownPeriod) < block.timestamp) {
+                return ShouldRebalance.ITERATE_REBALANCE;
             }
+            return ShouldRebalance.NONE;
+        }
+
+        // If not TWAP, then check if the rebalance interval has elapsed OR current leverage is above max leverage OR current leverage is below
+        // min leverage
+        if (
+            block.timestamp.sub(lastTradeTimestamp) > methodology.rebalanceInterval
+            || currentLeverageRatioAbs > _maxLeverageRatio.abs()
+            || currentLeverageRatioAbs < _minLeverageRatio.abs()
+        ) {
+            return ShouldRebalance.REBALANCE;
         }
 
         // Rebalancing is given priority over reinvestment.
@@ -1268,10 +1272,10 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         // and `ShouldRebalance.REBALANCE` in the next block. In such cases, the keeper system would have to replace their
         // reinvestment transaction with a rebalance transaction. // TODO: Add more clarity.
         if (block.timestamp.sub(lastReinvestTimestamp) > methodology.reinvestInterval) {
-            shouldRebalanceEnum = ShouldRebalance.REINVEST;
+            return ShouldRebalance.REINVEST;
         }
 
-        return shouldRebalanceEnum;
+        return ShouldRebalance.NONE;
     }
 
     /* =========== Validation Functions =========== */

@@ -2307,17 +2307,16 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       });
     });
 
-    describe("#reinvest", async () => {
+    describe.skip("#reinvest", async () => {
       let subjectCaller: Account;
 
       cacheBeforeEach(async () => {
-        // set funding rate to zero; allows us to avoid calculating small amounts of funding
-        // accrued in our test cases
+        // set funding rate to NON-ZERO, to allow funding to accrue which would be reinvested
         await perpV2Setup.clearingHouseConfig.setMaxFundingRate(BigNumber.from(0.1e6));
 
         await leverageStrategyExtension.engage();
 
-        // Set index price below mark price to accrue funding to short position
+        // Set index price below mark price to accrue positive funding to short position
         await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(950));
         await perpV2PriceFeedMock.setPrice(BigNumber.from(950).mul(10 ** 8));
         await increaseTimeAsync(ONE_DAY_IN_SECONDS);
@@ -2327,30 +2326,79 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         subjectCaller = owner;
       });
 
-
       async function subject(): Promise<any> {
         return await leverageStrategyExtension.connect(subjectCaller.wallet).reinvest();
       }
 
       it("verify initial testing state", async () => {
         const pendingFunding = await perpV2Setup.exchange.getAllPendingFundingPayment(setToken.address);
-        console.log("Pending Funding", pendingFunding.mul(-1).toString());
+        expect(pendingFunding.mul(-1)).to.gt(ZERO);
       });
 
-      describe("when engaged", async () => {
-        describe("when reinvest interval has elapsed", async () => {
+      it("should withdraw tracked settled funding from Perpetual protocol", async () => {
+        const trackedSettledFunding = await perpBasisTradingModule.settledFunding(setToken.address);
+        const pendingFunding = await perpV2Setup.exchange.getAllPendingFundingPayment(setToken.address);
+        const initialTrackedSettledFunding = trackedSettledFunding.add(pendingFunding.mul(-1));
+        console.log(initialTrackedSettledFunding.toString());
+        const initialCollateralBalance = await perpV2Setup.vault.getBalance(setToken.address);
 
+        await subject();
+
+        const currentTrackedSettledFunding = await perpBasisTradingModule.settledFunding(setToken.address);
+        const currentCollateralBalance = await perpV2Setup.vault.getBalance(setToken.address);
+
+        expect(currentTrackedSettledFunding).to.be.lt(ether(0.000001));
+        expect(initialCollateralBalance.sub(currentCollateralBalance)).to.eq(initialTrackedSettledFunding.div(BigNumber.from(10).pow(12)));
+      });
+
+      it("should reinvest into perp position", async () => {
+        const initialPositions = await perpBasisTradingModule.getPositionNotionalInfo(setToken.address);
+        const trackedSettledFunding = await perpBasisTradingModule.settledFunding(setToken.address);
+        const pendingFunding = await perpV2Setup.exchange.getAllPendingFundingPayment(setToken.address);
+        const initialTrackedSettledFunding = trackedSettledFunding.add(pendingFunding.mul(-1));
+        console.log(initialTrackedSettledFunding.toString());
+        console.log(initialTrackedSettledFunding.toString());
+        const usdAmountInvested = initialTrackedSettledFunding.div(BigNumber.from(10).pow(12)).div(2);
+        // const amountOutOnDex = await uniV3Setup.quoter.callStatic.quoteExactInput(exchange.buySpotQuoteExactInputPath, usdAmountInvested);
+        console.log((await perpV2Setup.usdc.balanceOf(owner.address)).toString(), usdAmountInvested.toString());
+        const amountOutOnDex = await uniV3Setup.quoter.callStatic.quoteExactInputSingle(
+          perpV2Setup.usdc.address,
+          systemSetup.weth.address,
+          3000,
+          usdAmountInvested,
+          0
+        );
+
+        await subject();
+
+        const currentPositions = await perpBasisTradingModule.getPositionNotionalInfo(setToken.address);
+        const expectedBaseBalance = initialPositions[0].baseBalance.add(amountOutOnDex.mul(-1));
+
+        expect(currentPositions[0].baseBalance).eq(expectedBaseBalance);
+        expect(currentPositions[0].baseToken).eq(strategy.spotAssetAddress);
+      });
+
+      it("should reinvest into spot position", async () => {
+        const setSupply = await setToken.totalSupply();
+        const iniitalPostionUnit = await setToken.getDefaultPositionRealUnit(strategy.spotAssetAddress);
+        const usdAmountInvested = (await perpBasisTradingModule.settledFunding(setToken.address)).div(BigNumber.from(10).pow(12)).div(2);
+        const amountOutOnDex = await uniV3Setup.quoter.callStatic.quoteExactInput(exchange.buySpotQuoteExactInputPath, usdAmountInvested);
+
+        await subject();
+
+        const currentPositionUnit = await setToken.getDefaultPositionRealUnit(strategy.spotAssetAddress);
+        const expectedNewPositionUnit = iniitalPostionUnit.add(preciseDiv(amountOutOnDex, setSupply));
+
+        expect(currentPositionUnit).to.eq(expectedNewPositionUnit);
+      });
+
+      describe("when reinvest interval has NOT elapsed", async () => {
+        beforeEach(async () => {
+          await subject();
         });
 
-        describe("when reinvest interval has NOT elapsed", async () => {
-
-          beforeEach(async () => {
-            await subject();
-          });
-
-          it("should revert", async () => {
-            await expect(subject()).to.be.revertedWith("Reinvestment interval not elapsed");
-          });
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Reinvestment interval not elapsed");
         });
       });
 
@@ -2768,7 +2816,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       });
     });
 
-    describe.skip("#shouldRebalance", async () => {
+    describe("#shouldRebalance", async () => {
       let subjectCaller: Account;
 
       beforeEach(async () => {
@@ -2794,7 +2842,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
           newExchangeSettings = {
             ...exchange,
-            twapMaxTradeSize: ether(.1),
+            twapMaxTradeSize: ether(.01),
             incentivizedTwapMaxTradeSize: ether(1)
           };
           await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
@@ -2810,7 +2858,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         describe("when above incentivized leverage ratio and incentivized TWAP cooldown has elapsed", async () => {
           beforeEach(async () => {
             // Set to above incentivized ratio
-            await perpV2PriceFeedMock.setPrice(BigNumber.from(1100).mul(10 ** 8));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
             await increaseTimeAsync(BigNumber.from(100));    // >60 (incentivized cooldown period)
           });
 
@@ -2850,7 +2898,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         describe("when above incentivized leverage ratio and incentivized TWAP cooldown has NOT elapsed", async () => {
           beforeEach(async () => {
             // Set to above incentivized ratio
-            await perpV2PriceFeedMock.setPrice(BigNumber.from(1100).mul(10 ** 8));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
             await increaseTimeAsync(BigNumber.from(50));    // <60 (incentivized cooldown period)
           });
 
@@ -2897,7 +2945,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         describe("when above incentivized leverage ratio and cooldown period has elapsed", async () => {
           beforeEach(async () => {
             // Set to above incentivized ratio
-            await perpV2PriceFeedMock.setPrice(BigNumber.from(1100).mul(10 ** 8));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
             await increaseTimeAsync(BigNumber.from(100));
           });
 
@@ -2974,7 +3022,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
         describe("when above incentivized leverage ratio and incentivized TWAP cooldown has NOT elapsed", async () => {
           beforeEach(async () => {
-            await perpV2PriceFeedMock.setPrice(BigNumber.from(1100).mul(10 ** 8));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
           });
 
           it("should verify initial leverage conditions", async () => {
@@ -2990,7 +3038,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           });
         });
 
-        describe("when between max and min leverage ratio and rebalance interval has NOT elapsed", async () => {
+        describe("when between max and min leverage ratio and both rebalance and reinvest interval has NOT elapsed", async () => {
           beforeEach(async () => {
             await perpV2PriceFeedMock.setPrice(BigNumber.from(1010).mul(10 ** 8));
           });
@@ -3002,23 +3050,59 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             expect(currentLeverageRatio.abs()).to.be.lt(methodology.maxLeverageRatio.abs());
           });
 
-          it("should not rebalance", async () => {
+          it("should not rebalance and nor reinvest", async () => {
             const shouldRebalance = await subject();
 
             expect(shouldRebalance).to.eq(ZERO);
           });
         });
+
+        describe("when between max and min leverage ratio and rebalance intereval has NOT elapsed but reinvest interval has elapsed", async () => {
+          let newMethodology: PerpV2BasisMethodologySettings;
+
+          beforeEach(async () => {
+            newMethodology = {
+              ...methodology,
+              reinvestInterval: ONE_DAY_IN_SECONDS.div(2)     // Set reinvest interval < rebalance interval
+            };
+            await leverageStrategyExtension.setMethodologySettings(newMethodology);
+            await increaseTimeAsync(ONE_DAY_IN_SECONDS.div(2));
+
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1010).mul(10 ** 8));
+          });
+
+          it("should verify initial conditions", async () => {
+            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+            const reinvestInterval = (await leverageStrategyExtension.getMethodology()).reinvestInterval;
+            const lastReinvestTimestamp = await leverageStrategyExtension.lastReinvestTimestamp();
+            const lastBlockTimestamp = await getLastBlockTimestamp();
+
+            expect(lastReinvestTimestamp.add(reinvestInterval)).lt(lastBlockTimestamp);
+            expect(currentLeverageRatio.abs()).to.be.gt(methodology.minLeverageRatio.abs());
+            expect(currentLeverageRatio.abs()).to.be.lt(methodology.maxLeverageRatio.abs());
+          });
+
+          it("should reinvest", async () => {
+            const shouldRebalance = await subject();
+
+            expect(shouldRebalance).to.eq(BigNumber.from(4));
+          });
+        });
       });
     });
 
-    describe.skip("#shouldRebalanceWithBounds", async () => {
+    describe("#shouldRebalanceWithBounds", async () => {
       let subjectMinLeverageRatio: BigNumber;
       let subjectMaxLeverageRatio: BigNumber;
 
       cacheBeforeEach(async () => {
         await initializeRootScopeContracts();
         await leverageStrategyExtension.engage();
-        // await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+      });
+
+      beforeEach(() => {
+        subjectMinLeverageRatio = ether(-0.85);
+        subjectMaxLeverageRatio = ether(-1.15);
       });
 
       async function subject(): Promise<number> {
@@ -3038,7 +3122,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
           newExchangeSettings = {
             ...exchange,
-            twapMaxTradeSize: ether(.1),
+            twapMaxTradeSize: ether(.01),
             incentivizedTwapMaxTradeSize: ether(1)
           };
           await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
@@ -3054,7 +3138,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         describe("when above incentivized leverage ratio and incentivized TWAP cooldown has elapsed", async () => {
           beforeEach(async () => {
             // Set to above incentivized ratio
-            await perpV2PriceFeedMock.setPrice(BigNumber.from(1100).mul(10 ** 8));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
             await increaseTimeAsync(BigNumber.from(100));    // >60 (incentivized cooldown period)
           });
 
@@ -3074,7 +3158,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         describe("when below incentivized leverage ratio and regular TWAP cooldown has elapsed", async () => {
           beforeEach(async () => {
             // Set to below incentivized ratio
-            await perpV2PriceFeedMock.setPrice(BigNumber.from(900).mul(10 ** 8));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1050).mul(10 ** 8));
             await increaseTimeAsync(BigNumber.from(4000));    // >3000 (regular cooldown period)
           });
 
@@ -3094,7 +3178,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         describe("when above incentivized leverage ratio and incentivized TWAP cooldown has NOT elapsed", async () => {
           beforeEach(async () => {
             // Set to above incentivized ratio
-            await perpV2PriceFeedMock.setPrice(BigNumber.from(1100).mul(10 ** 8));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
             await increaseTimeAsync(BigNumber.from(50));    // <60 (incentivized cooldown period)
           });
 
@@ -3141,7 +3225,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         describe("when above incentivized leverage ratio and cooldown period has elapsed", async () => {
           beforeEach(async () => {
             // Set to above incentivized ratio
-            await perpV2PriceFeedMock.setPrice(BigNumber.from(1100).mul(10 ** 8));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
             await increaseTimeAsync(BigNumber.from(100));
           });
 
@@ -3218,7 +3302,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
         describe("when above incentivized leverage ratio and incentivized TWAP cooldown has NOT elapsed", async () => {
           beforeEach(async () => {
-            await perpV2PriceFeedMock.setPrice(BigNumber.from(1100).mul(10 ** 8));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
           });
 
           it("should verify initial leverage conditions", async () => {
@@ -3227,14 +3311,14 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             expect(currentLeverageRatio.abs()).to.be.gt(incentive.incentivizedLeverageRatio.abs());
           });
 
-          it("should not rebalance", async () => {
+          it("should not ripcord", async () => {
             const shouldRebalance = await subject();
 
             expect(shouldRebalance).to.eq(ZERO);
           });
         });
 
-        describe("when between max and min leverage ratio and rebalance interval has NOT elapsed", async () => {
+        describe("when between max and min leverage ratio and both rebalance and reinvest interval has NOT elapsed", async () => {
           beforeEach(async () => {
             await perpV2PriceFeedMock.setPrice(BigNumber.from(1010).mul(10 ** 8));
           });
@@ -3246,10 +3330,42 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             expect(currentLeverageRatio.abs()).to.be.lt(methodology.maxLeverageRatio.abs());
           });
 
-          it("should not rebalance", async () => {
+          it("should not rebalance and nor reinvest", async () => {
             const shouldRebalance = await subject();
 
             expect(shouldRebalance).to.eq(ZERO);
+          });
+        });
+
+        describe("when between max and min leverage ratio and rebalance intereval has NOT elapsed but reinvest interval has elapsed", async () => {
+          let newMethodology: PerpV2BasisMethodologySettings;
+
+          beforeEach(async () => {
+            newMethodology = {
+              ...methodology,
+              reinvestInterval: ONE_DAY_IN_SECONDS.div(2)     // Set reinvest interval < rebalance interval
+            };
+            await leverageStrategyExtension.setMethodologySettings(newMethodology);
+            await increaseTimeAsync(ONE_DAY_IN_SECONDS.div(2));
+
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1010).mul(10 ** 8));
+          });
+
+          it("should verify initial conditions", async () => {
+            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+            const reinvestInterval = (await leverageStrategyExtension.getMethodology()).reinvestInterval;
+            const lastReinvestTimestamp = await leverageStrategyExtension.lastReinvestTimestamp();
+            const lastBlockTimestamp = await getLastBlockTimestamp();
+
+            expect(lastReinvestTimestamp.add(reinvestInterval)).lt(lastBlockTimestamp);
+            expect(currentLeverageRatio.abs()).to.be.gt(methodology.minLeverageRatio.abs());
+            expect(currentLeverageRatio.abs()).to.be.lt(methodology.maxLeverageRatio.abs());
+          });
+
+          it("should reinvest", async () => {
+            const shouldRebalance = await subject();
+
+            expect(shouldRebalance).to.eq(BigNumber.from(4));
           });
         });
 
