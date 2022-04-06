@@ -406,7 +406,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
             int256 totalRebalanceNotional
         ) = _calculateChunkRebalanceNotional(leverageInfo, newLeverageRatio);
 
-        _executeEngageTrades(leverageInfo, chunkRebalanceNotional);
+        _executeRebalanceTrades(leverageInfo, chunkRebalanceNotional);
 
         _updateDisengageState();
 
@@ -745,7 +745,6 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         int256 baseRebalanceUnits = _chunkRebalanceNotional.preciseDiv(_leverageInfo.action.setTotalSupply.toInt256());
         uint256 oppositeBoundUnits = _calculateOppositeBoundUnits(baseRebalanceUnits.neg(), _leverageInfo.action, _leverageInfo.slippageTolerance).div(1000000000000);
 
-        // Todo: Fix this for disengage.
         _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, true, false);
 
         uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();

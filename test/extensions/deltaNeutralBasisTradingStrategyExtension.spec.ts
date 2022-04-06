@@ -2194,9 +2194,8 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       });
     });
 
-    describe.skip("#disengage", async () => {
+    describe("#disengage", async () => {
       let subjectCaller: Account;
-      // let ifEngaged: boolean;
 
       beforeEach(async () => {
         subjectCaller = owner;
@@ -2214,7 +2213,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
         context("when notional is less than max trade size", async () => {
           it("should remove the base position from the SetToken", async () => {
-            const initialPositions = await perpBasisTradingModule.getPositionNotionalInfo(setToken.address);
+            const initialPositions = await perpBasisTradingModule.getPositionUnitInfo(setToken.address);
 
             await subject();
 
@@ -2222,6 +2221,17 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(0);
+          });
+
+          it("should sell all the spot assets", async () => {
+            const initialSpotAssetUnit = await setToken.getDefaultPositionRealUnit(spotAsset.address);
+
+            await subject();
+
+            const newSpotAssetUnit = await setToken.getDefaultPositionRealUnit(spotAsset.address);
+
+            expect(initialSpotAssetUnit).to.be.gt(ZERO);
+            expect(newSpotAssetUnit).to.be.eq(ZERO);
           });
 
           it("should set the last trade timestamp", async () => {
@@ -2259,6 +2269,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           cacheBeforeEach(intializeContracts);
 
           it("should update the base position on the SetToken correctly", async () => {
+            const totalSupply = await setToken.totalSupply();
             const initialPositions = await perpBasisTradingModule.getPositionNotionalInfo(setToken.address);
 
             await subject();
@@ -2266,13 +2277,24 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             const newPositions = await perpBasisTradingModule.getPositionUnitInfo(setToken.address);
             const newPosition = newPositions[0];
 
-            const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(newExchangeSettings.twapMaxTradeSize), totalSupply);
 
             expect(initialPositions.length).to.eq(1);
             expect(newPositions.length).to.eq(1);
             expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
+          });
+
+          it("should update the spot position on the SetToken correctly", async () => {
+            const totalSupply = await setToken.totalSupply();
+            const initialPositionUnit = await setToken.getDefaultPositionRealUnit(spotAsset.address);
+            const expectedNewPositionUnit = initialPositionUnit.sub(preciseDiv(newExchangeSettings.twapMaxTradeSize, totalSupply));
+
+            await subject();
+
+            const newPositionUnit = await setToken.getDefaultPositionRealUnit(spotAsset.address);
+
+            expect(newPositionUnit).to.eq(expectedNewPositionUnit);
           });
 
           it("should set the last trade timestamp", async () => {
@@ -2303,6 +2325,12 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
               await expect(subject()).to.be.revertedWith("SetToken must have > 0 supply");
             });
           });
+        });
+      });
+
+      describe("when not engaged", async () => {
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Current leverage ratio must NOT be 0");
         });
       });
     });
@@ -3391,7 +3419,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       });
     });
 
-    describe.only("#getChunkRebalanceNotional", async () => {
+    describe("#getChunkRebalanceNotional", async () => {
       let collateralToken: Address;
 
       cacheBeforeEach(async () => {
@@ -3652,7 +3680,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       });
     });
 
-    describe.only("#getCurrentLeverageRatio", async () => {
+    describe("#getCurrentLeverageRatio", async () => {
 
       cacheBeforeEach(initializeRootScopeContracts);
 
