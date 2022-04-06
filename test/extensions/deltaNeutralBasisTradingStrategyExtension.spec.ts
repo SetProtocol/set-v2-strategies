@@ -50,6 +50,7 @@ import { BaseManager, DeltaNeutralBasisTradingStrategyExtension } from "@utils/c
 const expect = getWaffleExpect();
 const provider = ethers.provider;
 
+// todo: Add unit tests for all events
 
 describe("DeltaNeutralBasisTradingStrategyExtension", () => {
   let owner: Account;
@@ -271,7 +272,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
     const incentivizedTwapMaxTradeSize = ether(25);
     const incentivizedTwapCooldownPeriod = BigNumber.from(60);
-    const incentivizedSlippageTolerance = ether(0.05);
+    const incentivizedSlippageTolerance = ether(0.15);
     const etherReward = ether(1);
     const incentivizedLeverageRatio = ether(-1.3);
 
@@ -1937,7 +1938,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       });
     });
 
-    describe.skip("#ripcord", async () => {
+    describe("#ripcord", async () => {
       let transferredEth: BigNumber;
       let subjectCaller: Account;
 
@@ -1959,9 +1960,8 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         context("when not in a TWAP rebalance", async () => {
           cacheBeforeEach(async () => {
             // Set to above incentivized ratio
-            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1200));
-            await perpV2PriceFeedMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
-            console.log((await leverageStrategyExtension.getCurrentLeverageRatio()).toString());
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1150));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1150).mul(10 ** 8));
 
             // Deposit ETH to incentivize calling ripcord
             transferredEth = ether(1);
@@ -1994,10 +1994,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
           it("should update the baseToken position on the SetToken correctly", async () => {
             const initialPositions = await perpBasisTradingModule.getPositionNotionalInfo(setToken.address);
-
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-
-
             const expectedNewLeverageRatio = methodology.maxLeverageRatio;
 
             await subject();
@@ -2021,6 +2018,30 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             expect(newPositions.length).to.eq(1);
             expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
             expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
+          });
+
+          it("should update the spot asset position on the SetToken correctly", async () => {
+            const totalSupply = await setToken.totalSupply();
+            const initialPositions = await perpBasisTradingModule.getPositionNotionalInfo(setToken.address);
+            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+            const expectedNewLeverageRatio = methodology.maxLeverageRatio;
+            const initialSpotPositionUnit = await setToken.getDefaultPositionRealUnit(spotAsset.address);
+
+            await subject();
+
+            const totalRebalanceNotional = preciseDiv(
+              preciseMul(initialPositions[0].baseBalance, expectedNewLeverageRatio.sub(currentLeverageRatio)),    // numerator
+              preciseMul(currentLeverageRatio, ether(1).sub(expectedNewLeverageRatio))                            // denominator
+            );
+
+            const chunkRebalanceNotional = totalRebalanceNotional.abs().gt(exchange.incentivizedTwapMaxTradeSize)
+              ? (totalRebalanceNotional.gt(ZERO) ? exchange.incentivizedTwapMaxTradeSize : exchange.incentivizedTwapMaxTradeSize.mul(-1))
+              : totalRebalanceNotional;
+
+            const newSpotPositionUnit = await setToken.getDefaultPositionRealUnit(spotAsset.address);
+            const expectedNewPositionUnit = initialSpotPositionUnit.sub(preciseDiv(chunkRebalanceNotional.abs(), totalSupply));
+
+            expect(newSpotPositionUnit).to.eq(expectedNewPositionUnit);
           });
 
           it("should transfer incentive", async () => {
@@ -2060,13 +2081,12 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             );
           });
 
-          describe.skip("when greater than incentivized max trade size", async () => {
+          describe("when greater than incentivized max trade size", async () => {
             let newIncentivizedMaxTradeSize: BigNumber;
 
             cacheBeforeEach(async () => {
               newIncentivizedMaxTradeSize = ether(0.01);
               const newPerpV2BasisExchangeSettings: PerpV2BasisExchangeSettings = {
-                ...exchange,
                 ...exchange,
                 twapMaxTradeSize: ether(0.001),
                 incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
@@ -2098,9 +2118,21 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
               expect(newPosition.baseToken).to.eq(perpV2Setup.vETH.address);
               expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
             });
+
+            it("should update the baseToken position on the SetToken correctly", async () => {
+              const totalSupply = await setToken.totalSupply();
+              const initialSpotPositionUnit = await setToken.getDefaultPositionRealUnit(spotAsset.address);
+
+              await subject();
+
+              const newSpotPositionUnit = await setToken.getDefaultPositionRealUnit(spotAsset.address);
+              const expectedNewPositionUnit = initialSpotPositionUnit.sub(preciseDiv(newIncentivizedMaxTradeSize.abs(), totalSupply));
+
+              expect(newSpotPositionUnit).to.eq(expectedNewPositionUnit);
+            });
           });
 
-          describe.skip("when incentivized cooldown period has not elapsed", async () => {
+          describe("when incentivized cooldown period has not elapsed", async () => {
             let newIncentivizedMaxTradeSize: BigNumber;
 
             cacheBeforeEach(async () => {
@@ -2122,7 +2154,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             });
           });
 
-          describe.skip("when below incentivized leverage ratio threshold", async () => {
+          describe("when below incentivized leverage ratio threshold", async () => {
             beforeEach(async () => {
               await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1010));
               await perpV2PriceFeedMock.setPrice(BigNumber.from(1010).mul(10 ** 8));
@@ -2134,7 +2166,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           });
         });
 
-        context.skip("when in the midst of a TWAP rebalance", async () => {
+        context("when in the midst of a TWAP rebalance", async () => {
           let newIncentivizedMaxTradeSize: BigNumber;
 
           cacheBeforeEach(async () => {
@@ -2157,8 +2189,8 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             await increaseTimeAsync(BigNumber.from(100));
 
             // Set to above incentivized ratio
-            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1100));
-            await perpV2PriceFeedMock.setPrice(BigNumber.from(1100).mul(10 ** 8));
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1150));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1150).mul(10 ** 8));
           });
 
           it("should validate leverage ratio and in TWAP", async () => {
