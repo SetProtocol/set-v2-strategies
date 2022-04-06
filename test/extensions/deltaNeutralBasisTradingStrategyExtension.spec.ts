@@ -3391,15 +3391,19 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       });
     });
 
-    describe.skip("#getChunkRebalanceNotional", async () => {
+    describe.only("#getChunkRebalanceNotional", async () => {
+      let collateralToken: Address;
+
       cacheBeforeEach(async () => {
         await initializeRootScopeContracts();
+
+        collateralToken = await perpBasisTradingModule.collateralToken();
 
         await leverageStrategyExtension.engage();
         await increaseTimeAsync(ONE_DAY_IN_SECONDS);
       });
 
-      async function subject(): Promise<[BigNumber, Address, Address]> {
+      async function subject(): Promise<[BigNumber, Address, Address, Address, Address]> {
         return await leverageStrategyExtension.getChunkRebalanceNotional();
       }
 
@@ -3413,7 +3417,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
           exchangeSettings = {
             ...exchange,
-            twapMaxTradeSize: ether(.1),
+            twapMaxTradeSize: ether(.01),
             incentivizedTwapMaxTradeSize: ether(1)
           };
           await leverageStrategyExtension.setExchangeSettings(exchangeSettings);
@@ -3431,7 +3435,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         describe("when above incentivized leverage ratio", async () => {
           beforeEach(async () => {
             // Set to above incentivized ratio
-            await perpV2PriceFeedMock.setPrice(BigNumber.from(1100).mul(10 ** 8));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
           });
 
           it("should verify initial leverage conditions", async () => {
@@ -3440,12 +3444,12 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             expect(currentLeverageRatio.abs()).to.be.gt(incentive.incentivizedLeverageRatio.abs());
           });
 
-          it("should return correct total rebalance size, sell asset and buy asset", async () => {
+          it("should return correct total rebalance size, sell assets and buy assets", async () => {
             const initialPositions = await perpBasisTradingModule.getPositionNotionalInfo(setToken.address);
             const newLeverageRatio = methodology.maxLeverageRatio;
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
 
-            const [chunkRebalance, sellAsset, buyAsset] = await subject();
+            const [chunkRebalance, sellAssetOnPerp, buyAssetOnPerp, sellAssetOnDex, buyAssetOnDex] = await subject();
 
             const totalRebalanceNotional = preciseDiv(
               preciseMul(initialPositions[0].baseBalance, newLeverageRatio.sub(currentLeverageRatio)),    // numerator
@@ -3459,8 +3463,10 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
               )
               : totalRebalanceNotional;
 
-            expect(sellAsset).to.eq(strategy.virtualQuoteAddress);
-            expect(buyAsset).to.eq(strategy.virtualBaseAddress);
+            expect(sellAssetOnPerp).to.eq(strategy.virtualQuoteAddress);
+            expect(buyAssetOnPerp).to.eq(strategy.virtualBaseAddress);
+            expect(sellAssetOnDex).to.eq(strategy.spotAssetAddress);
+            expect(buyAssetOnDex).to.eq(collateralToken);
             expect(chunkRebalance).to.eq(expectedTotalRebalance);
           });
         });
@@ -3485,7 +3491,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
               methodology
             );
 
-            const [chunkRebalance, sellAsset, buyAsset] = await subject();
+            const [chunkRebalance, sellAssetOnPerp, buyAssetOnPerp, sellAssetOnDex, buyAssetOnDex] = await subject();
 
             const totalRebalanceNotional = preciseDiv(
               preciseMul(initialPositions[0].baseBalance, newLeverageRatio.sub(currentLeverageRatio)),    // numerator
@@ -3498,8 +3504,10 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
               )
               : totalRebalanceNotional;
 
-            expect(sellAsset).to.eq(strategy.virtualQuoteAddress);
-            expect(buyAsset).to.eq(strategy.virtualBaseAddress);
+            expect(sellAssetOnPerp).to.eq(strategy.virtualQuoteAddress);
+            expect(buyAssetOnPerp).to.eq(strategy.virtualBaseAddress);
+            expect(sellAssetOnDex).to.eq(strategy.spotAssetAddress);
+            expect(buyAssetOnDex).to.eq(collateralToken);
             expect(chunkRebalance).to.eq(expectedTotalRebalance);
           });
         });
@@ -3509,7 +3517,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         describe("when above incentivized leverage ratio", async () => {
           beforeEach(async () => {
             // Set to above incentivized ratio
-            await perpV2PriceFeedMock.setPrice(BigNumber.from(1100).mul(10 ** 8));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1200).mul(10 ** 8));
           });
 
           it("should verify initial leverage conditions", async () => {
@@ -3523,15 +3531,17 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             const newLeverageRatio = methodology.maxLeverageRatio;
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
 
-            const [chunkRebalance, sellAsset, buyAsset] = await subject();
+            const [chunkRebalance, sellAssetOnPerp, buyAssetOnPerp, sellAssetOnDex, buyAssetOnDex] = await subject();
 
             const expectedTotalRebalanceNotional = preciseDiv(
               preciseMul(initialPositions[0].baseBalance, newLeverageRatio.sub(currentLeverageRatio)),    // numerator
               preciseMul(currentLeverageRatio, ether(1).sub(newLeverageRatio))                            // denominator
             );
 
-            expect(sellAsset).to.eq(strategy.virtualQuoteAddress);
-            expect(buyAsset).to.eq(strategy.virtualBaseAddress);
+            expect(sellAssetOnPerp).to.eq(strategy.virtualQuoteAddress);
+            expect(buyAssetOnPerp).to.eq(strategy.virtualBaseAddress);
+            expect(sellAssetOnDex).to.eq(strategy.spotAssetAddress);
+            expect(buyAssetOnDex).to.eq(collateralToken);
             expect(chunkRebalance).to.eq(expectedTotalRebalanceNotional);
           });
         });
@@ -3556,15 +3566,17 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
               methodology
             );
 
-            const [chunkRebalance, sellAsset, buyAsset] = await subject();
+            const [chunkRebalance, sellAssetOnPerp, buyAssetOnPerp, sellAssetOnDex, buyAssetOnDex] = await subject();
 
             const expectedTotalRebalanceNotional = preciseDiv(
               preciseMul(initialPositions[0].baseBalance, newLeverageRatio.sub(currentLeverageRatio)),    // numerator
               preciseMul(currentLeverageRatio, ether(1).sub(newLeverageRatio))                            // denominator
             );
 
-            expect(buyAsset).to.eq(strategy.virtualQuoteAddress);
-            expect(sellAsset).to.eq(strategy.virtualBaseAddress);
+            expect(buyAssetOnPerp).to.eq(strategy.virtualQuoteAddress);
+            expect(sellAssetOnPerp).to.eq(strategy.virtualBaseAddress);
+            expect(buyAssetOnDex).to.eq(strategy.spotAssetAddress);
+            expect(sellAssetOnDex).to.eq(collateralToken);
             expect(chunkRebalance).to.eq(expectedTotalRebalanceNotional);
           });
         });
@@ -3589,16 +3601,18 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
               methodology
             );
 
-            const [chunkRebalance, sellAsset, buyAsset] = await subject();
+            const [chunkRebalance, sellAssetOnPerp, buyAssetOnPerp, sellAssetOnDex, buyAssetOnDex] = await subject();
 
             const expectedTotalRebalanceNotional = preciseDiv(
               preciseMul(initialPositions[0].baseBalance, newLeverageRatio.sub(currentLeverageRatio)),    // numerator
               preciseMul(currentLeverageRatio, ether(1).sub(newLeverageRatio))                            // denominator
             );
 
-            expect(buyAsset).to.eq(strategy.virtualBaseAddress);
-            expect(sellAsset).to.eq(strategy.virtualQuoteAddress);
+            expect(buyAssetOnPerp).to.eq(strategy.virtualBaseAddress);
+            expect(sellAssetOnPerp).to.eq(strategy.virtualQuoteAddress);
             expect(chunkRebalance).to.eq(expectedTotalRebalanceNotional);
+            expect(sellAssetOnDex).to.eq(strategy.spotAssetAddress);
+            expect(buyAssetOnDex).to.eq(collateralToken);;
           });
         });
 
@@ -3621,22 +3635,24 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
               methodology
             );
 
-            const [chunkRebalance, sellAsset, buyAsset] = await subject();
+            const [chunkRebalance, sellAssetOnPerp, buyAssetOnPerp, sellAssetOnDex, buyAssetOnDex] = await subject();
 
             const expectedTotalRebalanceNotional = preciseDiv(
               preciseMul(initialPositions[0].baseBalance, newLeverageRatio.sub(currentLeverageRatio)),    // numerator
               preciseMul(currentLeverageRatio, ether(1).sub(newLeverageRatio))                            // denominator
             );
 
-            expect(buyAsset).to.eq(strategy.virtualQuoteAddress);
-            expect(sellAsset).to.eq(strategy.virtualBaseAddress);
+            expect(buyAssetOnPerp).to.eq(strategy.virtualQuoteAddress);
+            expect(sellAssetOnPerp).to.eq(strategy.virtualBaseAddress);
+            expect(buyAssetOnDex).to.eq(strategy.spotAssetAddress);
+            expect(sellAssetOnDex).to.eq(collateralToken);
             expect(chunkRebalance).to.eq(expectedTotalRebalanceNotional);
           });
         });
       });
     });
 
-    describe.skip("#getCurrentLeverageRatio", async () => {
+    describe.only("#getCurrentLeverageRatio", async () => {
 
       cacheBeforeEach(initializeRootScopeContracts);
 

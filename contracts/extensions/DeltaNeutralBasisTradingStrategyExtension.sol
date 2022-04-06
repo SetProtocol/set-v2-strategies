@@ -227,6 +227,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     ExecutionSettings internal execution;                   // Struct containing execution parameters
     ExchangeSettings internal exchange;                     // Struct containing exchange settings
     IncentiveSettings internal incentive;                   // Struct containing incentive parameters for ripcord
+    IERC20 internal collateralToken;
     int256 public twapLeverageRatio;                        // Stored leverage ratio to keep track of target between TWAP rebalances
     uint256 public lastTradeTimestamp;                      // Last rebalance timestamp. Current timestamp must be greater than this variable + rebalance interval to rebalance
     uint256 public lastReinvestTimestamp;                   // Last reinvest timestamp. Current timestamp must be greater than this variable + reinvest interval to reinvest
@@ -265,6 +266,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
         // Set reinvest interval
         lastReinvestTimestamp = block.timestamp;
+        collateralToken = strategy.basisTradingModule.collateralToken();
     }
 
     /* ============ External Functions ============ */
@@ -551,14 +553,16 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
      * Note: This function does not take into account timestamps, so it may return a nonzero value even when shouldRebalance would return ShouldRebalance.NONE
      * (since minimum delays have not elapsed).
      *
-     * @return size             Total notional chunk size. Measured in the asset that would be sold.
-     * @return sellAsset        Asset that would be sold during a rebalance
-     * @return buyAsset         Asset that would be purchased during a rebalance
+     * @return size                   Total notional chunk size. Measured in the asset that would be sold.
+     * @return sellAssetOnPerp        Asset that would be sold during a rebalance on Perpetual protocol
+     * @return buyAssetOnPerp         Asset that would be purchased during a rebalance on Perpetual protocol
+     * @return sellAssetOnDex         Asset that would be sold during a rebalance on decentralized exchange
+     * @return buyAssetOnDex          Asset that would be purchased during a rebalance on decentralized exchange
      */
     function getChunkRebalanceNotional()
         external
         view
-        returns(int256 size, address sellAsset, address buyAsset)
+        returns(int256 size, address sellAssetOnPerp, address buyAssetOnPerp, address sellAssetOnDex, address buyAssetOnDex)
     {
 
         int256 newLeverageRatio;
@@ -595,24 +599,20 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         bool increaseLeverage = newLeverageRatio.abs() > currentLeverageRatio.abs();
 
         /*
-        ------------------------------------------------------------------------------
-        |   New LR             |  increaseLeverage |    sellAsset   |    buyAsset    |
-        ------------------------------------------------------------------------------
-        |   = 0 (not possible) |        x          |        x       |      x         |
-        |   > 0  (long)        |       true        |      quote     |    base        |
-        |   > 0  (long)        |       false       |      base      |    quote       |
-        |   < 0  (short)       |       true        |      base      |    quote       |
-        |   < 0  (short)       |       false       |      quote     |    base        |
-        ------------------------------------------------------------------------------
+        --------------------------------------------------------------------------------
+        |   New LR             |  increaseLeverage | sellAssetOnPerp |  buyAssetOnPerp |
+        --------------------------------------------------------------------------------
+        |   = 0 (not possible) |        x          |        x        |      x          |
+        |   > 0 (not supported)|        x          |        x        |      x          |
+        |   < 0  (short)       |       true        |      base       |    quote        |
+        |   < 0  (short)       |       false       |      quote      |    base         |
+        --------------------------------------------------------------------------------
         */
 
-        if (newLeverageRatio > 0) {
-            sellAsset = increaseLeverage ? strategy.virtualQuoteAddress : strategy.virtualBaseAddress;
-            buyAsset = increaseLeverage ? strategy.virtualBaseAddress : strategy.virtualQuoteAddress;
-        } else {
-            sellAsset = increaseLeverage ? strategy.virtualBaseAddress : strategy.virtualQuoteAddress;
-            buyAsset = increaseLeverage ? strategy.virtualQuoteAddress : strategy.virtualBaseAddress;
-        }
+        sellAssetOnPerp = increaseLeverage ? strategy.virtualBaseAddress : strategy.virtualQuoteAddress;
+        buyAssetOnPerp = increaseLeverage ? strategy.virtualQuoteAddress : strategy.virtualBaseAddress;
+        sellAssetOnDex = increaseLeverage ? address(collateralToken): strategy.spotAssetAddress;
+        buyAssetOnDex = increaseLeverage ? strategy.spotAssetAddress : address(collateralToken);
     }
 
     /**
@@ -748,7 +748,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         // Todo: Fix this for disengage.
         _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, true, false);
 
-        uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(strategy.basisTradingModule.collateralToken())).toUint256();
+        uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
         _deposit(defaultUsdcUnits);
 
         _executePerpTrade(baseRebalanceUnits, _leverageInfo);
@@ -779,7 +779,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         } else {
             _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, false, true);
             // Deposit the whole thing (rather than that only received from trade)
-            uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(strategy.basisTradingModule.collateralToken())).toUint256();
+            uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
             _deposit(defaultUsdcUnits);
         }
     }
@@ -819,7 +819,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
                 ITradeModule.trade.selector,        // basis trading module ?
                 address(strategy.setToken),
                 exchange.exchangeName,
-                address(strategy.basisTradingModule.collateralToken()),
+                address(collateralToken),
                 _usdcUnits,
                 address(strategy.spotAssetAddress),
                 _baseRebalanceUnits,
@@ -837,7 +837,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
                 exchange.exchangeName,
                 address(strategy.spotAssetAddress),
                 _baseRebalanceUnits,
-                address(strategy.basisTradingModule.collateralToken()),
+                address(collateralToken),
                 _usdcUnits,
                 exchangeData
             );
@@ -860,7 +860,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
     function _handleReinvest(LeverageInfo memory _leverageInfo) internal returns (uint256, uint256) {
 
-        uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(strategy.basisTradingModule.collateralToken())).toUint256();
+        uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
 
         // Todo: should we update timestamp here?
         if (defaultUsdcUnits == 0) { return (0, 0); }
@@ -875,7 +875,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         _executeDexTrade(baseUnits, defaultUsdcUnits, true, false);
 
         // Deposit rest
-        defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(strategy.basisTradingModule.collateralToken())).toUint256();
+        defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
         if (defaultUsdcUnits > 0) { _deposit(defaultUsdcUnits); }
 
         // Open perp position
@@ -974,7 +974,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         view
         returns (int256, int256)
     {
-        int256 collateralBalanceToBeUsedForOpeningPerpPosition = strategy.basisTradingModule.collateralToken().balanceOf(address(strategy.setToken)).div(2).toInt256().mul(1000000000000); // to precise units
+        int256 collateralBalanceToBeUsedForOpeningPerpPosition = collateralToken.balanceOf(address(strategy.setToken)).div(2).toInt256().mul(1000000000000); // to precise units
         int256 totalRebalanceNotional = collateralBalanceToBeUsedForOpeningPerpPosition.preciseMul(_targetLeverageRatio).preciseDiv(_leverageInfo.action.basePrice);
 
         uint256 chunkRebalanceNotionalAbs = Math.min(totalRebalanceNotional.abs(), _leverageInfo.twapMaxTradeSize);
