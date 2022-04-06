@@ -427,7 +427,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
         _validateReinvest();
 
-        _withdrawFundingAndAccrueFees(PreciseUnitMath.MAX_UINT_256);
+        _withdrawFundingAndAccrueFees(PreciseUnitMath.MAX_UINT_256);    // Pass MAX_UINT_256 to withdraw all funding.
 
         (uint256 usdcReinvestedNotional, uint256 spotAmountIncreasedNotional) = _handleReinvest(leverageInfo);
 
@@ -635,7 +635,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
     /**
      * Helper that checks if conditions are met for rebalance or ripcord. Returns an enum with 0 = no rebalance, 1 = call rebalance(), 2 = call iterateRebalance()
-     * 3 = call ripcord()
+     * 3 = call ripcord() and 4 = call reinvest()
      *
      * @return ShouldRebalance      Enum representing whether should rebalance
      */
@@ -648,7 +648,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     /**
      * Helper that checks if conditions are met for rebalance or ripcord with custom max and min bounds specified by caller. This function simplifies the
      * logic for off-chain keeper bots to determine what threshold to call rebalance when leverage exceeds max or drops below min. Returns an enum with
-     * 0 = no rebalance, 1 = call rebalance(), 2 = call iterateRebalance(), 3 = call ripcord()
+     * 0 = no rebalance, 1 = call rebalance(), 2 = call iterateRebalance(), 3 = call ripcord() and 4 = call reinvest()
      *
      * @param _customMinLeverageRatio          Min leverage ratio passed in by caller
      * @param _customMaxLeverageRatio          Max leverage ratio passed in by caller
@@ -717,7 +717,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * Calculates chunk rebalance notional and calls trade to open a position. Used in the rebalance() and iterateRebalance() functions
+     * Calculates chunk rebalance notional and calls `_executeEngageTrades` to open required positions. Used in the rebalance() and iterateRebalance() functions
      *
      * return uint256           Calculated notional to trade
      * return uint256           Total notional to rebalance over TWAP
@@ -734,7 +734,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * Calculate base rebalance units, opposite bound units and invoke trade on PerpV2BasisTradingModule.
+     * Calculate base rebalance units and opposite bound units. Invoke trade on TradeModule. Deposit rest of the collateral token and invoke trade
+     * on PerpV2BasisTradingModule.
      */
     function _executeEngageTrades(
         LeverageInfo memory _leverageInfo,
@@ -754,7 +755,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * Calculate base rebalance units, opposite bound units and invoke trade on PerpV2BasisTradingModule.
+     * Calculate base rebalance units and opposite bound units. Invoke trade on PerpV2BasisTradingModule. If levering, withdraw collateral token and invoke trade
+     * on TradeModule. If delevering, invoke trade on TradeModule and deposit the recieved collateral token to PerpV2.
      */
     function _executeRebalanceTrades(
         LeverageInfo memory _leverageInfo,
@@ -767,11 +769,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
         _executePerpTrade(baseRebalanceUnits, _leverageInfo);
 
-        int256 spotAssetUnitBefore =  strategy.setToken.getDefaultPositionRealUnit(strategy.spotAssetAddress);
-
         // just add a to sell in executeTrade
         if (baseRebalanceUnits < 0) {
-            bytes memory path = exchange.buyExactSpotTradeData.slice(0, exchange.buyExactSpotTradeData.length - 1);       // Extract path data from `_data`
             // todo: what if not enough balance
             _withdraw(oppositeBoundUnits);
             _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, true, false);
@@ -790,7 +789,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         uint256 oppositeBoundUnits = _calculateOppositeBoundUnits(_baseRebalanceUnits, _leverageInfo.action, _leverageInfo.slippageTolerance);
 
         bytes memory perpTradeCallData = abi.encodeWithSelector(
-            IPerpV2LeverageModuleV2.trade.selector,     // trade or trade AndTrackFunding
+            IPerpV2LeverageModuleV2.trade.selector,     // todo: trade or trade AndTrackFunding
             address(strategy.setToken),
             strategy.virtualBaseAddress,
             _baseRebalanceUnits,
@@ -815,7 +814,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
                 exchangeData = exchange.buyExactSpotTradeData;
             }
             dexTradeCallData = abi.encodeWithSelector(
-                ITradeModule.trade.selector,        // basis trading module ?
+                ITradeModule.trade.selector,
                 address(strategy.setToken),
                 exchange.exchangeName,
                 address(collateralToken),
@@ -846,7 +845,6 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     function _withdrawFundingAndAccrueFees(uint256 _fundingNotional) internal {
-        // Todo: May be put it into a handle reinvest function
         // Withdraw funding to be reinvested. Pass MAX_UINT_256 to withdraw all funding.
         bytes memory withdrawCallData = abi.encodeWithSelector(
             IPerpV2BasisTradingModule.withdrawFundingAndAccrueFees.selector,
@@ -861,8 +859,6 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
         uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
 
-        console.logUint(defaultUsdcUnits);
-        // Todo: should we update timestamp here?
         if (defaultUsdcUnits == 0) { return (0, 0); }
 
         uint256 setTotalSupply = strategy.setToken.totalSupply();
@@ -872,17 +868,13 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
         // We do slippage checks because we don't wanna get sandwiched attack by someone removing liquidity and giving us the worst price possible.
         // Todo: Is this trade vulnerable to that?
-        console.log("executing dex trade");
         _executeDexTrade(baseUnits, defaultUsdcUnits, true, false);
 
         // Deposit rest
         defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
-
-        console.logUint(defaultUsdcUnits);
         if (defaultUsdcUnits > 0) { _deposit(defaultUsdcUnits); }
 
         // Open perp position
-        console.log("executing perp trade");
         _executePerpTrade(baseUnits.toInt256().neg(), _leverageInfo);
 
         return (usdcAmountInNotional, spotAmountOutNotional);
@@ -961,15 +953,6 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         return _currentLeverageRatio > 0 ? newLeverageRatio.toInt256() : newLeverageRatio.toInt256().neg();
     }
 
-    /**
-     * Calculate total notional rebalance quantity and chunked rebalance quantity in base asset units for engaging the SetToken. Used in engage().
-     * Leverage ratio (for the base asset) is zero before engage. We open a new base asset position with size equals to (collateralBalance * targetLeverageRatio / baseAssetPrice)
-     * to gain (targetLeverageRatio * collateralBalance) worth of exposure to the base asset.
-     * Note: We can't use `_calculateChunkRebalanceNotional` function because CLR is 0 during engage and it would lead to a divison by zero error.
-     *
-     * return int256          Chunked rebalance notional in base asset units
-     * return int256          Total rebalance notional in base asset units
-     */
     function _calculateEngageRebalanceSize(
         LeverageInfo memory _leverageInfo,
         int256 _targetLeverageRatio
@@ -1008,7 +991,6 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         int256 leverageRatioDifference = _newLeverageRatio.sub(_leverageInfo.currentLeverageRatio);
         int256 denominator = _leverageInfo.currentLeverageRatio.preciseMul(PreciseUnitMath.preciseUnitInt().sub(_newLeverageRatio));
         int256 totalRebalanceNotional = leverageRatioDifference.preciseMul(_leverageInfo.action.baseBalance).preciseDiv(denominator);
-
 
         uint256 chunkRebalanceNotionalAbs = Math.min(totalRebalanceNotional.abs(), _leverageInfo.twapMaxTradeSize);
         return (
