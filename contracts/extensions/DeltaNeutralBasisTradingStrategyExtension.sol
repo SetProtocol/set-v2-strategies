@@ -21,6 +21,7 @@ pragma experimental ABIEncoderV2;
 
 import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Math } from "@openzeppelin/contracts/math/Math.sol";
 import { SafeCast } from "@openzeppelin/contracts/utils/SafeCast.sol";
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
@@ -35,17 +36,15 @@ import { ITradeModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/
 import { IVault } from "@setprotocol/set-protocol-v2/contracts/interfaces/external/perp-v2/IVault.sol";
 import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/PreciseUnitMath.sol";
 import { StringArrayUtils } from "@setprotocol/set-protocol-v2/contracts/lib/StringArrayUtils.sol";
+import { UnitConversionUtils } from "@setprotocol/set-protocol-v2/contracts/lib/UnitConversionUtils.sol";
 
 import { BaseExtension } from "../lib/BaseExtension.sol";
 import { IBaseManager } from "../interfaces/IBaseManager.sol";
 import { IPriceFeed } from "../interfaces/IPriceFeed.sol";
 import { IUniswapV3Quoter } from "../interfaces/IUniswapV3Quoter.sol";
 
-import "hardhat/console.sol";
-
-// Todo: Use basis trading module
 // Todo: Should we enable TWAP during reinvestment?
-// todo: can reinvest interval be 0?
+
 contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     using Address for address;
     using PreciseUnitMath for uint256;
@@ -89,20 +88,20 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
     struct ContractSettings {
         ISetToken setToken;                                 // Instance of leverage token
-        IPerpV2BasisTradingModule basisTradingModule;       // Instance of Perp V2 basis trading module
+        IPerpV2BasisTradingModule basisTradingModule;       // Instance of PerpV2 basis trading module
         ITradeModule tradeModule;                           // Instance of the trade module
-        IUniswapV3Quoter quoter;
-        IAccountBalance perpV2AccountBalance;               // Instance of Perp V2 AccountBalance contract used to fetch position balances
+        IUniswapV3Quoter quoter;                            // Instance of UniswapV3 Quoter
+        IAccountBalance perpV2AccountBalance;               // Instance of PerpV2 AccountBalance contract used to fetch position balances
         IPriceFeed baseUSDPriceOracle;                      // PerpV2 oracle that returns TWAP price for base asset in USD. IPriceFeed is a PerpV2 specific interface
                                                             // to interact with differnt oracle providers, e.g. Band Protocol and Chainlink, for different assets
-                                                            // listed on PerpV2
+                                                            // listed on PerpV2.
         uint256 twapInterval;                               // TWAP interval to be used to fetch base asset price in seconds
                                                             // PerpV2 uses a 15 min TWAP interval, i.e. twapInterval = 900
         uint256 basePriceDecimalAdjustment;                 // Decimal adjustment for the price returned by the PerpV2 oracle for the base asset.
                                                             // Equal to vBaseAsset.decimals() - baseUSDPriceOracle.decimals()
         address virtualBaseAddress;                         // Address of virtual base asset (e.g. vETH, vWBTC etc)
         address virtualQuoteAddress;                        // Address of virtual USDC quote asset. The Perp V2 system uses USDC for all markets
-        address spotAssetAddress;                           // Address of corresponding spot address
+        address spotAssetAddress;                           // Address of spot asset corresponding to virtual base asset (e.g. if base asset is vETH, spot asset would be WETH)
     }
 
     struct MethodologySettings {
@@ -121,15 +120,17 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         uint256 slippageTolerance;                      // % in precise units to price min token receive amount from trade quantities
                                                         // NOTE: Applies to both perpetual and dex trades.
         uint256 twapCooldownPeriod;                     // Cooldown period required since last trade timestamp in seconds
+                                                        // NOTE: Applies to both perpetual and dex trades.
     }
 
     struct ExchangeSettings {
-        string exchangeName;                            // Exchange to use for dex trade
+        string exchangeName;                            // Name of the exchange adapter to be used for dex trade. This contract only supports UnisawpV3 trades.
+                                                        // So should be "UniswapV3ExchangeAdapterV2".
         bytes buyExactSpotTradeData;                    // Bytes containing path and fixIn boolean which will be passed to TradeModule#trade to buy exact amount of spot asset.
                                                         // Can be generated using UniswapV3ExchangeAdapterV2#generateDataParam
         bytes sellExactSpotTradeData;                   // Bytes containing path and fixIn boolean which will be passed to TradeModule#trade to sell exact amount of spot asset
                                                         // Can be generated using UniswapV3ExchangeAdapterV2#generateDataParam
-        bytes buySpotQuoteExactInputPath;               // Bytes containing path to buy spot asset using exact amount of input (USDC). Will be passed to Quoter#getExactInput.
+        bytes buySpotQuoteExactInputPath;               // Bytes containing UniswapV3 path to buy spot asset using exact amount of input asset (USDC). Will be passed to Quoter#getExactInput.
         uint256 twapMaxTradeSize;                       // Max trade size in base assset base units. Always a positive number
                                                         // NOTE: Applies to both perpetual and dex trades.
         uint256 incentivizedTwapMaxTradeSize;           // Max trade size for incentivized rebalances in base asset units. Always a positive number
@@ -137,16 +138,18 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     struct IncentiveSettings {
-        uint256 etherReward;                             // ETH reward for incentivized rebalances
-        int256 incentivizedLeverageRatio;                // Leverage ratio for incentivized rebalances. Is a negative number lower than maxLeverageRatio.
-                                                         // E.g. -2x for ETH -1x.
-        uint256 incentivizedSlippageTolerance;           // Slippage tolerance percentage for incentivized rebalances
-                                                         // NOTE: Applies to both perpetual and dex trades.
-        uint256 incentivizedTwapCooldownPeriod;          // TWAP cooldown in seconds for incentivized rebalances
+        uint256 etherReward;                            // ETH reward for incentivized rebalances
+        int256 incentivizedLeverageRatio;               // Leverage ratio for incentivized rebalances. Is a negative number lower than maxLeverageRatio.
+                                                        // E.g. -2x for ETH -1x.
+        uint256 incentivizedSlippageTolerance;          // Slippage tolerance percentage for incentivized rebalances
+                                                        // NOTE: Applies to both perpetual and dex trades.
+        uint256 incentivizedTwapCooldownPeriod;         // TWAP cooldown in seconds for incentivized rebalances
+                                                        // NOTE: Applies to both perpetual and dex trades.
     }
 
     /* ============ Events ============ */
 
+    // Todo: Emit spot and perp amounts separately? e.g. emit _chunkSpotRebalanceNotional, _totalSpotRebalanceNotional, _chunkPerpRebalanceNotional, _totalPerpRebalanceNotional.
     event Engaged(
         int256 _currentLeverageRatio,
         int256 _newLeverageRatio,
@@ -179,8 +182,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     );
     event Reinvested(
         uint256 _usdcReinvestedNotional,
-        uint256 _spotAmountIncreasedNotional,
-        uint256 _perpAmountIncreasedNotional
+        uint256 _spotRebalanceNotional,
+        uint256 _perpRebalanceNotional
     );
     event MethodologySettingsUpdated(
         int256 _targetLeverageRatio,
@@ -226,7 +229,10 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     ExecutionSettings internal execution;                   // Struct containing execution parameters
     ExchangeSettings internal exchange;                     // Struct containing exchange settings
     IncentiveSettings internal incentive;                   // Struct containing incentive parameters for ripcord
-    IERC20 internal collateralToken;
+
+    IERC20 internal collateralToken;                        // Collateral token to be deposited to PerpV2. We set this in the constructor for reading later.
+    uint8 internal collateralDecimals;                     // // Decimals of collateral token. We set this in the constructor for reading later.
+
     int256 public twapLeverageRatio;                        // Stored leverage ratio to keep track of target between TWAP rebalances
     uint256 public lastTradeTimestamp;                      // Last rebalance timestamp. Current timestamp must be greater than this variable + rebalance interval to rebalance
     uint256 public lastReinvestTimestamp;                   // Last reinvest timestamp. Current timestamp must be greater than this variable + reinvest interval to reinvest
@@ -263,9 +269,11 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         _validateExchangeSettings(_exchange);
         _validateNonExchangeSettings(methodology, execution, incentive);
 
-        // Set reinvest interval
-        lastReinvestTimestamp = block.timestamp;
         collateralToken = strategy.basisTradingModule.collateralToken();
+        collateralDecimals = ERC20(collateralToken).decimals();
+
+        // Set reinvest interval, so that first reinvestment takes place one reinvestment interval after deployment
+        lastReinvestTimestamp = block.timestamp;
     }
 
     /* ============ External Functions ============ */
@@ -288,6 +296,13 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         _withdraw(_collateralUnits);
     }
 
+    /**
+     * OPERATOR ONLY: Engage to enter delta neutral position for the first time. SetToken will use 50% of the collateral token to acquire spot asset on Uniswapv3, and deposit
+     * rest of the collateral token to PerpV2 to open a new short base token position on PerpV2 such that net exposure to the spot assetis zero. If total rebalance notional
+     * is above max trade size, then TWAP is kicked off.
+     * To complete engage if TWAP, any valid caller must call iterateRebalance until target is met.
+     * Note: Unlike PerpV2LeverageStrategyExtension, `deposit()` should NOT be called before `engage()`.
+     */
     function engage() external onlyOperator {
         LeverageInfo memory leverageInfo = _getAndValidateEngageInfo();
 
@@ -313,6 +328,17 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         );
     }
 
+    /**
+     * ONLY EOA AND ALLOWED CALLER: Rebalance product. If |min leverage ratio| < |current leverage ratio| < |max leverage ratio|, then rebalance
+     * can only be called once the rebalance interval has elapsed since last timestamp. If outside the max and min but below incentivized leverage ratio,
+     * rebalance can be called anytime to bring leverage ratio back to the max or min bounds. The methodology will determine whether to delever or lever.
+     * If levering up, SetToken increases the short position on PerpV2, withdraws collateral asset from PerpV2 and uses it to acquire more spot asset to keep
+     * the position delta-neutral. If delevering, SetToken decreases the short position on PerpV2, sells spot asset on UniswapV3 and deposits the returned
+     * collateral token to PerpV2 to collateralize the PerpV2 position.
+     *
+     * Note: If the calculated current leverage ratio is above the incentivized leverage ratio or in TWAP then rebalance cannot be called. Instead, you must call
+     * ripcord() which is incentivized with a reward in Ether or iterateRebalance().
+     */
     function rebalance() external onlyEOA onlyAllowedCaller(msg.sender) {
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
             execution.slippageTolerance,
@@ -339,6 +365,11 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         );
     }
 
+    /**
+     * ONLY EOA AND ALLOWED CALLER: Iterate a rebalance when in TWAP. TWAP cooldown period must have elapsed. If price moves advantageously, then
+     * exit without rebalancing and clear TWAP state. This function can only be called when |current leverage ratio| < |incentivized leverage ratio|
+     * and in TWAP state.
+     */
     function iterateRebalance() external onlyEOA onlyAllowedCaller(msg.sender) {
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
             execution.slippageTolerance,
@@ -365,6 +396,13 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         );
     }
 
+    /**
+     * ONLY EOA: In case |current leverage ratio| > |incentivized leverage ratio|, the ripcord function can be called by anyone to return leverage ratio
+     * back to the max leverage ratio. This function typically would only be called during times of high downside/upside volatility and / or normal keeper malfunctions. The
+     * caller of ripcord() will receive a reward in Ether. The ripcord function uses it's own TWAP cooldown period, slippage tolerance and TWAP max trade size which are
+     * typically looser than in regular rebalances. If chunk rebalance size is above max incentivized trade size, then caller must continue to call this function to pull
+     * the leverage ratio under the incentivized leverage ratio. Incentivized TWAP cooldown period must have elapsed. The function iterateRebalance will not work.
+     */
     function ripcord() external onlyEOA {
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
             incentive.incentivizedSlippageTolerance,
@@ -389,6 +427,14 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         );
     }
 
+    /**
+     * OPERATOR ONLY: Close open baseToken position on Perpetual Protocol and sell spot assets. TWAP cooldown period must have elapsed. This can be used for upgrading or shutting down the strategy.
+     * SetToken will sell all virtual base token positions into virtual USDC and all spot asset to the collateral token (USDC). It deposits the recieved USDC to PerpV2 to collateralize the Perpetual
+     * position. If the chunk rebalance size is less than the total notional size, then this function will trade out of base and spot token position in one go. If chunk rebalance size is above max
+     * trade size, then operator must continue to call this function to completely unwind position. The function iterateRebalance will not work.
+     *
+     * Note: If rebalancing is open to anyone disengage TWAP can be counter traded by a griefing party calling rebalance. Set anyoneCallable to false before disengage to prevent such attacks.
+     */
     function disengage() external onlyOperator {
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
             execution.slippageTolerance,
@@ -417,6 +463,13 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         );
     }
 
+    /**
+     * OPERATOR ONLY: Reinvests tracked settled funding to increase position. SetToken withdraws funding as collateral token using PerpV2BasisTradingModule. It uses
+     * the collateral token to acquire more spot asset and deposit the rest to PerpV2 to increase short perp position. It can only be called once the reinvest interval
+     * has elapsed since last reinvest timestamp.
+     *
+     * // Todo: Should it be allowed to call when LR is out of bounds?
+     */
     function reinvest() external onlyOperator {
         // Uses the same slippage tolerance and twap max trade size as rebalancing
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
@@ -426,7 +479,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
         _validateReinvest();
 
-        _withdrawFundingAndAccrueFees(PreciseUnitMath.MAX_UINT_256);    // Pass MAX_UINT_256 to withdraw all funding.
+        _withdrawFunding(PreciseUnitMath.MAX_UINT_256);    // Pass MAX_UINT_256 to withdraw all funding.
 
         (uint256 usdcReinvestedNotional, uint256 spotAmountIncreasedNotional) = _handleReinvest(leverageInfo);
 
@@ -497,9 +550,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         );
     }
 
-    // Todo: Confirm this.
     /**
-     * OPERATOR ONLY: Set exchange settings and check new settings are valid.Updating exchange settings during rebalances is allowed, as it is not possible
+     * OPERATOR ONLY: Set exchange settings and check new settings are valid. Updating exchange settings during rebalances is allowed, as it is not possible
      * to enter an unexpected state while doing so. Note: Need to pass in existing parameters if only changing a few settings.
      *
      * @param _newExchangeSettings     Struct containing exchange parameters
@@ -598,14 +650,14 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         bool increaseLeverage = newLeverageRatio.abs() > currentLeverageRatio.abs();
 
         /*
-        --------------------------------------------------------------------------------
-        |   New LR             |  increaseLeverage | sellAssetOnPerp |  buyAssetOnPerp |
-        --------------------------------------------------------------------------------
-        |   = 0 (not possible) |        x          |        x        |      x          |
-        |   > 0 (not supported)|        x          |        x        |      x          |
-        |   < 0  (short)       |       true        |      base       |    quote        |
-        |   < 0  (short)       |       false       |      quote      |    base         |
-        --------------------------------------------------------------------------------
+        ------------------------------------------------------------------------------------------------------------------------
+        |   New LR             |  increaseLeverage | sellAssetOnPerp |  buyAssetOnPerp | sellAssetOnDex    |  buyAssetOnDex    |
+        ------------------------------------------------------------------------------------------------------------------------
+        |   = 0 (not possible) |        x          |        x        |      x          |        x          |      x            |
+        |   > 0 (not possible) |        x          |        x        |      x          |        x          |      x            |
+        |   < 0  (short)       |       true        |  base (vETH)    |  quote (vUSD)   | collateral (USDC) |    spot (WETH)    |
+        |   < 0  (short)       |       false       |  quote (vUSD)   |  base (vETH)    |     spot (WETH)   | collateral (USDC) |
+        ------------------------------------------------------------------------------------------------------------------------
         */
 
         sellAssetOnPerp = increaseLeverage ? strategy.virtualBaseAddress : strategy.virtualQuoteAddress;
@@ -733,8 +785,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * Calculate base rebalance units and opposite bound units. Invoke trade on TradeModule. Deposit rest of the collateral token and invoke trade
-     * on PerpV2BasisTradingModule.
+     * Calculate base rebalance units and opposite bound units. Invoke trade on TradeModule to acquire spot asset. Deposit rest of the collateral token to PerpV2 and invoke trade
+     * on PerpV2BasisTradingModule to open short perp position.
      */
     function _executeEngageTrades(
         LeverageInfo memory _leverageInfo,
@@ -743,9 +795,14 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         internal
     {
         int256 baseRebalanceUnits = _chunkRebalanceNotional.preciseDiv(_leverageInfo.action.setTotalSupply.toInt256());
-        uint256 oppositeBoundUnits = _calculateOppositeBoundUnits(baseRebalanceUnits.neg(), _leverageInfo.action, _leverageInfo.slippageTolerance).div(1000000000000);
+        uint256 baseRebalanceUnitsAbs = baseRebalanceUnits.abs();
+        uint256 oppositeBoundUnits = _calculateOppositeBoundUnits(
+            baseRebalanceUnitsAbs,
+            _leverageInfo.action,
+            _leverageInfo.slippageTolerance
+        ).fromPreciseUnitToDecimals(collateralDecimals);
 
-        _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, true, false);
+        _executeDexTrade(baseRebalanceUnitsAbs, oppositeBoundUnits, true);
 
         uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
         _deposit(defaultUsdcUnits);
@@ -754,8 +811,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * Calculate base rebalance units and opposite bound units. Invoke trade on PerpV2BasisTradingModule. If levering, withdraw collateral token and invoke trade
-     * on TradeModule. If delevering, invoke trade on TradeModule and deposit the recieved collateral token to PerpV2.
+     * Calculate base rebalance units and opposite bound units. Invoke trade on PerpV2BasisTradingModule to lever/delever perp short position. If levering, withdraw collateral token
+     * and invoke trade on TradeModule to acquire more spot assets. If delevering, invoke trade on TradeModule to sell spot assets and deposit the recieved collateral token to PerpV2.
      */
     function _executeRebalanceTrades(
         LeverageInfo memory _leverageInfo,
@@ -764,18 +821,24 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         internal
     {
         int256 baseRebalanceUnits = _chunkRebalanceNotional.preciseDiv(_leverageInfo.action.setTotalSupply.toInt256());
-        uint256 oppositeBoundUnits = _calculateOppositeBoundUnits(baseRebalanceUnits.neg(), _leverageInfo.action, _leverageInfo.slippageTolerance).div(1000000000000);
+        uint256 baseRebalanceUnitsAbs = baseRebalanceUnits.abs();
+        uint256 oppositeBoundUnits = _calculateOppositeBoundUnits(
+            baseRebalanceUnitsAbs,
+            _leverageInfo.action,
+            _leverageInfo.slippageTolerance
+        ).fromPreciseUnitToDecimals(collateralDecimals);
 
         _executePerpTrade(baseRebalanceUnits, _leverageInfo);
 
-        // just add a to sell in executeTrade
         if (baseRebalanceUnits < 0) {
             // todo: what if not enough balance
             _withdraw(oppositeBoundUnits);
-            _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, true, false);
+
+            _executeDexTrade(baseRebalanceUnitsAbs, oppositeBoundUnits, true);
         } else {
-            _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, false, true);
-            // Deposit the whole thing (rather than that only received from trade)
+            _executeDexTrade(baseRebalanceUnitsAbs, oppositeBoundUnits, false);
+
+            // Deposit all USDC
             uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
             _deposit(defaultUsdcUnits);
         }
@@ -788,7 +851,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         uint256 oppositeBoundUnits = _calculateOppositeBoundUnits(_baseRebalanceUnits, _leverageInfo.action, _leverageInfo.slippageTolerance);
 
         bytes memory perpTradeCallData = abi.encodeWithSelector(
-            IPerpV2LeverageModuleV2.trade.selector,     // todo: trade or trade AndTrackFunding
+            IPerpV2BasisTradingModule.tradeAndTrackFunding.selector,        // tradeAndTrackFunding
             address(strategy.setToken),
             strategy.virtualBaseAddress,
             _baseRebalanceUnits,
@@ -802,17 +865,9 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
      * Executes trades on Dex.
      * Note: Only supports Uniswap V3.
      */
-    function _executeDexTrade(uint256 _baseRebalanceUnits, uint256 _usdcUnits, bool _buy, bool _fixIn) internal {
-        bytes memory dexTradeCallData;
-        bytes memory exchangeData;
-
-        if (_buy) {
-            if (_fixIn) {
-                // Not required
-            } else {
-                exchangeData = exchange.buyExactSpotTradeData;
-            }
-            dexTradeCallData = abi.encodeWithSelector(
+    function _executeDexTrade(uint256 _baseRebalanceUnits, uint256 _usdcUnits, bool _buy) internal {
+        bytes memory dexTradeCallData = _buy
+            ? abi.encodeWithSelector(
                 ITradeModule.trade.selector,
                 address(strategy.setToken),
                 exchange.exchangeName,
@@ -820,15 +875,9 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
                 _usdcUnits,
                 address(strategy.spotAssetAddress),
                 _baseRebalanceUnits,
-                exchangeData
-            );
-        } else {
-            if (_fixIn) {
-                exchangeData = exchange.sellExactSpotTradeData;
-            } else {
-                // Not required
-            }
-            dexTradeCallData = abi.encodeWithSelector(
+                exchange.buyExactSpotTradeData      // buy exact amount
+            )
+            : abi.encodeWithSelector(
                 ITradeModule.trade.selector,
                 address(strategy.setToken),
                 exchange.exchangeName,
@@ -836,15 +885,16 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
                 _baseRebalanceUnits,
                 address(collateralToken),
                 _usdcUnits,
-                exchangeData
+                exchange.sellExactSpotTradeData     // sell exact amount
             );
-        }
 
         invokeManager(address(strategy.tradeModule), dexTradeCallData);
     }
 
-    function _withdrawFundingAndAccrueFees(uint256 _fundingNotional) internal {
-        // Withdraw funding to be reinvested. Pass MAX_UINT_256 to withdraw all funding.
+    /**
+     * Invokes PerpV2BasisTradingModule to withdraw funding to be reinvested. Pass MAX_UINT_256 to withdraw all funding.
+     */
+    function _withdrawFunding(uint256 _fundingNotional) internal {
         bytes memory withdrawCallData = abi.encodeWithSelector(
             IPerpV2BasisTradingModule.withdrawFundingAndAccrueFees.selector,
             strategy.setToken,
@@ -854,6 +904,13 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         invokeManager(address(strategy.basisTradingModule), withdrawCallData);
     }
 
+    /**
+     * Reinvests 50% of USDC position to spot asset and deposits the rest to PerpV2 to increase the short perp position.
+     * Used in the reinvest() function.
+     *
+     * return uint256           Calculated amount of funding to be reinvested
+     * return uint256           Spot amount increase notional. Returned on swapping 50% of funding to be reinvested
+     */
     function _handleReinvest(LeverageInfo memory _leverageInfo) internal returns (uint256, uint256) {
 
         uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
@@ -861,22 +918,21 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         if (defaultUsdcUnits == 0) { return (0, 0); }
 
         uint256 setTotalSupply = strategy.setToken.totalSupply();
-        uint256 usdcAmountInNotional = defaultUsdcUnits.preciseMul(setTotalSupply).div(2);  // 50%
-        uint256 spotAmountOutNotional = strategy.quoter.quoteExactInput(exchange.buySpotQuoteExactInputPath, usdcAmountInNotional);
+        uint256 fundingReinvestedNotional = defaultUsdcUnits.preciseMul(setTotalSupply);  // 50%
+        uint256 spotAmountOutNotional = strategy.quoter.quoteExactInput(exchange.buySpotQuoteExactInputPath, fundingReinvestedNotional.div(2));
         uint256 baseUnits = spotAmountOutNotional.preciseDiv(setTotalSupply);
 
-        // We do slippage checks because we don't wanna get sandwiched attack by someone removing liquidity and giving us the worst price possible.
-        // Todo: Is this trade vulnerable to that?
-        _executeDexTrade(baseUnits, defaultUsdcUnits, true, false);
+        // Increase spot position
+        _executeDexTrade(baseUnits, defaultUsdcUnits, true);
 
         // Deposit rest
         defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
         if (defaultUsdcUnits > 0) { _deposit(defaultUsdcUnits); }
 
-        // Open perp position
+        // Increase perp position
         _executePerpTrade(baseUnits.toInt256().neg(), _leverageInfo);
 
-        return (usdcAmountInNotional, spotAmountOutNotional);
+        return (fundingReinvestedNotional, spotAmountOutNotional);
     }
 
     /* ============ Calculation functions ============ */
@@ -952,6 +1008,15 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         return _currentLeverageRatio > 0 ? newLeverageRatio.toInt256() : newLeverageRatio.toInt256().neg();
     }
 
+    /**
+     * Calculate total notional rebalance quantity and chunked rebalance quantity in base asset units for engaging the SetToken. Used in engage().
+     * Leverage ratio (for the base asset) is zero before engage. We open a new base asset position with size equals to ( (collateralBalance/2) * targetLeverageRatio / baseAssetPrice)
+     * to gain (targetLeverageRatio * collateralBalance/2) worth of exposure to the base asset.
+     * Note: We can't use `_calculateChunkRebalanceNotional` function because CLR is 0 during engage and it would lead to a divison by zero error.
+     *
+     * return int256          Chunked rebalance notional in base asset units
+     * return int256          Total rebalance notional in base asset units
+     */
     function _calculateEngageRebalanceSize(
         LeverageInfo memory _leverageInfo,
         int256 _targetLeverageRatio
@@ -960,8 +1025,11 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         view
         returns (int256, int256)
     {
-        int256 collateralBalanceToBeUsedForOpeningPerpPosition = collateralToken.balanceOf(address(strategy.setToken)).div(2).toInt256().mul(1000000000000); // to precise units
-        int256 totalRebalanceNotional = collateralBalanceToBeUsedForOpeningPerpPosition.preciseMul(_targetLeverageRatio).preciseDiv(_leverageInfo.action.basePrice);
+        int256 collateralAmount = collateralToken.balanceOf(address(strategy.setToken))
+            .div(2)
+            .toPreciseUnitsFromDecimals(collateralDecimals)
+            .toInt256();
+        int256 totalRebalanceNotional = collateralAmount.preciseMul(_targetLeverageRatio).preciseDiv(_leverageInfo.action.basePrice);
 
         uint256 chunkRebalanceNotionalAbs = Math.min(totalRebalanceNotional.abs(), _leverageInfo.twapMaxTradeSize);
 
@@ -1025,12 +1093,12 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     /* ========== Action Info functions ============ */
 
     /**
-     * Validate the Set is not already engaged. Create the leverage info struct to be used in engage.
+     * Validate there are no deposits on Perpetual protocol and the Set is not already engaged. Create the leverage info struct to be used in engage.
      */
     function _getAndValidateEngageInfo() internal view returns(LeverageInfo memory) {
         ActionInfo memory engageInfo = _createActionInfo();
 
-        // require(engageInfo.accountInfo.collateralBalance > 0, "Collateral balance must be > 0");
+        require(engageInfo.accountInfo.collateralBalance = 0, "PerpV2 collateral balance must be 0");
 
         // Assert base position unit is zero. Asserting base position unit instead of base balance allows us to neglect small dust amounts.
         require(engageInfo.baseBalance.preciseDiv(strategy.setToken.totalSupply().toInt256()) == 0, "Base position must NOT exist");
@@ -1077,6 +1145,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         ActionInfo memory rebalanceInfo;
 
         // Fetch base token prices from PerpV2 oracles and adjust them to 18 decimal places.
+        // NOTE: The same basePrice is used for both the virtual and the spot asset.
         int256 rawBasePrice = strategy.baseUSDPriceOracle.getPrice(strategy.twapInterval).toInt256();
         rebalanceInfo.basePrice = rawBasePrice.mul((10 ** strategy.basePriceDecimalAdjustment).toInt256());
 
@@ -1255,7 +1324,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         // Rebalancing is given priority over reinvestment.
         // This might lead to scenarios where this function returns `ShouldRebalance.REINVEST` in the current block
         // and `ShouldRebalance.REBALANCE` in the next block. In such cases, the keeper system would have to replace their
-        // reinvestment transaction with a rebalance transaction. // TODO: Add more clarity.
+        // reinvestment transaction with a rebalance transaction.
         if (block.timestamp.sub(lastReinvestTimestamp) > methodology.reinvestInterval) {
             return ShouldRebalance.REINVEST;
         }

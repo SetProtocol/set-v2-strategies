@@ -623,6 +623,16 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         await expect(subject()).to.be.revertedWith("Max TWAP trade size must not be 0");
       });
     });
+
+    describe("when TWAP max trade size is greater than incentivized max trade size", async () => {
+      beforeEach(async () => {
+        subjectPerpV2BasisExchangeSettings.twapMaxTradeSize = subjectPerpV2BasisExchangeSettings.incentivizedTwapMaxTradeSize.mul(2);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Max TWAP trade size must not be greater than incentivized max TWAP trade size");
+      });
+    });
   });
 
   context("SetToken has been issued", async () => {
@@ -704,15 +714,11 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         return leverageStrategyExtension.connect(subjectCaller.wallet).engage();
       }
 
-      // todo: make sure this is exactly equivalent to how it is done on the contract.
-      // helps to remove closeTo.
       async function getTotalEngageRebalanceNotional(_setToken: SetToken): Promise<BigNumber> {
         const collateralBalanceToBeUsedForOpeningPerpPosition = (await perpV2Setup.usdc.balanceOf(_setToken.address))
-          .div(2).mul(BigNumber.from(10).pow(18 - 6));
+          .div(2).mul(BigNumber.from(1000000000000));
         const targetLeverageRatio = (await leverageStrategyExtension.getMethodology()).targetLeverageRatio;
         const basePrice = (await perpV2Setup.ethPriceFeed.latestAnswer()).div(usdc(1));
-        // console.log((await perpV2Setup.ethPriceFeed.latestAnswer()).toString());
-        // console.log((await perpV2Setup.usdc.decimals()).toString());
         const totalRebalanceNotional = preciseMul(collateralBalanceToBeUsedForOpeningPerpPosition, targetLeverageRatio).div(basePrice);
         return totalRebalanceNotional;
       }
@@ -725,7 +731,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           const totalSupply = await setToken.totalSupply();
           const totalRebalanceNotional = await getTotalEngageRebalanceNotional(setToken);
           const expectedSpotAssetUnit = preciseDiv(totalRebalanceNotional.abs(), totalSupply);
-          console.log(totalRebalanceNotional.toString());
+
           // Determine expected USDC unit
           const usdcBalanceBefore = await perpV2Setup.usdc.balanceOf(setToken.address);
           const amountIn = await uniV3Setup.quoter.callStatic.quoteExactOutputSingle(
@@ -735,14 +741,12 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             totalRebalanceNotional.abs(),
             0
           );
-          console.log(amountIn.toString());
           const expectedUsdcDeposited = usdcBalanceBefore.sub(amountIn);
 
           await subject();
 
           const finalPositions = await setToken.getPositions();
           const currentUsdcBalanceInPerp = await perpV2Setup.vault.getBalance(setToken.address);
-          console.log(currentUsdcBalanceInPerp.toString());
 
           // One default USDC position before engage
           expect(initialPositions.length).to.eq(1);
@@ -830,7 +834,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           const totalSupply = await setToken.totalSupply();
           const totalRebalanceNotional = newExchangeSettings.twapMaxTradeSize.mul(-1);
           const expectedSpotAssetUnit = preciseDiv(totalRebalanceNotional.abs(), totalSupply);
-          console.log(totalRebalanceNotional.toString());
+
           // Determine expected USDC unit
           const usdcBalanceBefore = await perpV2Setup.usdc.balanceOf(setToken.address);
           const amountIn = await uniV3Setup.quoter.callStatic.quoteExactOutputSingle(
@@ -840,14 +844,12 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             totalRebalanceNotional.abs(),
             0
           );
-          console.log(amountIn.toString());
           const expectedUsdcDeposited = usdcBalanceBefore.sub(amountIn);
 
           await subject();
 
           const finalPositions = await setToken.getPositions();
           const currentUsdcBalanceInPerp = await perpV2Setup.vault.getBalance(setToken.address);
-          console.log(currentUsdcBalanceInPerp.toString());
 
           // One default USDC position before engage
           expect(initialPositions.length).to.eq(1);
@@ -911,9 +913,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         });
       });
 
-      describe.skip("when collateral balance is zero", async () => {
+      describe("when collateral balance is non-zero", async () => {
+        beforeEach(async () => {
+          await leverageStrategyExtension.deposit(usdc(1));
+        });
+
         it("should revert", async () => {
-          await expect(subject()).to.be.revertedWith("Collateral balance must be > 0");
+          await expect(subject()).to.be.revertedWith("PerpV2 collateral balance must be 0");
         });
       });
     });
@@ -933,8 +939,6 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         cacheBeforeEach(async () => {
           // Engage short position
           await leverageStrategyExtension.engage();
-          const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-          console.log(currentLeverageRatio.toString());
         });
 
         describe("when current leverage ratio is below target (lever), does not need a TWAP, and is inside bounds", async () => {
@@ -947,7 +951,6 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-            console.log(currentLeverageRatio.toString());
             expect(currentLeverageRatio.abs()).to.be.gt(methodology.minLeverageRatio.abs());
             expect(currentLeverageRatio.abs()).to.be.lt(methodology.targetLeverageRatio.abs());
           });
@@ -1050,7 +1053,6 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-            console.log(currentLeverageRatio.toString());
             expect(currentLeverageRatio.abs()).to.be.lt(methodology.minLeverageRatio.abs());
           });
 
@@ -1221,7 +1223,6 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-            console.log(currentLeverageRatio.toString());
             expect(currentLeverageRatio.abs()).to.be.gt(methodology.targetLeverageRatio.abs());
           });
 
@@ -1304,7 +1305,6 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-            console.log(currentLeverageRatio.toString());
             expect(currentLeverageRatio.abs()).to.be.gt(methodology.maxLeverageRatio.abs());
           });
 
@@ -1396,7 +1396,6 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
           it("should verify initial leverage conditions", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-            console.log(currentLeverageRatio.toString());
             expect(currentLeverageRatio.abs()).to.be.gt(methodology.maxLeverageRatio.abs());
           });
 
@@ -1489,8 +1488,6 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         cacheBeforeEach(async () => {
           // Engage short position
           await leverageStrategyExtension.engage();
-          const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-          console.log("CLR after enagage", currentLeverageRatio.toString());
         });
 
         context("when currently in the last chunk of a TWAP rebalance", async () => {
@@ -1508,11 +1505,8 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
               incentivizedTwapMaxTradeSize: ether(1)
             };
             preTwapLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-            console.log("preTwapLeverageRatio", preTwapLeverageRatio.toString());
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
-            const postlr = await leverageStrategyExtension.getCurrentLeverageRatio();
-            console.log("postlr", postlr.toString());
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
           });
 
@@ -1525,8 +1519,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
           it("should set the global last trade timestamp", async () => {
             await subject();
-            const postlr = await leverageStrategyExtension.getCurrentLeverageRatio();
-            console.log("postlr", postlr.toString());
+
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
 
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
@@ -1624,7 +1617,6 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
             preTwapLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
-            console.log((await leverageStrategyExtension.getCurrentLeverageRatio()).toString());
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
           });
 
@@ -1669,7 +1661,6 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             );
 
             await subject();
-            console.log((await leverageStrategyExtension.getCurrentLeverageRatio()).toString());
 
             const newPositions = await perpBasisTradingModule.getPositionUnitInfo(setToken.address);
             const newPosition = newPositions[0];
@@ -1678,13 +1669,11 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
               preciseMul(initialPositions[0].baseBalance, expectedNewLeverageRatio.sub(currentLeverageRatio)),    // numerator
               preciseMul(currentLeverageRatio, ether(1).sub(expectedNewLeverageRatio))                            // denominator
             );
-            console.log(totalRebalanceNotional.toString());
 
             const chunkRebalanceNotional = totalRebalanceNotional.abs().gt(newExchangeSettings.twapMaxTradeSize)
               ? (totalRebalanceNotional.gt(ZERO) ? newExchangeSettings.twapMaxTradeSize : newExchangeSettings.twapMaxTradeSize.mul(-1))
               : totalRebalanceNotional;
 
-            console.log(chunkRebalanceNotional.toString());
 
             const totalSupply = await setToken.totalSupply();
             const expectedNewPositionUnit = preciseDiv(initialPositions[0].baseBalance.add(chunkRebalanceNotional), totalSupply);
@@ -1856,9 +1845,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
               incentivizedTwapMaxTradeSize: ether(1)
             };
             await leverageStrategyExtension.setExchangeSettings(newExchangeSettings);
-            console.log((await leverageStrategyExtension.getCurrentLeverageRatio()).toString());
             await leverageStrategyExtension.connect(owner.wallet).rebalance();
-            console.log((await leverageStrategyExtension.getCurrentLeverageRatio()).toString());
 
             await increaseTimeAsync(BigNumber.from(4000));    // >3s (twapCoolDown period)
 
