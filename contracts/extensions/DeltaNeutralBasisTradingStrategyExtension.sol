@@ -798,14 +798,13 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         internal
     {
         int256 baseRebalanceUnits = _chunkRebalanceNotional.preciseDiv(_leverageInfo.action.setTotalSupply.toInt256());
-        int256 baseRebalanceUnitsNeg = baseRebalanceUnits.neg();
         uint256 oppositeBoundUnits = _calculateOppositeBoundUnits(
-            baseRebalanceUnitsNeg,
+            baseRebalanceUnits.neg(),
             _leverageInfo.action,
             _leverageInfo.slippageTolerance
         ).fromPreciseUnitToDecimals(collateralDecimals);
 
-        _executeDexTrade(baseRebalanceUnitsNeg, oppositeBoundUnits, true);
+        _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, true);
 
         uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
         _deposit(defaultUsdcUnits);
@@ -824,9 +823,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         internal
     {
         int256 baseRebalanceUnits = _chunkRebalanceNotional.preciseDiv(_leverageInfo.action.setTotalSupply.toInt256());
-        int256 baseRebalanceUnitsNeg = baseRebalanceUnits.neg();
         uint256 oppositeBoundUnits = _calculateOppositeBoundUnits(
-            baseRebalanceUnitsNeg,
+            baseRebalanceUnits.neg(),
             _leverageInfo.action,
             _leverageInfo.slippageTolerance
         ).fromPreciseUnitToDecimals(collateralDecimals);
@@ -837,9 +835,9 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
             // todo: what if not enough balance
             _withdraw(oppositeBoundUnits);
 
-            _executeDexTrade(baseRebalanceUnitsNeg, oppositeBoundUnits, true);
+            _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, true);
         } else {
-            _executeDexTrade(baseRebalanceUnitsNeg, oppositeBoundUnits, false);
+            _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, false);
 
             // Deposit all USDC
             uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
@@ -868,7 +866,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
      * Executes trades on Dex.
      * Note: Only supports Uniswap V3.
      */
-    function _executeDexTrade(int256 _baseUnits, uint256 _usdcUnits, bool _buy) internal {
+    function _executeDexTrade(uint256 _baseUnits, uint256 _usdcUnits, bool _buy) internal {
         bytes memory dexTradeCallData = _buy
             ? abi.encodeWithSelector(
                 ITradeModule.trade.selector,
@@ -877,7 +875,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
                 address(collateralToken),
                 _usdcUnits,
                 address(strategy.spotAssetAddress),
-                _baseUnits.toUint256(),
+                _baseUnits,
                 exchange.buyExactSpotTradeData      // buy exact amount
             )
             : abi.encodeWithSelector(
@@ -885,7 +883,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
                 address(strategy.setToken),
                 exchange.exchangeName,
                 address(strategy.spotAssetAddress),
-                _baseUnits.toUint256(),
+                _baseUnits,
                 address(collateralToken),
                 _usdcUnits,
                 exchange.sellExactSpotTradeData     // sell exact amount
@@ -923,7 +921,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         uint256 setTotalSupply = strategy.setToken.totalSupply();
         uint256 fundingReinvestedNotional = defaultUsdcUnits.preciseMul(setTotalSupply);  // 50%
         uint256 spotAmountOutNotional = strategy.quoter.quoteExactInput(exchange.buySpotQuoteExactInputPath, fundingReinvestedNotional.div(2));
-        int256 baseUnits = spotAmountOutNotional.preciseDiv(setTotalSupply).toInt256();
+        uint256 baseUnits = spotAmountOutNotional.preciseDiv(setTotalSupply);
 
         // Increase spot position
         _executeDexTrade(baseUnits, defaultUsdcUnits, true);
@@ -933,7 +931,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         _deposit(defaultUsdcUnits);
 
         // Increase perp position
-        _executePerpTrade(baseUnits.neg(), _leverageInfo);
+        _executePerpTrade(baseUnits.toInt256().neg(), _leverageInfo);
 
         return (fundingReinvestedNotional, spotAmountOutNotional);
     }
@@ -1102,9 +1100,6 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         ActionInfo memory engageInfo = _createActionInfo();
 
         require(engageInfo.accountInfo.collateralBalance == 0, "PerpV2 collateral balance must be 0");
-
-        // Assert base position unit is zero. Asserting base position unit instead of base balance allows us to neglect small dust amounts.
-        require(engageInfo.baseBalance.preciseDiv(strategy.setToken.totalSupply().toInt256()) == 0, "Base position must NOT exist");
 
         return LeverageInfo({
             action: engageInfo,

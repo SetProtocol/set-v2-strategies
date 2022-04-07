@@ -42,8 +42,8 @@ import {
 } from "../../utils/index";
 import { PerpV2PriceFeedMock } from "@utils/contracts";
 
-import { PerpV2Fixture, SystemFixture, UniswapV3Fixture } from "@setprotocol/set-protocol-v2/utils/fixtures";
-import { getPerpV2Fixture, getSystemFixture, getUniswapV3Fixture } from "@setprotocol/set-protocol-v2/utils/test";
+import { PerpV2Fixture, SystemFixture, UniswapV3Fixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
+import { getPerpV2Fixture, getSystemFixture, getUniswapV3Fixture } from "@setprotocol/set-protocol-v2/dist/utils/test";
 
 import { BaseManager, DeltaNeutralBasisTradingStrategyExtension } from "@utils/contracts/index";
 
@@ -890,16 +890,6 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             chunkRebalanceNotional,
             totalRebalanceNotional,
           );
-        });
-
-        describe("when base token position already exists", async () => {
-          beforeEach(async () => {
-            await subject();
-          });
-
-          it("should revert", async () => {
-            await expect(subject()).to.be.revertedWith("Base position must NOT exist");
-          });
         });
 
         describe("when the caller is not the operator", async () => {
