@@ -928,7 +928,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
         // Deposit rest
         defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
-        if (defaultUsdcUnits > 0) { _deposit(defaultUsdcUnits); }
+        _deposit(defaultUsdcUnits);
 
         // Increase perp position
         _executePerpTrade(baseUnits.toInt256().neg(), _leverageInfo);
