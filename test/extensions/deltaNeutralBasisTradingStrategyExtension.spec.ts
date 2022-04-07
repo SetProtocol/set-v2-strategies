@@ -2461,6 +2461,29 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             await expect(subject()).to.be.revertedWith("Reinvestment interval not elapsed");
           });
         });
+
+        describe("when leverage ratio is out of bounds", async () => {
+          beforeEach(async () => {
+            // Set oracle prices to increase LR
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1150));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(1150).mul(10 ** 8));
+          });
+
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Invalid leverage ratio");
+          });
+        });
+      });
+
+      describe("when funding has not accrued", async () => {
+        cacheBeforeEach(async () => {
+          await leverageStrategyExtension.engage();
+          await increaseTimeAsync(ONE_DAY_IN_SECONDS.mul(7));
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Zero accrued funding");
+        });
       });
 
       describe("when not engaged", async () => {

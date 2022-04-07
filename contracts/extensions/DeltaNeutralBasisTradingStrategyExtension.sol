@@ -468,7 +468,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
      * the collateral token to acquire more spot asset and deposit the rest to PerpV2 to increase short perp position. It can only be called once the reinvest interval
      * has elapsed since last reinvest timestamp.
      *
-     * // Todo: Should it be allowed to call when LR is out of bounds?
+     * NOTE: Rebalance is prioritized over reinvestment. This function can not be called when leverage ratio is out of bounds. Call `rebalance()` instead.
      */
     function reinvest() external onlyOperator {
         // Uses the same slippage tolerance and twap max trade size as rebalancing
@@ -477,13 +477,14 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
             exchange.twapMaxTradeSize
         );
 
-        _validateReinvest();
+        _validateReinvest(leverageInfo);
 
         _withdrawFunding(PreciseUnitMath.MAX_UINT_256);    // Pass MAX_UINT_256 to withdraw all funding.
 
         (uint256 usdcReinvestedNotional, uint256 spotAmountIncreasedNotional) = _handleReinvest(leverageInfo);
 
-        // Todo: Should we update this if usdcReinvestedNotional is zero
+        require(usdcReinvestedNotional > 0, "Zero accrued funding");
+
         _updateReinvestState();
 
         emit Reinvested(
@@ -1429,10 +1430,16 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * Validate reinvest interval has elapsed in the reinvest() function
+     * Validate reinvest interval has elapsed  and valid leverage ratio. Called in the reinvest() function
      */
-    function _validateReinvest() internal view {
+    function _validateReinvest(LeverageInfo memory _leverageInfo) internal view {
+        uint256 currentLeverageRatioAbs = _leverageInfo.currentLeverageRatio.abs();
         require(block.timestamp.sub(methodology.reinvestInterval) > lastReinvestTimestamp, "Reinvestment interval not elapsed");
+        require(
+            currentLeverageRatioAbs < methodology.maxLeverageRatio.abs()
+            && currentLeverageRatioAbs > methodology.minLeverageRatio.abs(),
+            "Invalid leverage ratio"
+        );
     }
 
     /**
