@@ -466,13 +466,13 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * OPERATOR ONLY: Reinvests tracked settled funding to increase position. SetToken withdraws funding as collateral token using PerpV2BasisTradingModule. It uses
+     * ONLY EOA AND ALLOWED CALLER: Reinvests tracked settled funding to increase position. SetToken withdraws funding as collateral token using PerpV2BasisTradingModule. It uses
      * the collateral token to acquire more spot asset and deposit the rest to PerpV2 to increase short perp position. It can only be called once the reinvest interval
      * has elapsed since last reinvest timestamp.
      *
      * NOTE: Rebalance is prioritized over reinvestment. This function can not be called when leverage ratio is out of bounds. Call `rebalance()` instead.
      */
-    function reinvest() external onlyOperator {
+    function reinvest() external onlyEOA onlyAllowedCaller(msg.sender) {
         // Uses the same slippage tolerance and twap max trade size as rebalancing
         LeverageInfo memory leverageInfo = _getAndValidateLeveragedInfo(
             execution.slippageTolerance,
