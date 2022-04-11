@@ -1,39 +1,47 @@
-/*
- * Deploy Hardhat Network State for Subgraph Tests
- * -----------------------------------------------
- * Deploy a test environment to hardhat for subgraph development
- *
- * Setup
- * - Deploy system
- * - Deploy ManagerCore
- * - Deploy DelegatedManagerFactory
- * - Deploy IssuanceExtension with IssuanceModule
- * - Deploy StreamingFeeSplitExtension
- * - Deploy TradeExtension and TradeModule
- * - Initialize ManagerCore
- *
- * Case 1: DelegatedManagerFactory deployed DelegatedManager and SetToken
- * - Deploy DelegatedManager and SetToken through DelegatedManagerFactory
- * - Initialize DelegatedManager through DelegatedManagerFactory
- * - Update owner
- * - Update methodologist
- * - Add operatorTwo
- * - Remove operatorOne
- *
- * Case 2: DelegatedManagerFactory deployed DelegatedManager with migrating SetToken
- * - Deploy SetToken through SetTokenCreator
- * - Deploy DelegatedManager through DelegatedManagerFactory
- * - Initialize DelegatedManager through DelegatedManagerFactory
- *
- * Case 3: DelegatedManagerFactory deployed DelegatedManager and SetToken, migrate to EOA manager
- * - Deploy DelegatedManager and SetToken through DelegatedManagerFactory
- * - Initialize DelegatedManager through DelegatedManagerFactory
- * - Remove extensions from DelegatedManager
- * - Change SetToken manager to EOA manager
- *
- * Case 4: EOA managed SetToken
- * - Deploy SetToken through SetTokenCreator
- */
+// Deploy Hardhat Network State for Subgraph Tests
+// -----------------------------------------------
+// This script is intended for use with the set-protocol-v2-subgraph repository
+// for deploying a containerized local Hardhat node and test environment for
+// subgraph development. See command `task deploy-hardhat` in that repo for
+// more information.
+//
+// Standalone execution against a local Hardhat node deployed from this
+// repository is possible via the following command:
+//
+//   npx hardhat run --no-compile $(pwd)/subgraph/test/deploy-state-delegated-manager.ts --network localhost
+//
+// The following deployment state and test cases are executed:
+//
+// Setup
+// - Deploy system
+// - Deploy ManagerCore
+// - Deploy DelegatedManagerFactory
+// - Deploy IssuanceExtension with IssuanceModule
+// - Deploy StreamingFeeSplitExtension
+// - Deploy TradeExtension and TradeModule
+// - Initialize ManagerCore
+//
+// Case 1: DelegatedManagerFactory deployed DelegatedManager and SetToken
+// - Deploy DelegatedManager and SetToken through DelegatedManagerFactory
+// - Initialize DelegatedManager through DelegatedManagerFactory
+// - Update owner
+// - Update methodologist
+// - Add operatorTwo
+// - Remove operatorOne
+//
+// Case 2: DelegatedManagerFactory deployed DelegatedManager with migrating SetToken
+// - Deploy SetToken through SetTokenCreator
+// - Deploy DelegatedManager through DelegatedManagerFactory
+// - Initialize DelegatedManager through DelegatedManagerFactory
+//
+// Case 3: DelegatedManagerFactory deployed DelegatedManager and SetToken, migrate to EOA manager
+// - Deploy DelegatedManager and SetToken through DelegatedManagerFactory
+// - Initialize DelegatedManager through DelegatedManagerFactory
+// - Remove extensions from DelegatedManager
+// - Change SetToken manager to EOA manager
+//
+// Case 4: EOA managed SetToken
+// - Deploy SetToken through SetTokenCreator
 
 import "module-alias/register";
 import { getSystemFixture, getProtocolUtils } from "@setprotocol/set-protocol-v2/dist/utils/test/index";
