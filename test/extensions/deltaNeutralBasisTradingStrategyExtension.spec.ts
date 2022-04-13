@@ -46,6 +46,7 @@ import { PerpV2Fixture, SystemFixture, UniswapV3Fixture } from "@setprotocol/set
 import { getPerpV2Fixture, getSystemFixture, getUniswapV3Fixture } from "@setprotocol/set-protocol-v2/dist/utils/test";
 
 import { BaseManager, DeltaNeutralBasisTradingStrategyExtension } from "@utils/contracts/index";
+import { toUSDCDecimals } from "@setprotocol/set-protocol-v2/dist/utils/common";
 
 const expect = getWaffleExpect();
 const provider = ethers.provider;
@@ -2385,6 +2386,11 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           const initialTrackedSettledFunding = trackedSettledFunding.add(pendingFunding.mul(-1));
           const fundingWithdrawnNetFees = initialTrackedSettledFunding.sub(preciseMul(initialTrackedSettledFunding, performanceFeePercentage));
 
+          const currentLeverageRatio = (await leverageStrategyExtension.getCurrentLeverageRatio()).mul(-1);
+          const multiplicationFactor = preciseDiv(currentLeverageRatio, ether(1).add(currentLeverageRatio));
+          const amountInvested = preciseMul(fundingWithdrawnNetFees, multiplicationFactor);
+          const usdAmountDeposited = toUSDCDecimals(fundingWithdrawnNetFees.sub(amountInvested));
+
           // Doesn't contain owedRealizedPnl
           const initialVaultCollateralBalance = await perpV2Setup.vault.getBalance(setToken.address);
 
@@ -2394,10 +2400,11 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           const currentVaultCollateralBalance = await perpV2Setup.vault.getBalance(setToken.address);
 
           expect(currentTrackedSettledFunding).to.be.lt(ether(0.000001));
-          // Depositing back half to PerpV2.
+
+          // Depositing back to PerpV2.
           expect(
             currentVaultCollateralBalance.sub(initialVaultCollateralBalance)
-          ).closeTo(fundingWithdrawnNetFees.div(BigNumber.from(10).pow(12)).div(2), 300);
+          ).closeTo(usdAmountDeposited, 300);
         });
 
         it("should reinvest into perp position", async () => {
@@ -2408,7 +2415,10 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           const initialTrackedSettledFunding = trackedSettledFunding.add(pendingFunding.mul(-1));
           const fundingWithdrawnNetFees = initialTrackedSettledFunding.sub(preciseMul(initialTrackedSettledFunding, performanceFeePercentage));
 
-          const usdAmountInvested = fundingWithdrawnNetFees.div(BigNumber.from(10).pow(12)).div(2);
+          const currentLeverageRatio = (await leverageStrategyExtension.getCurrentLeverageRatio()).mul(-1);
+          const multiplicationFactor = preciseDiv(currentLeverageRatio, ether(1).add(currentLeverageRatio));
+          const usdAmountInvested = toUSDCDecimals(preciseMul(fundingWithdrawnNetFees, multiplicationFactor));
+
           // .155427105277853193
           const amountOutOnDex = await uniV3Setup.quoter.callStatic.quoteExactInput(exchange.buySpotQuoteExactInputPath, usdAmountInvested);
 
@@ -2430,7 +2440,10 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           const initialTrackedSettledFunding = trackedSettledFunding.add(pendingFunding.mul(-1));
           const fundingWithdrawnNetFees = initialTrackedSettledFunding.sub(preciseMul(initialTrackedSettledFunding, performanceFeePercentage));
 
-          const usdAmountInvested = fundingWithdrawnNetFees.div(BigNumber.from(10).pow(12)).div(2);
+          const currentLeverageRatio = (await leverageStrategyExtension.getCurrentLeverageRatio()).mul(-1);
+          const multiplicationFactor = preciseDiv(currentLeverageRatio, ether(1).add(currentLeverageRatio));
+          const usdAmountInvested = toUSDCDecimals(preciseMul(fundingWithdrawnNetFees, multiplicationFactor));
+
           // .155427105277853193
           const amountOutOnDex = await uniV3Setup.quoter.callStatic.quoteExactInput(exchange.buySpotQuoteExactInputPath, usdAmountInvested);
 

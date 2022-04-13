@@ -918,8 +918,19 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         if (defaultUsdcUnits == 0) { return (0, 0); }
 
         uint256 setTotalSupply = strategy.setToken.totalSupply();
-        uint256 fundingReinvestedNotional = defaultUsdcUnits.preciseMul(setTotalSupply);  // 50%
-        uint256 spotAmountOutNotional = strategy.quoter.quoteExactInput(exchange.buySpotQuoteExactInputPath, fundingReinvestedNotional.div(2));
+        uint256 fundingReinvestedNotional = defaultUsdcUnits.preciseMul(setTotalSupply);
+
+        // Let C be the total collateral available. Let c be the amount of collateral deposited to Perp to open perp position.
+        // Then we acquire, (C - c) worth of spot position. To maintain delta neutrality, we short same amount on PerpV2.
+        // Also, we need to maintiain the same leverage ratio as CLR.
+        // So, CLR = (C - c) / c, or c = C / (1 + CLR). And amount used to acquire spot, (C - c) = C * CLR / (1 + CLR)
+        uint256 multiplicationFactor = _leverageInfo.currentLeverageRatio.abs()
+            .preciseDiv(PreciseUnitMath.preciseUnit().add(_leverageInfo.currentLeverageRatio.abs()));
+
+        uint256 spotAmountOutNotional = strategy.quoter.quoteExactInput(
+            exchange.buySpotQuoteExactInputPath,
+            fundingReinvestedNotional.preciseMul(multiplicationFactor)
+        );
         uint256 baseUnits = spotAmountOutNotional.preciseDiv(setTotalSupply);
 
         // Increase spot position
@@ -1025,8 +1036,11 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         view
         returns (int256, int256)
     {
+        // Let C be the total collateral available. Let c be the amount of collateral deposited to Perp to open perp position.
+        // Then we acquire, (C - c) worth of spot position. To maintain delta neutrality, we short same amount on PerpV2.
+        // So, TLR = (C - c) / c, or c = C / (1 + TLR)
         int256 collateralAmount = collateralToken.balanceOf(address(strategy.setToken))
-            .div(2)
+            .preciseDiv(PreciseUnitMath.preciseUnit().add(methodology.targetLeverageRatio.abs()))
             .toPreciseUnitsFromDecimals(collateralDecimals)
             .toInt256();
         int256 totalRebalanceNotional = collateralAmount.preciseMul(_targetLeverageRatio).preciseDiv(_leverageInfo.action.basePrice);
