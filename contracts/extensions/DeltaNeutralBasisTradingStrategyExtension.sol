@@ -43,8 +43,6 @@ import { IBaseManager } from "../interfaces/IBaseManager.sol";
 import { IPriceFeed } from "../interfaces/IPriceFeed.sol";
 import { IUniswapV3Quoter } from "../interfaces/IUniswapV3Quoter.sol";
 
-// Todo: Should we enable TWAP during reinvestment?
-
 contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     using Address for address;
     using PreciseUnitMath for uint256;
@@ -151,36 +149,37 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
     /* ============ Events ============ */
 
-    // Todo: Emit spot and perp amounts separately? e.g. emit _chunkSpotRebalanceNotional, _totalSpotRebalanceNotional, _chunkPerpRebalanceNotional, _totalPerpRebalanceNotional.
+    // Below events emit `_chunkPerpRebalanceNotional` and `_totalPerpRebalanceNotional`. Spot rebalance notional amounts can be calculated by
+    // _chunkSpotRebalanceNotional = _chunkPerpRebalanceNotional * -1 and _totalSpotRebalanceNotional = _totalPerpRebalanceNotional * -1
     event Engaged(
         int256 _currentLeverageRatio,
         int256 _newLeverageRatio,
-        int256 _chunkRebalanceNotional,
-        int256 _totalRebalanceNotional
+        int256 _chunkPerpRebalanceNotional,
+        int256 _totalPerpRebalanceNotional
     );
     event Rebalanced(
         int256 _currentLeverageRatio,
         int256 _newLeverageRatio,
-        int256 _chunkRebalanceNotional,
-        int256 _totalRebalanceNotional
+        int256 _chunkPerpRebalanceNotional,
+        int256 _totalPerpRebalanceNotional
     );
     event RebalanceIterated(
         int256 _currentLeverageRatio,
         int256 _newTwapLeverageRatio,
-        int256 _chunkRebalanceNotional,
-        int256 _totalRebalanceNotional
+        int256 _chunkPerpRebalanceNotional,
+        int256 _totalPerpRebalanceNotional
     );
     event RipcordCalled(
         int256 _currentLeverageRatio,
         int256 _newLeverageRatio,
-        int256 _rebalanceNotional,
+        int256 _perpRebalanceNotional,
         uint256 _etherIncentive
     );
     event Disengaged(
         int256 _currentLeverageRatio,
         int256 _newLeverageRatio,
-        int256 _chunkRebalanceNotional,
-        int256 _totalRebalanceNotional
+        int256 _chunkPerpRebalanceNotional,
+        int256 _totalPerpRebalanceNotional
     );
     event Reinvested(
         uint256 _usdcReinvestedNotional,
@@ -470,7 +469,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     /**
      * ONLY EOA AND ALLOWED CALLER: Reinvests tracked settled funding to increase position. SetToken withdraws funding as collateral token using
      * PerpV2BasisTradingModule. It uses the collateral token to acquire more spot asset and deposit the rest to PerpV2 to increase short perp position.
-     * It can only be called once the reinvest interval has elapsed since last reinvest timestamp.
+     * It can only be called once the reinvest interval has elapsed since last reinvest timestamp. TWAP is not supported because reinvestment amounts
+     * would be generally small.
      *
      * NOTE: Rebalance is prioritized over reinvestment. This function can not be called when leverage ratio is out of bounds. Call `rebalance()` instead.
      */
@@ -832,7 +832,6 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         _executePerpTrade(baseRebalanceUnits, _leverageInfo);
 
         if (baseRebalanceUnits < 0) {
-            // todo: what if not enough balance
             _withdraw(oppositeBoundUnits);
 
             _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, true);
