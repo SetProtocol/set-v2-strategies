@@ -927,14 +927,15 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         uint256 multiplicationFactor = _leverageInfo.currentLeverageRatio.abs()
             .preciseDiv(PreciseUnitMath.preciseUnit().add(_leverageInfo.currentLeverageRatio.abs()));
 
-        uint256 spotAmountOutNotional = strategy.quoter.quoteExactInput(
-            exchange.buySpotQuoteExactInputPath,
-            fundingReinvestedNotional.preciseMul(multiplicationFactor)
-        );
+        uint256 spotReinvestmentNotional = fundingReinvestedNotional.preciseMul(multiplicationFactor);
+
+        uint256 spotAmountOutNotional = strategy.quoter.quoteExactInput(exchange.buySpotQuoteExactInputPath, spotReinvestmentNotional);
+
         uint256 baseUnits = spotAmountOutNotional.preciseDiv(setTotalSupply);
+        uint256 spotReinvestmentUnits = spotReinvestmentNotional.preciseDiv(setTotalSupply);
 
         // Increase spot position
-        _executeDexTrade(baseUnits, defaultUsdcUnits, true);
+        _executeDexTrade(baseUnits, spotReinvestmentUnits, true);
 
         // Deposit rest
         defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
@@ -1347,7 +1348,12 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         // - In this case, the `reinvest()` transaction would not revert. The keeper can SAFELY send the `rebalance()` transaction after the
         //   `reinvest()` transaction is mined.
         if (block.timestamp.sub(lastReinvestTimestamp) > methodology.reinvestInterval) {
-            return ShouldRebalance.REINVEST;
+            uint256 reinvestmentNotional = strategy.basisTradingModule.getUpdatedSettledFunding(strategy.setToken);
+
+            // Reinvest only if reinvestment amount is greater than 1 wei worth of USDC (to account for rounding errors)
+            if (reinvestmentNotional.fromPreciseUnitToDecimals(collateralDecimals) > 1) {
+                return ShouldRebalance.REINVEST;
+            }
         }
 
         return ShouldRebalance.NONE;
