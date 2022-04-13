@@ -932,7 +932,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         uint256 spotAmountOutNotional = strategy.quoter.quoteExactInput(exchange.buySpotQuoteExactInputPath, spotReinvestmentNotional);
 
         uint256 baseUnits = spotAmountOutNotional.preciseDiv(setTotalSupply);
-        uint256 spotReinvestmentUnits = spotReinvestmentNotional.preciseDiv(setTotalSupply);
+        uint256 spotReinvestmentUnits = spotReinvestmentNotional.preciseDivCeil(setTotalSupply);
 
         // Increase spot position
         _executeDexTrade(baseUnits, spotReinvestmentUnits, true);

@@ -3464,32 +3464,67 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         describe("when between max and min leverage ratio and rebalance intereval has NOT elapsed but reinvest interval has elapsed", async () => {
           let newMethodology: PerpV2BasisMethodologySettings;
 
-          beforeEach(async () => {
+          cacheBeforeEach(async () => {
             newMethodology = {
               ...methodology,
               reinvestInterval: ONE_DAY_IN_SECONDS.div(2)     // Set reinvest interval < rebalance interval
             };
             await leverageStrategyExtension.setMethodologySettings(newMethodology);
-            await increaseTimeAsync(ONE_DAY_IN_SECONDS.div(2));
 
-            await perpV2PriceFeedMock.setPrice(BigNumber.from(1010).mul(10 ** 8));
+            // set funding rate to NON-ZERO, to allow funding to accrue
+            await perpV2Setup.clearingHouseConfig.setMaxFundingRate(BigNumber.from(0.1e6));
           });
 
-          it("should verify initial conditions", async () => {
-            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
-            const reinvestInterval = (await leverageStrategyExtension.getMethodology()).reinvestInterval;
-            const lastReinvestTimestamp = await leverageStrategyExtension.lastReinvestTimestamp();
-            const lastBlockTimestamp = await getLastBlockTimestamp();
+          describe("when reinvestment amount is non zero", async () => {
+            beforeEach(async () => {
+              // Set oracle price below mark price to accrue positive funding
+              await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(980));
+              await perpV2PriceFeedMock.setPrice(BigNumber.from(980).mul(10 ** 8));
+              await increaseTimeAsync(ONE_DAY_IN_SECONDS.div(2));
+            });
 
-            expect(lastReinvestTimestamp.add(reinvestInterval)).lt(lastBlockTimestamp);
-            expect(currentLeverageRatio.abs()).to.be.gt(methodology.minLeverageRatio.abs());
-            expect(currentLeverageRatio.abs()).to.be.lt(methodology.maxLeverageRatio.abs());
+            it("should verify initial conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+              const reinvestInterval = (await leverageStrategyExtension.getMethodology()).reinvestInterval;
+              const lastReinvestTimestamp = await leverageStrategyExtension.lastReinvestTimestamp();
+              const lastBlockTimestamp = await getLastBlockTimestamp();
+
+              expect(lastReinvestTimestamp.add(reinvestInterval)).lt(lastBlockTimestamp);
+              expect(currentLeverageRatio.abs()).to.be.gt(methodology.minLeverageRatio.abs());
+              expect(currentLeverageRatio.abs()).to.be.lt(methodology.maxLeverageRatio.abs());
+            });
+
+            it("should reinvest", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(BigNumber.from(4));
+            });
           });
 
-          it("should reinvest", async () => {
-            const shouldRebalance = await subject();
+          describe("when reinvestment amount is zero", async () => {
+            beforeEach(async () => {
+              // Set oracle price above mark price to accrue negative funding
+              await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1020));
+              await perpV2PriceFeedMock.setPrice(BigNumber.from(1020).mul(10 ** 8));
+              await increaseTimeAsync(ONE_DAY_IN_SECONDS.div(2));
+            });
 
-            expect(shouldRebalance).to.eq(BigNumber.from(4));
+            it("should verify initial conditions", async () => {
+              const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+              const reinvestInterval = (await leverageStrategyExtension.getMethodology()).reinvestInterval;
+              const lastReinvestTimestamp = await leverageStrategyExtension.lastReinvestTimestamp();
+              const lastBlockTimestamp = await getLastBlockTimestamp();
+
+              expect(lastReinvestTimestamp.add(reinvestInterval)).lt(lastBlockTimestamp);
+              expect(currentLeverageRatio.abs()).to.be.gt(methodology.minLeverageRatio.abs());
+              expect(currentLeverageRatio.abs()).to.be.lt(methodology.maxLeverageRatio.abs());
+            });
+
+            it("should not reinvest", async () => {
+              const shouldRebalance = await subject();
+
+              expect(shouldRebalance).to.eq(ZERO);
+            });
           });
         });
 
