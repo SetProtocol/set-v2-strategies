@@ -20,8 +20,8 @@ pragma solidity 0.6.10;
 pragma experimental ABIEncoderV2;
 
 import { Address } from "@openzeppelin/contracts/utils/Address.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Math } from "@openzeppelin/contracts/math/Math.sol";
 import { SafeCast } from "@openzeppelin/contracts/utils/SafeCast.sol";
 import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
@@ -233,11 +233,13 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     IncentiveSettings internal incentive;                   // Struct containing incentive parameters for ripcord
 
     IERC20 internal collateralToken;                        // Collateral token to be deposited to PerpV2. We set this in the constructor for reading later.
-    uint8 internal collateralDecimals;                     // // Decimals of collateral token. We set this in the constructor for reading later.
+    uint8 internal collateralDecimals;                      // Decimals of collateral token. We set this in the constructor for reading later.
 
     int256 public twapLeverageRatio;                        // Stored leverage ratio to keep track of target between TWAP rebalances
-    uint256 public lastTradeTimestamp;                      // Last rebalance timestamp. Current timestamp must be greater than this variable + rebalance interval to rebalance
-    uint256 public lastReinvestTimestamp;                   // Last reinvest timestamp. Current timestamp must be greater than this variable + reinvest interval to reinvest
+    uint256 public lastTradeTimestamp;                      // Last rebalance timestamp. Current timestamp must be greater than this variable + rebalance
+                                                            // interval to rebalance
+    uint256 public lastReinvestTimestamp;                   // Last reinvest timestamp. Current timestamp must be greater than this variable + reinvest
+                                                            // interval to reinvest
 
     /* ============ Constructor ============ */
 
@@ -466,9 +468,9 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * ONLY EOA AND ALLOWED CALLER: Reinvests tracked settled funding to increase position. SetToken withdraws funding as collateral token using PerpV2BasisTradingModule. It uses
-     * the collateral token to acquire more spot asset and deposit the rest to PerpV2 to increase short perp position. It can only be called once the reinvest interval
-     * has elapsed since last reinvest timestamp.
+     * ONLY EOA AND ALLOWED CALLER: Reinvests tracked settled funding to increase position. SetToken withdraws funding as collateral token using
+     * PerpV2BasisTradingModule. It uses the collateral token to acquire more spot asset and deposit the rest to PerpV2 to increase short perp position.
+     * It can only be called once the reinvest interval has elapsed since last reinvest timestamp.
      *
      * NOTE: Rebalance is prioritized over reinvestment. This function can not be called when leverage ratio is out of bounds. Call `rebalance()` instead.
      */
@@ -497,8 +499,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * OPERATOR ONLY: Set methodology settings and check new settings are valid. Note: Need to pass in existing parameters if only changing a few settings. Must not be
-     * in a rebalance.
+     * OPERATOR ONLY: Set methodology settings and check new settings are valid. Note: Need to pass in existing parameters if only changing a few settings.
+     * Must not be in a rebalance.
      *
      * @param _newMethodologySettings          Struct containing methodology parameters
      */
@@ -518,8 +520,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * OPERATOR ONLY: Set execution settings and check new settings are valid. Note: Need to pass in existing parameters if only changing a few settings. Must not be
-     * in a rebalance.
+     * OPERATOR ONLY: Set execution settings and check new settings are valid. Note: Need to pass in existing parameters if only changing a few settings.
+     * Must not be in a rebalance.
      *
      * @param _newExecutionSettings          Struct containing execution parameters
      */
@@ -535,8 +537,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * OPERATOR ONLY: Set incentive settings and check new settings are valid. Note: Need to pass in existing parameters if only changing a few settings. Must not be
-     * in a rebalance.
+     * OPERATOR ONLY: Set incentive settings and check new settings are valid. Note: Need to pass in existing parameters if only changing a few settings.
+     * Must not be in a rebalance.
      *
      * @param _newIncentiveSettings          Struct containing incentive parameters
      */
@@ -564,18 +566,16 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         onlyOperator
     {
         exchange = _newExchangeSettings;
-        _validateExchangeSettings(_newExchangeSettings);
 
-        exchange.twapMaxTradeSize = _newExchangeSettings.twapMaxTradeSize;
-        exchange.incentivizedTwapMaxTradeSize = _newExchangeSettings.incentivizedTwapMaxTradeSize;
+        _validateExchangeSettings(exchange);
 
         emit ExchangeSettingsUpdated(
-            _newExchangeSettings.exchangeName,
-            _newExchangeSettings.buyExactSpotTradeData,
-            _newExchangeSettings.sellExactSpotTradeData,
-            _newExchangeSettings.buySpotQuoteExactInputPath,
-            _newExchangeSettings.twapMaxTradeSize,
-            _newExchangeSettings.incentivizedTwapMaxTradeSize
+            exchange.exchangeName,
+            exchange.buyExactSpotTradeData,
+            exchange.sellExactSpotTradeData,
+            exchange.buySpotQuoteExactInputPath,
+            exchange.twapMaxTradeSize,
+            exchange.incentivizedTwapMaxTradeSize
         );
     }
 
@@ -591,8 +591,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     /* ============ External Getter Functions ============ */
 
     /**
-     * Get current leverage ratio. Current leverage ratio is defined as the sum of USD values of all SetToken open positions on Perp V2 divided by its account value on
-     * PerpV2. Prices for base and quote asset are retrieved from the Chainlink Price Oracle.
+     * Get current leverage ratio. Current leverage ratio is defined as the sum of USD values of all SetToken open positions on Perp V2 divided by its
+     * account value on PerpV2. Prices for base and quote asset are retrieved from the Chainlink Price Oracle.
      *
      * return currentLeverageRatio         Current leverage ratio in precise units (10e18)
      */
@@ -670,15 +670,14 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * Get current Ether incentive for when current leverage ratio exceeds incentivized leverage ratio and ripcord can be called. If ETH balance on the contract is
-     * below the etherReward, then return the balance of ETH instead.
+     * Get current Ether incentive for when current leverage ratio exceeds incentivized leverage ratio and ripcord can be called. If ETH balance on the contract
+     * is below the etherReward, then return the balance of ETH instead.
      *
      * return etherReward               Quantity of ETH reward in base units (10e18)
      */
     function getCurrentEtherIncentive() external view returns(uint256) {
         int256 currentLeverageRatio = getCurrentLeverageRatio();
 
-        // Todo: This fix needs to be applied to the perp leverage strategy extension contract as well.
         if (currentLeverageRatio.abs() >= incentive.incentivizedLeverageRatio.abs()) {
             // If ETH reward is below the balance on this contract, then return ETH balance on contract instead
             return incentive.etherReward < address(this).balance ? incentive.etherReward : address(this).balance;
@@ -788,8 +787,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * Calculate base rebalance units and opposite bound units. Invoke trade on TradeModule to acquire spot asset. Deposit rest of the collateral token to PerpV2 and invoke trade
-     * on PerpV2BasisTradingModule to open short perp position.
+     * Calculate base rebalance units and opposite bound units. Invoke trade on TradeModule to acquire spot asset. Deposit rest of the collateral token to PerpV2
+     * and invoke trade on PerpV2BasisTradingModule to open short perp position.
      */
     function _executeEngageTrades(
         LeverageInfo memory _leverageInfo,
@@ -813,8 +812,9 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * Calculate base rebalance units and opposite bound units. Invoke trade on PerpV2BasisTradingModule to lever/delever perp short position. If levering, withdraw collateral token
-     * and invoke trade on TradeModule to acquire more spot assets. If delevering, invoke trade on TradeModule to sell spot assets and deposit the recieved collateral token to PerpV2.
+     * Calculate base rebalance units and opposite bound units. Invoke trade on PerpV2BasisTradingModule to lever/delever perp short position. If levering, withdraw
+     * collateral token and invoke trade on TradeModule to acquire more spot assets. If delevering, invoke trade on TradeModule to sell spot assets and deposit the
+     * recieved collateral token to PerpV2.
      */
     function _executeRebalanceTrades(
         LeverageInfo memory _leverageInfo,
@@ -1011,8 +1011,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
     /**
      * Calculate total notional rebalance quantity and chunked rebalance quantity in base asset units for engaging the SetToken. Used in engage().
-     * Leverage ratio (for the base asset) is zero before engage. We open a new base asset position with size equals to ( (collateralBalance/2) * targetLeverageRatio / baseAssetPrice)
-     * to gain (targetLeverageRatio * collateralBalance/2) worth of exposure to the base asset.
+     * Leverage ratio (for the base asset) is zero before engage. We open a new base asset position with size equals to
+     * (collateralBalance/2) * targetLeverageRatio / baseAssetPrice) to gain (targetLeverageRatio * collateralBalance/2) worth of exposure to the base asset.
      * Note: We can't use `_calculateChunkRebalanceNotional` function because CLR is 0 during engage and it would lead to a divison by zero error.
      *
      * return int256          Chunked rebalance notional in base asset units
@@ -1069,12 +1069,18 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * Derive the quote token units for slippage tolerance. The units are calculated by the base token units multiplied by base asset price divided by quote asset price.
-     * Output is measured to precise units (1e18).
+     * Derive the quote token units for slippage tolerance. The units are calculated by the base token units multiplied by base asset price divided by quote
+     * asset price. Output is measured to precise units (1e18).
      *
      * return int256           Position units to quote
      */
-    function _calculateOppositeBoundUnits(int256 _baseRebalanceUnits, ActionInfo memory _actionInfo, uint256 _slippageTolerance) internal pure returns (uint256) {
+    function _calculateOppositeBoundUnits(
+        int256 _baseRebalanceUnits,
+        ActionInfo memory _actionInfo,
+        uint256 _slippageTolerance
+    )
+        internal pure returns (uint256)
+    {
         uint256 oppositeBoundUnits;
         if (_baseRebalanceUnits > 0) {
             oppositeBoundUnits = _baseRebalanceUnits
@@ -1319,10 +1325,14 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
             return ShouldRebalance.REBALANCE;
         }
 
-        // Rebalancing is given priority over reinvestment.
-        // This might lead to scenarios where this function returns `ShouldRebalance.REINVEST` in the current block
-        // and `ShouldRebalance.REBALANCE` in the next block. In such cases, the keeper system would have to replace their
-        // reinvestment transaction with a rebalance transaction.
+        // Rebalancing is given priority over reinvestment. This might lead to scenarios where this function returns `ShouldRebalance.REINVEST` in
+        // the current block and `ShouldRebalance.REBALANCE` in the next blocks. This might be due to two reasons
+        // 1. The leverage ratio moves out of bounds in the next block.
+        // - In this case, the `reinvest()` transaction sent by the keeper would revert with "Invalid leverage ratio". The keeper can send a new
+        //   `rebalance()` transaction in the next blocks.
+        // 2. The rebalance interval elapses in the next block.
+        // - In this case, the `reinvest()` transaction would not revert. The keeper can SAFELY send the `rebalance()` transaction after the
+        //   `reinvest()` transaction is mined.
         if (block.timestamp.sub(lastReinvestTimestamp) > methodology.reinvestInterval) {
             return ShouldRebalance.REINVEST;
         }

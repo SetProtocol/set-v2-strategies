@@ -599,7 +599,7 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
     function getCurrentEtherIncentive() external view returns(uint256) {
         int256 currentLeverageRatio = getCurrentLeverageRatio();
 
-        if (currentLeverageRatio >= incentive.incentivizedLeverageRatio) {
+        if (currentLeverageRatio.abs() >= incentive.incentivizedLeverageRatio.abs()) {
             // If ETH reward is below the balance on this contract, then return ETH balance on contract instead
             return incentive.etherReward < address(this).balance ? incentive.etherReward : address(this).balance;
         } else {
@@ -754,7 +754,6 @@ contract PerpV2LeverageStrategyExtension is BaseExtension {
 
         // Fetch base token prices from PerpV2 oracles and adjust them to 18 decimal places.
         int256 rawBasePrice = strategy.baseUSDPriceOracle.getPrice(strategy.twapInterval).toInt256();
-        uint256 decimals = strategy.baseUSDPriceOracle.decimals();
         rebalanceInfo.basePrice = rawBasePrice.mul((10 ** strategy.basePriceDecimalAdjustment).toInt256());
 
         // vUSD price is fixed to 1$
