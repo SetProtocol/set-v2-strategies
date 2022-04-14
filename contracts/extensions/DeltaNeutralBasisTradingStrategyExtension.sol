@@ -28,6 +28,7 @@ import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 import { SignedSafeMath } from "@openzeppelin/contracts/math/SignedSafeMath.sol";
 
 import { BytesLib } from "@setprotocol/set-protocol-v2/external/contracts/uniswap/v3/lib/BytesLib.sol";
+import { BytesArrayUtils } from "@setprotocol/set-protocol-v2/contracts/lib/BytesArrayUtils.sol";
 import { IAccountBalance } from "@setprotocol/set-protocol-v2/contracts/interfaces/external/perp-v2/IAccountBalance.sol";
 import { IPerpV2BasisTradingModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IPerpV2BasisTradingModule.sol";
 import { IPerpV2LeverageModuleV2 } from "@setprotocol/set-protocol-v2/contracts/interfaces/IPerpV2LeverageModuleV2.sol";
@@ -64,6 +65,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     using SafeCast for uint256;
     using StringArrayUtils for string[];
     using BytesLib for bytes;
+    using BytesArrayUtils for bytes;
     using UnitConversionUtils for int256;
     using UnitConversionUtils for uint256;
 
@@ -1462,8 +1464,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         require(
             data.length >= 44
             && data.toAddress(0) == strategy.spotAssetAddress
-            && data.toAddress(data.length - 21) == address(collateralToken),
-            // && data.toBool(data.length - 1) == false,                           // FixIn is false; since exactOutput
+            && data.toAddress(data.length - 21) == address(collateralToken)
+            && data.toBool(data.length - 1) == false,                           // FixIn is false; since exactOutput
             "Invalid buyExactSpotTradeData data"
         );
 
@@ -1472,14 +1474,14 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         require(
             data.length >= 44
             && data.toAddress(0) == strategy.spotAssetAddress
-            && data.toAddress(data.length - 21) == address(collateralToken),
-            // && data.toBool(data.length - 1) == true,                            // FixIn is false; since exactInput
+            && data.toAddress(data.length - 21) == address(collateralToken)
+            && data.toBool(data.length - 1) == true,                            // FixIn is false; since exactInput
             "Invalid sellExactSpotTradeData data"
         );
 
         data = _settings.buySpotQuoteExactInputPath;
         require(
-            data.length >= 43                                                       // No FixIn bool at end
+            data.length >= 43                                                   // No FixIn bool at end
             && data.toAddress(0) == address(collateralToken)
             && data.toAddress(data.length - 20) == strategy.spotAssetAddress,
             "Invalid buySpotQuoteExactInputPath data"

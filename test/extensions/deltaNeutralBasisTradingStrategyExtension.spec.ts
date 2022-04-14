@@ -2824,7 +2824,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           });
         });
 
-        describe.skip("when fix input bool is invalid", async () => {
+        describe("when fix input bool is invalid", async () => {
           beforeEach(async () => {
             buyExactSpotTradeData = await uniswapV3ExchangeAdapter.generateDataParam(
               [systemSetup.weth.address, perpV2Setup.usdc.address], // exactOutput paths are reversed in Uniswap V3
@@ -2898,7 +2898,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           });
         });
 
-        describe.skip("when fix input bool is invalid", async () => {
+        describe("when fix input bool is invalid", async () => {
           beforeEach(async () => {
             sellExactSpotTradeData = await uniswapV3ExchangeAdapter.generateDataParam(
               [systemSetup.weth.address, perpV2Setup.usdc.address], // exactOutput paths are reversed in Uniswap V3
