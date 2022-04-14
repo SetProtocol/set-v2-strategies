@@ -43,6 +43,17 @@ import { IBaseManager } from "../interfaces/IBaseManager.sol";
 import { IPriceFeed } from "../interfaces/IPriceFeed.sol";
 import { IUniswapV3Quoter } from "../interfaces/IUniswapV3Quoter.sol";
 
+/**
+ * @title DeltaNeutralBasisTradingStrategyExtension
+ * @author Set Protocol
+ *
+ * Strategy smart contract that transforms a SetToken into an on-chain delta neutral basis trading token that earns yield by shorting assets
+ * on PerpV2 and collecting funding, while maintaing delta neutral exposure to the short asset by holding an equal amount of spot asset.
+ * This extension is paired with the PerpV2BasisTradingModule from Set Protocol where module interactions are invoked via the IBaseManager
+ * contract. Any basis trading token can be constructed as long as the market is listed on Perp V2 and there is enough liquidity for the
+ * corresponding spot asset on UniswapV3. This extension contract also allows the operator to set an ETH reward to incentivize keepers
+ * calling the rebalance function at different leverage thresholds.
+ */
 contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     using Address for address;
     using PreciseUnitMath for uint256;
@@ -183,8 +194,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     );
     event Reinvested(
         uint256 _usdcReinvestedNotional,
-        uint256 _spotRebalanceNotional,
-        uint256 _perpRebalanceNotional
+        uint256 _spotRebalanceNotional
     );
     event MethodologySettingsUpdated(
         int256 _targetLeverageRatio,
@@ -485,17 +495,19 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
         _withdrawFunding(PreciseUnitMath.MAX_UINT_256);    // Pass MAX_UINT_256 to withdraw all funding.
 
-        (uint256 usdcReinvestedNotional, uint256 spotAmountIncreasedNotional) = _handleReinvest(leverageInfo);
+        (
+            uint256 totalReinvestNotional,
+            uint256 spotReinvestNotional,
+            uint256 spotBuyNotional
+        ) = _calculateReinvestNotional(leverageInfo);
 
-        require(usdcReinvestedNotional > 0, "Zero accrued funding");
+        require(totalReinvestNotional > 0, "Zero accrued funding");
+
+        _executeReinvestTrades(leverageInfo, spotReinvestNotional, spotBuyNotional);
 
         _updateReinvestState();
 
-        emit Reinvested(
-            usdcReinvestedNotional,
-            spotAmountIncreasedNotional,
-            spotAmountIncreasedNotional
-        );
+        emit Reinvested(totalReinvestNotional, spotBuyNotional);
     }
 
     /**
@@ -740,7 +752,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     /* ============ Internal Functions ============ */
 
     /**
-     * OEPRATOR ONLY: Deposits specified units of current USDC tokens not already being used as collateral into Perpetual Protocol.
+     * Deposits specified units of current USDC tokens not already being used as collateral into Perpetual Protocol.
      *
      * @param  _collateralUnits     Collateral to deposit in position units
      */
@@ -755,7 +767,15 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * OPERATOR ONLY: Withdraws specified units of USDC tokens from Perpetual Protocol and adds it as default position on the SetToken.
+     * Deposits all current USDC tokens held in the Set to Perpetual Protocol.
+     */
+    function _depositAll() internal {
+        uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
+        _deposit(defaultUsdcUnits);
+    }
+
+    /**
+     * Withdraws specified units of USDC tokens from Perpetual Protocol and adds it as default position on the SetToken.
      *
      * @param  _collateralUnits     Collateral to withdraw in position units
      */
@@ -797,6 +817,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         internal
     {
         int256 baseRebalanceUnits = _chunkRebalanceNotional.preciseDiv(_leverageInfo.action.setTotalSupply.toInt256());
+
         uint256 oppositeBoundUnits = _calculateOppositeBoundUnits(
             baseRebalanceUnits.neg(),
             _leverageInfo.action,
@@ -805,8 +826,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
 
         _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, true);
 
-        uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
-        _deposit(defaultUsdcUnits);
+        _depositAll();
 
         _executePerpTrade(baseRebalanceUnits, _leverageInfo);
     }
@@ -838,9 +858,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         } else {
             _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, false);
 
-            // Deposit all USDC
-            uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
-            _deposit(defaultUsdcUnits);
+            _depositAll();
         }
     }
 
@@ -905,46 +923,27 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     }
 
     /**
-     * Reinvests 50% of USDC position to spot asset and deposits the rest to PerpV2 to increase the short perp position.
+     * Reinvests default USDC position to spot asset and deposits the rest to PerpV2 to increase the short perp position.
      * Used in the reinvest() function.
-     *
-     * return uint256           Calculated amount of funding to be reinvested
-     * return uint256           Spot amount increase notional. Returned on swapping 50% of funding to be reinvested
      */
-    function _handleReinvest(LeverageInfo memory _leverageInfo) internal returns (uint256, uint256) {
-
-        uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
-
-        if (defaultUsdcUnits == 0) { return (0, 0); }
+    function _executeReinvestTrades(
+        LeverageInfo memory _leverageInfo,
+        uint256 _spotReinvestNotional,
+        uint256 _spotBuyNotional
+    ) internal {
 
         uint256 setTotalSupply = strategy.setToken.totalSupply();
-        uint256 fundingReinvestedNotional = defaultUsdcUnits.preciseMul(setTotalSupply);
-
-        // Let C be the total collateral available. Let c be the amount of collateral deposited to Perp to open perp position.
-        // Then we acquire, (C - c) worth of spot position. To maintain delta neutrality, we short same amount on PerpV2.
-        // Also, we need to maintiain the same leverage ratio as CLR.
-        // So, CLR = (C - c) / c, or c = C / (1 + CLR). And amount used to acquire spot, (C - c) = C * CLR / (1 + CLR)
-        uint256 multiplicationFactor = _leverageInfo.currentLeverageRatio.abs()
-            .preciseDiv(PreciseUnitMath.preciseUnit().add(_leverageInfo.currentLeverageRatio.abs()));
-
-        uint256 spotReinvestmentNotional = fundingReinvestedNotional.preciseMul(multiplicationFactor);
-
-        uint256 spotAmountOutNotional = strategy.quoter.quoteExactInput(exchange.buySpotQuoteExactInputPath, spotReinvestmentNotional);
-
-        uint256 baseUnits = spotAmountOutNotional.preciseDiv(setTotalSupply);
-        uint256 spotReinvestmentUnits = spotReinvestmentNotional.preciseDivCeil(setTotalSupply);
+        uint256 baseUnits = _spotBuyNotional.preciseDiv(setTotalSupply);
+        uint256 spotReinvestUnits = _spotReinvestNotional.preciseDivCeil(setTotalSupply);
 
         // Increase spot position
-        _executeDexTrade(baseUnits, spotReinvestmentUnits, true);
+        _executeDexTrade(baseUnits, spotReinvestUnits, true);
 
         // Deposit rest
-        defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
-        _deposit(defaultUsdcUnits);
+        _depositAll();
 
         // Increase perp position
         _executePerpTrade(baseUnits.toInt256().neg(), _leverageInfo);
-
-        return (fundingReinvestedNotional, spotAmountOutNotional);
     }
 
     /* ============ Calculation functions ============ */
@@ -1053,6 +1052,37 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
             totalRebalanceNotional >= 0 ? chunkRebalanceNotionalAbs.toInt256() : chunkRebalanceNotionalAbs.toInt256().neg(),
             totalRebalanceNotional
         );
+    }
+
+    /**
+     * Calculate total notional funding to be reinvested (in USD), notional funding to be reinvested into spot position
+     * and notional amount of spot asset to be bought during reinvestment.
+     *
+     * return uint256          Total notional funding to be reinvested
+     * return uint256          Notional funding to be reinvested into spot position
+     * return uint256          Notional amount of spot asset to be bought during reinvestment
+     */
+    function _calculateReinvestNotional(LeverageInfo memory _leverageInfo) internal returns (uint256, uint256, uint256) {
+
+        uint256 defaultUsdcUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
+
+        if (defaultUsdcUnits == 0) { return (0, 0, 0); }
+
+        uint256 setTotalSupply = strategy.setToken.totalSupply();
+        uint256 totalReinvestNotional = defaultUsdcUnits.preciseMul(setTotalSupply);
+
+        // Let C be the total collateral available. Let c be the amount of collateral deposited to Perp to open perp position.
+        // Then we acquire, (C - c) worth of spot position. To maintain delta neutrality, we short same amount on PerpV2.
+        // Also, we need to maintiain the same leverage ratio as CLR.
+        // So, CLR = (C - c) / c, or c = C / (1 + CLR). And amount used to acquire spot, (C - c) = C * CLR / (1 + CLR)
+        uint256 multiplicationFactor = _leverageInfo.currentLeverageRatio.abs()
+            .preciseDiv(PreciseUnitMath.preciseUnit().add(_leverageInfo.currentLeverageRatio.abs()));
+
+        uint256 spotReinvestNotional = totalReinvestNotional.preciseMul(multiplicationFactor);
+
+        uint256 spotBuyNotional = strategy.quoter.quoteExactInput(exchange.buySpotQuoteExactInputPath, spotReinvestNotional);
+
+        return (totalReinvestNotional, spotReinvestNotional, spotBuyNotional);
     }
 
     /**

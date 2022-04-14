@@ -2425,7 +2425,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           const currentPositions = await perpBasisTradingModule.getPositionNotionalInfo(setToken.address);
           const expectedBaseBalance = initialPositions[0].baseBalance.add(amountOutOnDex.mul(-1));
 
-          expect(currentPositions[0].baseBalance).closeTo(expectedBaseBalance, ether(0.0001).toNumber());
+          expect(currentPositions[0].baseBalance).closeTo(expectedBaseBalance, ether(0.00001).toNumber());
           expect(currentPositions[0].baseToken).eq(strategy.virtualBaseAddress);
         });
 
