@@ -279,11 +279,11 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         incentive = _incentive;
         exchange = _exchange;
 
-        _validateExchangeSettings(_exchange);
-        _validateNonExchangeSettings(methodology, execution, incentive);
-
         collateralToken = strategy.basisTradingModule.collateralToken();
         collateralDecimals = ERC20(address(collateralToken)).decimals();
+
+        _validateExchangeSettings(_exchange);
+        _validateNonExchangeSettings(methodology, execution, incentive);
 
         // Set reinvest interval, so that first reinvestment takes place one reinvestment interval after deployment
         lastReinvestTimestamp = block.timestamp;
@@ -1446,11 +1446,43 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
     /**
      * Validate an ExchangeSettings struct settings.
      */
-    function _validateExchangeSettings(ExchangeSettings memory _settings) internal pure {
+    function _validateExchangeSettings(ExchangeSettings memory _settings) internal view {
         require(_settings.twapMaxTradeSize != 0, "Max TWAP trade size must not be 0");
         require(
             _settings.twapMaxTradeSize <= _settings.incentivizedTwapMaxTradeSize,
             "Max TWAP trade size must not be greater than incentivized max TWAP trade size"
+        );
+
+        bytes memory data;
+
+        // For a single hop trade, trade data bytes length is 44. 20 source/destination token address + 3 fees + 20 source/destination token
+        // address + 1 fixInput bool. For multi-hop trades, trade data bytes length is greater than 44.
+        // `buyExactSpotTradeData` is trade data for an exact output trade. And exact output paths are reversed in UniswapV3.
+        data = _settings.buyExactSpotTradeData;
+        require(
+            data.length >= 44
+            && data.toAddress(0) == strategy.spotAssetAddress
+            && data.toAddress(data.length - 21) == address(collateralToken),
+            // && data.toBool(data.length - 1) == false,                           // FixIn is false; since exactOutput
+            "Invalid buyExactSpotTradeData data"
+        );
+
+        // `sellExactSpotTradeData` is trade data for an exact input trade.
+        data = _settings.sellExactSpotTradeData;
+        require(
+            data.length >= 44
+            && data.toAddress(0) == strategy.spotAssetAddress
+            && data.toAddress(data.length - 21) == address(collateralToken),
+            // && data.toBool(data.length - 1) == true,                            // FixIn is false; since exactInput
+            "Invalid sellExactSpotTradeData data"
+        );
+
+        data = _settings.buySpotQuoteExactInputPath;
+        require(
+            data.length >= 43                                                       // No FixIn bool at end
+            && data.toAddress(0) == address(collateralToken)
+            && data.toAddress(data.length - 20) == strategy.spotAssetAddress,
+            "Invalid buySpotQuoteExactInputPath data"
         );
     }
 

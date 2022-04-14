@@ -38,7 +38,8 @@ import {
   preciseMul,
   usdc,
   increaseTimeAsync,
-  calculateNewLeverageRatioPerpV2Basis
+  calculateNewLeverageRatioPerpV2Basis,
+  getRandomAddress
 } from "../../utils/index";
 import { PerpV2PriceFeedMock } from "@utils/contracts";
 
@@ -323,7 +324,6 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       incentive,
       exchange
     );
-
     // Add adapter
     await baseManager.connect(owner.wallet).addAdapter(leverageStrategyExtension.address);
 
@@ -2766,6 +2766,209 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           subjectExchangeSettings.twapMaxTradeSize,
           subjectExchangeSettings.incentivizedTwapMaxTradeSize
         );
+      });
+
+      describe("when buyExactSpotTradeData is invalid", async () => {
+        let buyExactSpotTradeData: string;
+
+        describe("when length is invalid", async () => {
+          beforeEach(async () => {
+            buyExactSpotTradeData = await uniswapV3ExchangeAdapter.generateDataParam(
+              [systemSetup.weth.address],
+              [],
+              false
+            );
+            subjectExchangeSettings = {
+              ...exchange,
+              buyExactSpotTradeData: buyExactSpotTradeData
+            };
+          });
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Invalid buyExactSpotTradeData data");
+          });
+        });
+
+        describe("when first token is invalid", async () => {
+          beforeEach(async () => {
+            const randomAddress = await getRandomAddress();
+            buyExactSpotTradeData = await uniswapV3ExchangeAdapter.generateDataParam(
+              [randomAddress, perpV2Setup.usdc.address],
+              [3000],
+              false
+            );
+            subjectExchangeSettings = {
+              ...exchange,
+              buyExactSpotTradeData: buyExactSpotTradeData
+            };
+          });
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Invalid buyExactSpotTradeData data");
+          });
+        });
+
+        describe("when last token is invalid", async () => {
+          beforeEach(async () => {
+            const randomAddress = await getRandomAddress();
+            buyExactSpotTradeData = await uniswapV3ExchangeAdapter.generateDataParam(
+              [systemSetup.weth.address, randomAddress],
+              [3000],
+              false
+            );
+            subjectExchangeSettings = {
+              ...exchange,
+              buyExactSpotTradeData: buyExactSpotTradeData
+            };
+          });
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Invalid buyExactSpotTradeData data");
+          });
+        });
+
+        describe.skip("when fix input bool is invalid", async () => {
+          beforeEach(async () => {
+            buyExactSpotTradeData = await uniswapV3ExchangeAdapter.generateDataParam(
+              [systemSetup.weth.address, perpV2Setup.usdc.address], // exactOutput paths are reversed in Uniswap V3
+              [3000],
+              true
+            );
+            subjectExchangeSettings = {
+              ...exchange,
+              buyExactSpotTradeData: buyExactSpotTradeData
+            };
+          });
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Invalid buyExactSpotTradeData data");
+          });
+        });
+      });
+
+      describe("when sellExactSpotTradeData is invalid", async () => {
+        let sellExactSpotTradeData: string;
+
+        describe("when length is invalid", async () => {
+          beforeEach(async () => {
+            sellExactSpotTradeData = await uniswapV3ExchangeAdapter.generateDataParam(
+              [systemSetup.weth.address],
+              [],
+              true
+            );
+            subjectExchangeSettings = {
+              ...exchange,
+              sellExactSpotTradeData: sellExactSpotTradeData
+            };
+          });
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Invalid sellExactSpotTradeData data");
+          });
+        });
+
+        describe("when first token is invalid", async () => {
+          beforeEach(async () => {
+            const randomAddress = await getRandomAddress();
+            sellExactSpotTradeData = await uniswapV3ExchangeAdapter.generateDataParam(
+              [randomAddress, perpV2Setup.usdc.address],
+              [3000],
+              true
+            );
+            subjectExchangeSettings = {
+              ...exchange,
+              sellExactSpotTradeData: sellExactSpotTradeData
+            };
+          });
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Invalid sellExactSpotTradeData data");
+          });
+        });
+
+        describe("when last token is invalid", async () => {
+          beforeEach(async () => {
+            const randomAddress = await getRandomAddress();
+            sellExactSpotTradeData = await uniswapV3ExchangeAdapter.generateDataParam(
+              [systemSetup.weth.address, randomAddress],
+              [3000],
+              true
+            );
+            subjectExchangeSettings = {
+              ...exchange,
+              sellExactSpotTradeData: sellExactSpotTradeData
+            };
+          });
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Invalid sellExactSpotTradeData data");
+          });
+        });
+
+        describe.skip("when fix input bool is invalid", async () => {
+          beforeEach(async () => {
+            sellExactSpotTradeData = await uniswapV3ExchangeAdapter.generateDataParam(
+              [systemSetup.weth.address, perpV2Setup.usdc.address], // exactOutput paths are reversed in Uniswap V3
+              [3000],
+              false
+            );
+            subjectExchangeSettings = {
+              ...exchange,
+              sellExactSpotTradeData: sellExactSpotTradeData
+            };
+          });
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Invalid sellExactSpotTradeData data");
+          });
+        });
+      });
+
+
+      describe("when buySpotQuoteExactInputPath is invalid", async () => {
+        let buySpotQuoteExactInputPath: string;
+
+        describe("when length is invalid", async () => {
+          beforeEach(async () => {
+            buySpotQuoteExactInputPath = solidityPack(
+              ["address"],
+              [systemSetup.weth.address]
+            );
+            subjectExchangeSettings = {
+              ...exchange,
+              buySpotQuoteExactInputPath: buySpotQuoteExactInputPath
+            };
+          });
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Invalid buySpotQuoteExactInputPath data");
+          });
+        });
+
+        describe("when first token is invalid", async () => {
+          beforeEach(async () => {
+            const randomAddress = await getRandomAddress();
+            buySpotQuoteExactInputPath = solidityPack(
+              ["address", "uint24", "address"],
+              [randomAddress, BigNumber.from(3000), systemSetup.weth.address]
+            );
+            subjectExchangeSettings = {
+              ...exchange,
+              buySpotQuoteExactInputPath: buySpotQuoteExactInputPath
+            };
+          });
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Invalid buySpotQuoteExactInputPath data");
+          });
+        });
+
+        describe("when last token is invalid", async () => {
+          beforeEach(async () => {
+            const randomAddress = await getRandomAddress();
+            buySpotQuoteExactInputPath = solidityPack(
+              ["address", "uint24", "address"],
+              [perpV2Setup.usdc.address, BigNumber.from(3000), randomAddress]
+            );
+            subjectExchangeSettings = {
+              ...exchange,
+              buySpotQuoteExactInputPath: buySpotQuoteExactInputPath
+            };
+          });
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Invalid buySpotQuoteExactInputPath data");
+          });
+        });
       });
 
       describe("when the caller is not the operator", async () => {
