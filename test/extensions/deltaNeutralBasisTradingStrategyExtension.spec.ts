@@ -784,6 +784,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           expect(twapLeverageRatio).to.eq(ZERO);
         });
 
+        it("should deposit all USDC to PerpV2", async () => {
+          await subject();
+
+          const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+          expect(usdcPositionUnit).to.eq(ZERO);
+        });
+
         it("should emit Engaged event", async () => {
           const totalRebalanceNotional = await getTotalEngageRebalanceNotional(setToken);
           await expect(subject()).to.emit(leverageStrategyExtension, "Engaged").withArgs(
@@ -889,6 +896,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             chunkRebalanceNotional,
             totalRebalanceNotional,
           );
+        });
+
+        it("should deposit all USDC to PerpV2", async () => {
+          await subject();
+
+          const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+          expect(usdcPositionUnit).to.eq(ZERO);
         });
 
         describe("when the caller is not the operator", async () => {
@@ -1013,6 +1027,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             expect(actualNewPositionUnit).to.eq(expectedNewPositionUnit);
           });
 
+          it("should deposit all USDC to PerpV2", async () => {
+            await subject();
+
+            const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+            expect(usdcPositionUnit).to.eq(ZERO);
+          });
+
           it("should emit Rebalanced event", async () => {
             const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
             const expectedNewLeverageRatio = calculateNewLeverageRatioPerpV2Basis(
@@ -1115,6 +1136,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
             expect(actualNewPositionUnit).to.eq(expectedNewPositionUnit);
           });
+
+          it("should deposit all USDC to PerpV2", async () => {
+            await subject();
+
+            const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+            expect(usdcPositionUnit).to.eq(ZERO);
+          });
         });
 
         describe("when rebalance interval has not elapsed below min leverage ratio and greater than max trade size", async () => {
@@ -1193,6 +1221,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             const actualNewPositionUnit = await setToken.getDefaultPositionRealUnit(spotAsset.address);
 
             expect(actualNewPositionUnit).to.eq(expectedNewPositionUnit);
+          });
+
+          it("should deposit all USDC to PerpV2", async () => {
+            await subject();
+
+            const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+            expect(usdcPositionUnit).to.eq(ZERO);
           });
         });
 
@@ -1284,6 +1319,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
             expect(actualNewPositionUnit).to.closeTo(expectedNewPositionUnit, 1);
           });
+
+          it("should deposit all USDC to PerpV2", async () => {
+            await subject();
+
+            const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+            expect(usdcPositionUnit).to.eq(ZERO);
+          });
         });
 
         describe("when rebalance interval has not elapsed, above max leverage ratio and lower than max trade size", async () => {
@@ -1366,6 +1408,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
             expect(actualNewPositionUnit).to.closeTo(expectedNewPositionUnit, 1);
           });
+
+          it("should deposit all USDC to PerpV2", async () => {
+            await subject();
+
+            const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+            expect(usdcPositionUnit).to.eq(ZERO);
+          });
         });
 
         describe("when rebalance interval has not elapsed, above max leverage ratio and greater than max trade size", async () => {
@@ -1441,6 +1490,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             const actualNewPositionUnit = await setToken.getDefaultPositionRealUnit(spotAsset.address);
 
             expect(actualNewPositionUnit).to.closeTo(expectedNewPositionUnit, 1);
+          });
+
+          it("should deposit all USDC to PerpV2", async () => {
+            await subject();
+
+            const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+            expect(usdcPositionUnit).to.eq(ZERO);
           });
 
           describe("when in a TWAP rebalance", async () => {
@@ -1585,6 +1641,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
             expect(actualNewPositionUnit).to.eq(expectedNewPositionUnit);
           });
+
+          it("should deposit all USDC to PerpV2", async () => {
+            await subject();
+
+            const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+            expect(usdcPositionUnit).to.eq(ZERO);
+          });
         });
 
         context("when current leverage ratio is below target and in the middle of a TWAP", async () => {
@@ -1703,6 +1766,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
             expect(actualNewPositionUnit).to.eq(expectedNewPositionUnit);
           });
+
+          it("should deposit all USDC to PerpV2", async () => {
+            await subject();
+
+            const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+            expect(usdcPositionUnit).to.eq(ZERO);
+          });
         });
 
         context("when current leverage ratio is above target and in the middle of a TWAP", async () => {
@@ -1818,6 +1888,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
             expect(actualNewPositionUnit).to.eq(expectedNewPositionUnit);
           });
+
+          it("should deposit all USDC to PerpV2", async () => {
+            await subject();
+
+            const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+            expect(usdcPositionUnit).to.eq(ZERO);
+          });
         });
 
         describe("when price has moved advantageously towards target leverage ratio", async () => {
@@ -1879,6 +1956,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             const spotAssetUnitAfter = await setToken.getDefaultPositionRealUnit(strategy.spotAssetAddress);
 
             expect(spotAssetUnitBefore).to.eq(spotAssetUnitAfter);
+          });
+
+          it("should deposit all USDC to PerpV2", async () => {
+            await subject();
+
+            const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+            expect(usdcPositionUnit).to.eq(ZERO);
           });
         });
 
@@ -2020,6 +2104,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             expect(newSpotPositionUnit).to.eq(expectedNewPositionUnit);
           });
 
+          it("should deposit all USDC to PerpV2", async () => {
+            await subject();
+
+            const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+            expect(usdcPositionUnit).to.eq(ZERO);
+          });
+
           it("should transfer incentive", async () => {
             const previousContractEthBalance = await getEthBalance(leverageStrategyExtension.address);
             const previousOwnerEthBalance = await getEthBalance(owner.address);
@@ -2095,7 +2186,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
               expect(newPosition.baseUnit).to.closeTo(expectedNewPositionUnit, 1);
             });
 
-            it("should update the baseToken position on the SetToken correctly", async () => {
+            it("should update the spot asset position on the SetToken correctly", async () => {
               const totalSupply = await setToken.totalSupply();
               const initialSpotPositionUnit = await setToken.getDefaultPositionRealUnit(spotAsset.address);
 
@@ -2105,6 +2196,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
               const expectedNewPositionUnit = initialSpotPositionUnit.sub(preciseDiv(newIncentivizedMaxTradeSize.abs(), totalSupply));
 
               expect(newSpotPositionUnit).to.eq(expectedNewPositionUnit);
+            });
+
+            it("should deposit all USDC to PerpV2", async () => {
+              await subject();
+
+              const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+              expect(usdcPositionUnit).to.eq(ZERO);
             });
           });
 
@@ -2250,6 +2348,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
           });
 
+          it("should deposit all USDC to PerpV2", async () => {
+            await subject();
+
+            const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+            expect(usdcPositionUnit).to.eq(ZERO);
+          });
+
           describe("when SetToken has 0 supply", async () => {
             beforeEach(async () => {
               const totalSupply = await setToken.totalSupply();
@@ -2311,6 +2416,13 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             const lastTradeTimestamp = await leverageStrategyExtension.lastTradeTimestamp();
 
             expect(lastTradeTimestamp).to.eq(await getLastBlockTimestamp());
+          });
+
+          it("should deposit all USDC to PerpV2", async () => {
+            await subject();
+
+            const usdcPositionUnit = await setToken.getDefaultPositionRealUnit(perpV2Setup.usdc.address);
+            expect(usdcPositionUnit).to.eq(ZERO);
           });
 
           describe("when cooldown has not elapsed", async () => {
@@ -2915,7 +3027,6 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           });
         });
       });
-
 
       describe("when buySpotQuoteExactInputPath is invalid", async () => {
         let buySpotQuoteExactInputPath: string;

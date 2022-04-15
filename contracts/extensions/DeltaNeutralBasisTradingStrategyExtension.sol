@@ -857,9 +857,13 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
             _withdraw(oppositeBoundUnits);
 
             _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, true);
+
+            // Deposit unused USDC
+            _depositAll();
         } else {
             _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, false);
 
+            // Deposit received USDC
             _depositAll();
         }
     }
