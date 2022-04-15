@@ -33,7 +33,7 @@ export interface MerkleDistributorInfo {
 
 export type DistributionFormat = { address: string; earnings: BigNumber };
 
-export interface PerpV2ContractSettings {
+export interface PerpV2LeverageContractSettings {
   setToken: Address;
   perpV2LeverageModule: Address;
   perpV2AccountBalance: Address;
@@ -44,7 +44,7 @@ export interface PerpV2ContractSettings {
   virtualQuoteAddress: Address;
 }
 
-export interface PerpV2MethodologySettings {
+export interface PerpV2LeverageMethodologySettings {
   targetLeverageRatio: BigNumber;
   minLeverageRatio: BigNumber;
   maxLeverageRatio: BigNumber;
@@ -52,17 +52,61 @@ export interface PerpV2MethodologySettings {
   rebalanceInterval: BigNumber;
 }
 
-export interface PerpV2ExecutionSettings {
+export interface PerpV2LeverageExecutionSettings {
   twapCooldownPeriod: BigNumber;
   slippageTolerance: BigNumber;
 }
 
-export interface PerpV2ExchangeSettings {
+export interface PerpV2LeverageExchangeSettings {
   twapMaxTradeSize: BigNumber;
   incentivizedTwapMaxTradeSize: BigNumber;
 }
 
-export interface PerpV2IncentiveSettings {
+export interface PerpV2LeverageIncentiveSettings {
+  incentivizedTwapCooldownPeriod: BigNumber;
+  incentivizedSlippageTolerance: BigNumber;
+  etherReward: BigNumber;
+  incentivizedLeverageRatio: BigNumber;
+}
+
+export interface PerpV2BasisContractSettings {
+  setToken: Address;
+  basisTradingModule: Address;
+  tradeModule: Address;
+  quoter: Address;
+  perpV2AccountBalance: Address;
+  baseUSDPriceOracle: Address;
+  twapInterval: BigNumber;
+  basePriceDecimalAdjustment: BigNumber;
+  virtualBaseAddress: Address;
+  virtualQuoteAddress: Address;
+  spotAssetAddress: Address;
+}
+
+export interface PerpV2BasisMethodologySettings {
+  targetLeverageRatio: BigNumber;
+  minLeverageRatio: BigNumber;
+  maxLeverageRatio: BigNumber;
+  recenteringSpeed: BigNumber;
+  rebalanceInterval: BigNumber;
+  reinvestInterval: BigNumber;
+}
+
+export interface PerpV2BasisExecutionSettings {
+  twapCooldownPeriod: BigNumber;
+  slippageTolerance: BigNumber;
+}
+
+export interface PerpV2BasisExchangeSettings {
+  exchangeName: string;
+  buyExactSpotTradeData: Bytes;
+  sellExactSpotTradeData: Bytes;
+  buySpotQuoteExactInputPath: Bytes;
+  twapMaxTradeSize: BigNumber;
+  incentivizedTwapMaxTradeSize: BigNumber;
+}
+
+export interface PerpV2BasisIncentiveSettings {
   incentivizedTwapCooldownPeriod: BigNumber;
   incentivizedSlippageTolerance: BigNumber;
   etherReward: BigNumber;

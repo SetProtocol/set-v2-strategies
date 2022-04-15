@@ -4,6 +4,7 @@ export { BaseManager } from "../..//typechain/BaseManager";
 export { ChainlinkAggregatorMock } from "../../typechain/ChainlinkAggregatorMock";
 export { DelegatedManager } from "../../typechain/DelegatedManager";
 export { DelegatedManagerFactory } from "../../typechain/DelegatedManagerFactory";
+export { DeltaNeutralBasisTradingStrategyExtension } from "../../typechain/DeltaNeutralBasisTradingStrategyExtension";
 export { ManagerCore } from "../../typechain/ManagerCore";
 export { ManagerMock } from "../../typechain/ManagerMock";
 export { ModuleMock } from "../../typechain/ModuleMock";

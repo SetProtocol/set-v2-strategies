@@ -5,20 +5,20 @@ import { ethers } from "hardhat";
 import {
   Address,
   Account,
-  PerpV2ContractSettings,
-  PerpV2MethodologySettings,
-  PerpV2ExecutionSettings,
-  PerpV2IncentiveSettings,
-  PerpV2ExchangeSettings
+  PerpV2LeverageContractSettings,
+  PerpV2LeverageMethodologySettings,
+  PerpV2LeverageExecutionSettings,
+  PerpV2LeverageIncentiveSettings,
+  PerpV2LeverageExchangeSettings
 } from "@utils/types";
 
 import { ADDRESS_ZERO, ZERO, ONE_DAY_IN_SECONDS, TWO } from "../../utils/constants";
 import {
+  PerpV2LeverageModuleV2,
+  SetToken,
   PositionV2,
   PerpV2LibraryV2,
   PerpV2Positions,
-  PerpV2LeverageModuleV2,
-  SetToken,
   SlippageIssuanceModule,
   ContractCallerMock
 } from "@setprotocol/set-protocol-v2/utils/contracts";
@@ -59,20 +59,20 @@ describe("PerpV2LeverageStrategyExtension", () => {
   let deployer: DeployHelper;
   let setToken: SetToken;
 
-  let strategy: PerpV2ContractSettings;
-  let methodology: PerpV2MethodologySettings;
-  let execution: PerpV2ExecutionSettings;
-  let incentive: PerpV2IncentiveSettings;
-  let exchange: PerpV2ExchangeSettings;
+  let strategy: PerpV2LeverageContractSettings;
+  let methodology: PerpV2LeverageMethodologySettings;
+  let execution: PerpV2LeverageExecutionSettings;
+  let incentive: PerpV2LeverageIncentiveSettings;
+  let exchange: PerpV2LeverageExchangeSettings;
   let customTargetLeverageRatio: any;
   let customMinLeverageRatio: any;
   let basePriceDecimalAdjustment: BigNumber;
 
   let leverageStrategyExtension: PerpV2LeverageStrategyExtension;
+  let perpV2LeverageModule: PerpV2LeverageModuleV2;
   let positionLib: PositionV2;
   let perpLib: PerpV2LibraryV2;
   let perpPositionsLib: PerpV2Positions;
-  let perpV2LeverageModule: PerpV2LeverageModuleV2;
   let issuanceModule: SlippageIssuanceModule;
   let baseManager: BaseManager;
   let maxPerpPositionsPerSet: BigNumber;
@@ -139,7 +139,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       "contracts/protocol/integration/lib/PerpV2LibraryV2.sol:PerpV2LibraryV2",
       perpLib.address,
       "contracts/protocol/integration/lib/PerpV2Positions.sol:PerpV2Positions",
-      perpPositionsLib.address,
+      perpPositionsLib.address
     );
 
     await systemSetup.controller.addModule(issuanceModule.address);
@@ -264,11 +264,11 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
   describe("#constructor", async () => {
     let subjectManagerAddress: Address;
-    let subjectContractSettings: PerpV2ContractSettings;
-    let subjectPerpV2MethodologySettings: PerpV2MethodologySettings;
-    let subjectExecutionSettings: PerpV2ExecutionSettings;
-    let subjectIncentiveSettings: PerpV2IncentiveSettings;
-    let subjectPerpV2ExchangeSettings: PerpV2ExchangeSettings;
+    let subjectContractSettings: PerpV2LeverageContractSettings;
+    let subjectPerpV2LeverageMethodologySettings: PerpV2LeverageMethodologySettings;
+    let subjectExecutionSettings: PerpV2LeverageExecutionSettings;
+    let subjectIncentiveSettings: PerpV2LeverageIncentiveSettings;
+    let subjectPerpV2LeverageExchangeSettings: PerpV2LeverageExchangeSettings;
 
     cacheBeforeEach(initializeRootScopeContracts);
 
@@ -284,7 +284,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         virtualBaseAddress: perpV2Setup.vETH.address,
         virtualQuoteAddress: perpV2Setup.vQuote.address,
       };
-      subjectPerpV2MethodologySettings = {
+      subjectPerpV2LeverageMethodologySettings = {
         targetLeverageRatio: ether(2),
         minLeverageRatio: ether(1.7),
         maxLeverageRatio: ether(2.3),
@@ -301,7 +301,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         etherReward: ether(1),
         incentivizedLeverageRatio: ether(3.5),
       };
-      subjectPerpV2ExchangeSettings = {
+      subjectPerpV2LeverageExchangeSettings = {
         twapMaxTradeSize: ether(5),
         incentivizedTwapMaxTradeSize: ether(10),
       };
@@ -311,10 +311,10 @@ describe("PerpV2LeverageStrategyExtension", () => {
       return await deployer.extensions.deployPerpV2LeverageStrategyExtension(
         subjectManagerAddress,
         subjectContractSettings,
-        subjectPerpV2MethodologySettings,
+        subjectPerpV2LeverageMethodologySettings,
         subjectExecutionSettings,
         subjectIncentiveSettings,
-        subjectPerpV2ExchangeSettings
+        subjectPerpV2LeverageExchangeSettings
       );
     }
 
@@ -344,11 +344,11 @@ describe("PerpV2LeverageStrategyExtension", () => {
       const retrievedAdapter = await subject();
       const methodology = await retrievedAdapter.getMethodology();
 
-      expect(methodology.targetLeverageRatio).to.eq(subjectPerpV2MethodologySettings.targetLeverageRatio);
-      expect(methodology.minLeverageRatio).to.eq(subjectPerpV2MethodologySettings.minLeverageRatio);
-      expect(methodology.maxLeverageRatio).to.eq(subjectPerpV2MethodologySettings.maxLeverageRatio);
-      expect(methodology.recenteringSpeed).to.eq(subjectPerpV2MethodologySettings.recenteringSpeed);
-      expect(methodology.rebalanceInterval).to.eq(subjectPerpV2MethodologySettings.rebalanceInterval);
+      expect(methodology.targetLeverageRatio).to.eq(subjectPerpV2LeverageMethodologySettings.targetLeverageRatio);
+      expect(methodology.minLeverageRatio).to.eq(subjectPerpV2LeverageMethodologySettings.minLeverageRatio);
+      expect(methodology.maxLeverageRatio).to.eq(subjectPerpV2LeverageMethodologySettings.maxLeverageRatio);
+      expect(methodology.recenteringSpeed).to.eq(subjectPerpV2LeverageMethodologySettings.recenteringSpeed);
+      expect(methodology.rebalanceInterval).to.eq(subjectPerpV2LeverageMethodologySettings.rebalanceInterval);
     });
 
     it("should set the correct execution parameters", async () => {
@@ -373,13 +373,13 @@ describe("PerpV2LeverageStrategyExtension", () => {
       const retrievedAdapter = await subject();
       const exchange = await retrievedAdapter.getExchangeSettings();
 
-      expect(exchange.twapMaxTradeSize).to.eq(subjectPerpV2ExchangeSettings.twapMaxTradeSize);
-      expect(exchange.incentivizedTwapMaxTradeSize).to.eq(subjectPerpV2ExchangeSettings.incentivizedTwapMaxTradeSize);
+      expect(exchange.twapMaxTradeSize).to.eq(subjectPerpV2LeverageExchangeSettings.twapMaxTradeSize);
+      expect(exchange.incentivizedTwapMaxTradeSize).to.eq(subjectPerpV2LeverageExchangeSettings.incentivizedTwapMaxTradeSize);
     });
 
     describe("when min leverage ratio is 0", async () => {
       beforeEach(async () => {
-        subjectPerpV2MethodologySettings.minLeverageRatio = ZERO;
+        subjectPerpV2LeverageMethodologySettings.minLeverageRatio = ZERO;
       });
 
       it("should revert", async () => {
@@ -389,7 +389,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
     describe("when min leverage ratio is above target", async () => {
       beforeEach(async () => {
-        subjectPerpV2MethodologySettings.minLeverageRatio = ether(2.1);
+        subjectPerpV2LeverageMethodologySettings.minLeverageRatio = ether(2.1);
       });
 
       it("should revert", async () => {
@@ -399,7 +399,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
     describe("when max leverage ratio is below target", async () => {
       beforeEach(async () => {
-        subjectPerpV2MethodologySettings.maxLeverageRatio = ether(1.9);
+        subjectPerpV2LeverageMethodologySettings.maxLeverageRatio = ether(1.9);
       });
 
       it("should revert", async () => {
@@ -409,7 +409,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
     describe("when recentering speed is >100%", async () => {
       beforeEach(async () => {
-        subjectPerpV2MethodologySettings.recenteringSpeed = ether(1.1);
+        subjectPerpV2LeverageMethodologySettings.recenteringSpeed = ether(1.1);
       });
 
       it("should revert", async () => {
@@ -419,7 +419,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
     describe("when recentering speed is 0%", async () => {
       beforeEach(async () => {
-        subjectPerpV2MethodologySettings.recenteringSpeed = ZERO;
+        subjectPerpV2LeverageMethodologySettings.recenteringSpeed = ZERO;
       });
 
       it("should revert", async () => {
@@ -459,7 +459,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
     describe("when rebalance interval is shorter than TWAP cooldown period", async () => {
       beforeEach(async () => {
-        subjectPerpV2MethodologySettings.rebalanceInterval = ZERO;
+        subjectPerpV2LeverageMethodologySettings.rebalanceInterval = ZERO;
       });
 
       it("should revert", async () => {
@@ -479,7 +479,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
     describe("when an exchange has a twapMaxTradeSize of 0", async () => {
       beforeEach(async () => {
-        subjectPerpV2ExchangeSettings.twapMaxTradeSize = ZERO;
+        subjectPerpV2LeverageExchangeSettings.twapMaxTradeSize = ZERO;
       });
 
       it("should revert", async () => {
@@ -619,14 +619,14 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
       context("when rebalance notional is greater than max trade size", async () => {
         describe("when the collateral balance is not zero", () => {
-          let newPerpV2ExchangeSettings: PerpV2ExchangeSettings;
+          let newPerpV2LeverageExchangeSettings: PerpV2LeverageExchangeSettings;
 
           beforeEach(async () => {
-            newPerpV2ExchangeSettings = {
+            newPerpV2LeverageExchangeSettings = {
               twapMaxTradeSize: ether(10),
               incentivizedTwapMaxTradeSize: ether(15),
             };
-            await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+            await leverageStrategyExtension.setExchangeSettings(newPerpV2LeverageExchangeSettings);
           });
 
           it("should set the last trade timestamp", async () => {
@@ -654,7 +654,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
             expect(initialPositions.length).to.eq(0);
             expect(finalPositions.length).to.eq(1);
-            expect(finalPositions[0].baseBalance).to.eq(newPerpV2ExchangeSettings.twapMaxTradeSize);
+            expect(finalPositions[0].baseBalance).to.eq(newPerpV2LeverageExchangeSettings.twapMaxTradeSize);
             expect(finalPositions[0].baseToken).to.eq(strategy.virtualBaseAddress);
           });
 
@@ -662,7 +662,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             const currentCollateral = (await perpV2LeverageModule.getAccountInfo(setToken.address)).collateralBalance;
             const basePrice = (await perpV2Setup.ethPriceFeed.latestAnswer()).div(usdc(1));
 
-            const chunkRebalanceNotional = newPerpV2ExchangeSettings.twapMaxTradeSize;
+            const chunkRebalanceNotional = newPerpV2LeverageExchangeSettings.twapMaxTradeSize;
             const totalRebalanceNotional = preciseMul(currentCollateral, methodology.targetLeverageRatio).div(basePrice);
 
             await expect(subject()).to.emit(leverageStrategyExtension, "Engaged").withArgs(
@@ -710,7 +710,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
 
       context("when engaging a short position", async () => {
-        let newMethodologySettings: PerpV2MethodologySettings;
+        let newMethodologySettings: PerpV2LeverageMethodologySettings;
 
         beforeEach(async () => {
           newMethodologySettings = {
@@ -766,20 +766,20 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         describe("when rebalance notional is greater than max trade size ", async () => {
-          let newPerpV2ExchangeSettings: PerpV2ExchangeSettings;
+          let newPerpV2LeverageExchangeSettings: PerpV2LeverageExchangeSettings;
 
           beforeEach(async () => {
-            newPerpV2ExchangeSettings = {
+            newPerpV2LeverageExchangeSettings = {
               twapMaxTradeSize: ether(10),
               incentivizedTwapMaxTradeSize: ether(15),
             };
-            await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+            await leverageStrategyExtension.setExchangeSettings(newPerpV2LeverageExchangeSettings);
           });
 
           it("should open a base token position on Perpetual Protocol", async () => {
             const initialPositions = await perpV2LeverageModule.getPositionNotionalInfo(setToken.address);
 
-            const totalRebalanceNotional = newPerpV2ExchangeSettings.twapMaxTradeSize.mul(-1);
+            const totalRebalanceNotional = newPerpV2LeverageExchangeSettings.twapMaxTradeSize.mul(-1);
 
             await subject();
 
@@ -804,7 +804,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
             const targetLeverageRatio = (await leverageStrategyExtension.getMethodology()).targetLeverageRatio;
             const basePrice = (await perpV2Setup.ethPriceFeed.latestAnswer()).div(usdc(1));
 
-            const chunkRebalanceNotional = newPerpV2ExchangeSettings.twapMaxTradeSize.mul(-1);
+            const chunkRebalanceNotional = newPerpV2LeverageExchangeSettings.twapMaxTradeSize.mul(-1);
             const totalRebalanceNotional = preciseMul(currentCollateral, targetLeverageRatio).div(basePrice);
 
             await expect(subject()).to.emit(leverageStrategyExtension, "Engaged").withArgs(
@@ -986,7 +986,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         describe("when rebalance interval has not elapsed below min leverage ratio and greater than max trade size", async () => {
-          let newSettings: PerpV2ExchangeSettings;
+          let newSettings: PerpV2LeverageExchangeSettings;
 
           cacheBeforeEach(async () => {
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1500));
@@ -1177,7 +1177,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         describe("when rebalance interval has not elapsed, above max leverage ratio and greater than max trade size", async () => {
-          let newSettings: PerpV2ExchangeSettings;
+          let newSettings: PerpV2LeverageExchangeSettings;
 
           cacheBeforeEach(async () => {
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(850));
@@ -1241,7 +1241,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         describe("when in a TWAP rebalance", async () => {
-          let newSettings: PerpV2ExchangeSettings;
+          let newSettings: PerpV2LeverageExchangeSettings;
 
           beforeEach(async () => {
             // Setup a TWAP rebalance
@@ -1313,7 +1313,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
 
       context("when rebalancing a short position", async () => {
-        let newMethodologySettings: PerpV2MethodologySettings;
+        let newMethodologySettings: PerpV2LeverageMethodologySettings;
 
         cacheBeforeEach(async () => {
           newMethodologySettings = {
@@ -1476,7 +1476,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         describe("when rebalance interval has not elapsed below min leverage ratio and greater than max trade size", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
           cacheBeforeEach(async () => {
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(900));
@@ -1668,7 +1668,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         describe("when rebalance interval has not elapsed, above max leverage ratio and greater than max trade size", async () => {
-          let newSettings: PerpV2ExchangeSettings;
+          let newSettings: PerpV2LeverageExchangeSettings;
 
           cacheBeforeEach(async () => {
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1060));
@@ -1733,7 +1733,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         describe("when in a TWAP rebalance", async () => {
-          let newSettings: PerpV2ExchangeSettings;
+          let newSettings: PerpV2LeverageExchangeSettings;
 
           beforeEach(async () => {
             // Setup a TWAP rebalance
@@ -1784,7 +1784,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         context("when currently in the last chunk of a TWAP rebalance", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
@@ -1859,7 +1859,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         context("when current leverage ratio is below target and in the middle of a TWAP", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
           let preTwapLeverageRatio: BigNumber;
 
           cacheBeforeEach(async () => {
@@ -1952,7 +1952,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         context("when current leverage ratio is above target and in the middle of a TWAP", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
           let preTwapLeverageRatio: BigNumber;
 
           cacheBeforeEach(async () => {
@@ -2043,7 +2043,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         describe("when price has moved advantageously towards target leverage ratio", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
@@ -2109,7 +2109,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         describe("when cooldown has not elapsed", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
           beforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
@@ -2148,7 +2148,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         describe("when caller is not an allowed trader", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
           beforeEach(async () => {
             subjectCaller = await getRandomAccount();
@@ -2215,7 +2215,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
 
       context("when rebalancing short position", async () => {
-        let newMethodologySettings: PerpV2MethodologySettings;
+        let newMethodologySettings: PerpV2LeverageMethodologySettings;
 
         cacheBeforeEach(async () => {
           newMethodologySettings = {
@@ -2232,7 +2232,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         context("when currently in the last chunk of a TWAP rebalance", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
           let preTwapLeverageRatio: BigNumber;
 
           cacheBeforeEach(async () => {
@@ -2310,7 +2310,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         context("when current leverage ratio is below target and in the middle of a TWAP", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
           let preTwapLeverageRatio: BigNumber;
 
           cacheBeforeEach(async () => {
@@ -2399,7 +2399,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         context("when current leverage ratio is above target and in the middle of a TWAP", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
           let preTwapLeverageRatio: BigNumber;
 
           cacheBeforeEach(async () => {
@@ -2488,7 +2488,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         describe("when price has moved advantageously towards target leverage ratio", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
           cacheBeforeEach(async () => {
             await increaseTimeAsync(ONE_DAY_IN_SECONDS);
@@ -2697,11 +2697,11 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
             cacheBeforeEach(async () => {
               newIncentivizedMaxTradeSize = ether(0.01);
-              const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
+              const newPerpV2LeverageExchangeSettings: PerpV2LeverageExchangeSettings = {
                 twapMaxTradeSize: ether(0.001),
                 incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
               };
-              await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+              await leverageStrategyExtension.setExchangeSettings(newPerpV2LeverageExchangeSettings);
             });
 
             it("should set the global last trade timestamp", async () => {
@@ -2735,11 +2735,11 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
             cacheBeforeEach(async () => {
               newIncentivizedMaxTradeSize = ether(0.01);
-              const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
+              const newPerpV2LeverageExchangeSettings: PerpV2LeverageExchangeSettings = {
                 twapMaxTradeSize: ether(0.001),
                 incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
               };
-              await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+              await leverageStrategyExtension.setExchangeSettings(newPerpV2LeverageExchangeSettings);
             });
 
             beforeEach(async () => {
@@ -2810,11 +2810,11 @@ describe("PerpV2LeverageStrategyExtension", () => {
             await owner.wallet.sendTransaction({to: leverageStrategyExtension.address, value: transferredEth});
 
             newIncentivizedMaxTradeSize = ether(0.001);
-            const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
+            const newPerpV2LeverageExchangeSettings: PerpV2LeverageExchangeSettings = {
               twapMaxTradeSize: ether(0.001),
               incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
             };
-            await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+            await leverageStrategyExtension.setExchangeSettings(newPerpV2LeverageExchangeSettings);
 
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(990));
             await perpV2PriceFeedMock.setPrice(BigNumber.from(990).mul(10 ** 8));
@@ -2847,8 +2847,8 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
 
       context("when ripcord short position", async () => {
-        let newMethodologySettings: PerpV2MethodologySettings;
-        let newIncentiveSettings: PerpV2IncentiveSettings;
+        let newMethodologySettings: PerpV2LeverageMethodologySettings;
+        let newIncentiveSettings: PerpV2LeverageIncentiveSettings;
 
         cacheBeforeEach(async () => {
           newMethodologySettings = {
@@ -2980,11 +2980,11 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
             cacheBeforeEach(async () => {
               newIncentivizedMaxTradeSize = ether(0.01);
-              const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
+              const newPerpV2LeverageExchangeSettings: PerpV2LeverageExchangeSettings = {
                 twapMaxTradeSize: ether(0.001),
                 incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
               };
-              await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+              await leverageStrategyExtension.setExchangeSettings(newPerpV2LeverageExchangeSettings);
             });
 
             it("should set the global last trade timestamp", async () => {
@@ -3018,11 +3018,11 @@ describe("PerpV2LeverageStrategyExtension", () => {
 
             cacheBeforeEach(async () => {
               newIncentivizedMaxTradeSize = ether(0.01);
-              const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
+              const newPerpV2LeverageExchangeSettings: PerpV2LeverageExchangeSettings = {
                 twapMaxTradeSize: ether(0.001),
                 incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
               };
-              await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+              await leverageStrategyExtension.setExchangeSettings(newPerpV2LeverageExchangeSettings);
             });
 
             beforeEach(async () => {
@@ -3054,11 +3054,11 @@ describe("PerpV2LeverageStrategyExtension", () => {
             await owner.wallet.sendTransaction({to: leverageStrategyExtension.address, value: transferredEth});
 
             newIncentivizedMaxTradeSize = ether(0.001);
-            const newPerpV2ExchangeSettings: PerpV2ExchangeSettings = {
+            const newPerpV2LeverageExchangeSettings: PerpV2LeverageExchangeSettings = {
               twapMaxTradeSize: ether(0.001),
               incentivizedTwapMaxTradeSize: newIncentivizedMaxTradeSize
             };
-            await leverageStrategyExtension.setExchangeSettings(newPerpV2ExchangeSettings);
+            await leverageStrategyExtension.setExchangeSettings(newPerpV2LeverageExchangeSettings);
 
             await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(950));
             await perpV2PriceFeedMock.setPrice(BigNumber.from(950).mul(10 ** 8));
@@ -3196,7 +3196,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         context("when notional is greater than max trade size", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
           before(async () => {
             ifEngaged = true;
@@ -3298,7 +3298,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
 
       context("when disengage short position", async () => {
-        let newMethodologySettings: PerpV2MethodologySettings;
+        let newMethodologySettings: PerpV2LeverageMethodologySettings;
 
         cacheBeforeEach(async () => {
           newMethodologySettings = {
@@ -3363,7 +3363,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         context("when notional is greater than max trade size", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
           before(async () => {
             ifEngaged = true;
@@ -3440,7 +3440,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
     });
 
     describe("#setMethodologySettings", async () => {
-      let subjectMethodologySettings: PerpV2MethodologySettings;
+      let subjectMethodologySettings: PerpV2LeverageMethodologySettings;
       let subjectCaller: Account;
 
       const initializeSubjectVariables = () => {
@@ -3474,7 +3474,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
           expect(methodology.rebalanceInterval).to.eq(subjectMethodologySettings.rebalanceInterval);
         });
 
-        it("should emit PerpV2MethodologySettingsUpdated event", async () => {
+        it("should emit PerpV2LeverageMethodologySettingsUpdated event", async () => {
           await expect(subject()).to.emit(leverageStrategyExtension, "MethodologySettingsUpdated").withArgs(
             subjectMethodologySettings.targetLeverageRatio,
             subjectMethodologySettings.minLeverageRatio,
@@ -3566,7 +3566,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
 
       describe("when rebalance is in progress", async () => {
-        let newExchangeSettings: PerpV2ExchangeSettings;
+        let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
         beforeEach(async () => {
           await initializeRootScopeContracts();
@@ -3590,7 +3590,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
     });
 
     describe("#setExecutionSettings", async () => {
-      let subjectExecutionSettings: PerpV2ExecutionSettings;
+      let subjectExecutionSettings: PerpV2LeverageExecutionSettings;
       let subjectCaller: Account;
 
       const initializeSubjectVariables = () => {
@@ -3666,7 +3666,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
 
       describe("when rebalance is in progress", async () => {
-        let newExchangeSettings: PerpV2ExchangeSettings;
+        let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
         beforeEach(async () => {
           await initializeRootScopeContracts();
@@ -3690,7 +3690,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
     });
 
     describe("#setIncentiveSettings", async () => {
-      let subjectIncentiveSettings: PerpV2IncentiveSettings;
+      let subjectIncentiveSettings: PerpV2LeverageIncentiveSettings;
       let subjectCaller: Account;
 
       const initializeSubjectVariables = () => {
@@ -3773,7 +3773,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
 
       describe("when rebalance is in progress", async () => {
-        let newExchangeSettings: PerpV2ExchangeSettings;
+        let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
         beforeEach(async () => {
           await initializeRootScopeContracts();
@@ -3797,7 +3797,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
     });
 
     describe("#setExchangeSettings", async () => {
-      let subjectExchangeSettings: PerpV2ExchangeSettings;
+      let subjectExchangeSettings: PerpV2LeverageExchangeSettings;
       let subjectCaller: Account;
 
       cacheBeforeEach(initializeRootScopeContracts);
@@ -3910,7 +3910,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
 
       describe("when rebalance is in progress", async () => {
-        let newExchangeSettings: PerpV2ExchangeSettings;
+        let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
         beforeEach(async () => {
           await initializeRootScopeContracts();
@@ -4012,7 +4012,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         context("when in the midst of a TWAP rebalance", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
           cacheBeforeEach(async () => {
             // Set up new rebalance TWAP
@@ -4228,8 +4228,8 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
 
       context("when short position", async () => {
-        let newMethodologySettings: PerpV2MethodologySettings;
-        let newIncentiveSettings: PerpV2IncentiveSettings;
+        let newMethodologySettings: PerpV2LeverageMethodologySettings;
+        let newIncentiveSettings: PerpV2LeverageIncentiveSettings;
 
         cacheBeforeEach(async () => {
           newMethodologySettings = {
@@ -4253,7 +4253,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         context("when in the midst of a TWAP rebalance", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
           cacheBeforeEach(async () => {
             // Set up new rebalance TWAP
@@ -4507,7 +4507,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         context("when in the midst of a TWAP rebalance", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
           cacheBeforeEach(async () => {
             // Set up new rebalance TWAP
@@ -4743,8 +4743,8 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
 
       context("when short position", async () => {
-        let newMethodologySettings: PerpV2MethodologySettings;
-        let newIncentiveSettings: PerpV2IncentiveSettings;
+        let newMethodologySettings: PerpV2LeverageMethodologySettings;
+        let newIncentiveSettings: PerpV2LeverageIncentiveSettings;
 
         cacheBeforeEach(async () => {
           newMethodologySettings = {
@@ -4773,7 +4773,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         context("when in the midst of a TWAP rebalance", async () => {
-          let newExchangeSettings: PerpV2ExchangeSettings;
+          let newExchangeSettings: PerpV2LeverageExchangeSettings;
 
           cacheBeforeEach(async () => {
             // Set up new rebalance TWAP
@@ -5037,7 +5037,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         context("when in the midst of a TWAP rebalance", async () => {
-          let exchangeSettings: PerpV2ExchangeSettings;
+          let exchangeSettings: PerpV2LeverageExchangeSettings;
           let preTwapLeverageRatio: BigNumber;
 
           cacheBeforeEach(async () => {
@@ -5290,8 +5290,8 @@ describe("PerpV2LeverageStrategyExtension", () => {
       });
 
       context("when short position", async () => {
-        let newMethodologySettings: PerpV2MethodologySettings;
-        let newIncentiveSettings: PerpV2IncentiveSettings;
+        let newMethodologySettings: PerpV2LeverageMethodologySettings;
+        let newIncentiveSettings: PerpV2LeverageIncentiveSettings;
 
         cacheBeforeEach(async () => {
           newMethodologySettings = {
@@ -5316,7 +5316,7 @@ describe("PerpV2LeverageStrategyExtension", () => {
         });
 
         context("when in the midst of a TWAP rebalance", async () => {
-          let exchangeSettings: PerpV2ExchangeSettings;
+          let exchangeSettings: PerpV2LeverageExchangeSettings;
           let preTwapLeverageRatio: BigNumber;
 
           cacheBeforeEach(async () => {
