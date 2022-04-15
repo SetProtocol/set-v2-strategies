@@ -857,15 +857,12 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
             _withdraw(oppositeBoundUnits);
 
             _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, true);
-
-            // Deposit unused USDC
-            _depositAll();
         } else {
             _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, false);
-
-            // Deposit received USDC
-            _depositAll();
         }
+
+        // Deposit unused USDC during lever; Deposit received USDC during delever
+        _depositAll();
     }
 
     /**
@@ -1453,6 +1450,10 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
      * Validate an ExchangeSettings struct settings.
      */
     function _validateExchangeSettings(ExchangeSettings memory _settings) internal view {
+        require(
+            keccak256(abi.encodePacked((_settings.exchangeName))) == keccak256(abi.encodePacked(("UniswapV3ExchangeAdapterV2"))),
+            "Invalid exchange name"
+        );
         require(_settings.twapMaxTradeSize != 0, "Max TWAP trade size must not be 0");
         require(
             _settings.twapMaxTradeSize <= _settings.incentivizedTwapMaxTradeSize,
