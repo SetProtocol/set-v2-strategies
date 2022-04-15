@@ -579,9 +579,9 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         external
         onlyOperator
     {
-        exchange = _newExchangeSettings;
+        _validateExchangeSettings(_newExchangeSettings);
 
-        _validateExchangeSettings(exchange);
+        exchange = _newExchangeSettings;
 
         emit ExchangeSettingsUpdated(
             exchange.exchangeName,
@@ -1465,7 +1465,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
             data.length >= 44
             && data.toAddress(0) == strategy.spotAssetAddress
             && data.toAddress(data.length - 21) == address(collateralToken)
-            && data.toBool(data.length - 1) == false,                           // FixIn is false; since exactOutput
+            && !data.toBool(data.length - 1),                           // FixIn is false; since exactOutput
             "Invalid buyExactSpotTradeData data"
         );
 
@@ -1475,13 +1475,13 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
             data.length >= 44
             && data.toAddress(0) == strategy.spotAssetAddress
             && data.toAddress(data.length - 21) == address(collateralToken)
-            && data.toBool(data.length - 1) == true,                            // FixIn is false; since exactInput
+            && data.toBool(data.length - 1),                            // FixIn is true; since exactInput
             "Invalid sellExactSpotTradeData data"
         );
 
         data = _settings.buySpotQuoteExactInputPath;
         require(
-            data.length >= 43                                                   // No FixIn bool at end
+            data.length >= 43                                           // No FixIn bool at end
             && data.toAddress(0) == address(collateralToken)
             && data.toAddress(data.length - 20) == strategy.spotAssetAddress,
             "Invalid buySpotQuoteExactInputPath data"
