@@ -185,7 +185,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
     await systemSetup.integrationRegistry.addIntegration(
       tradeModule.address,
-      "UNISWAPV3",
+      "UniswapV3ExchangeAdapterV2",
       uniswapV3ExchangeAdapter.address
     );
 
@@ -251,7 +251,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
     const rebalanceInterval = ONE_DAY_IN_SECONDS;
     const reinvestInterval = ONE_DAY_IN_SECONDS.mul(7);
 
-    const exchangeName = "UNISWAPV3";
+    const exchangeName = "UniswapV3ExchangeAdapterV2";
     const buyExactSpotTradeData = await uniswapV3ExchangeAdapter.generateDataParam(
       [systemSetup.weth.address, perpV2Setup.usdc.address], // exactOutput paths are reversed in Uniswap V3
       [3000],
@@ -378,7 +378,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         incentivizedLeverageRatio: ether(-2),
       };
       subjectPerpV2BasisExchangeSettings = {
-        exchangeName: "UNISWAPV3",
+        exchangeName: "UniswapV3ExchangeAdapterV2",
         buyExactSpotTradeData: await uniswapV3ExchangeAdapter.generateDataParam(
           [systemSetup.weth.address, perpV2Setup.usdc.address], // reversed
           [3000],
@@ -2878,6 +2878,19 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           subjectExchangeSettings.twapMaxTradeSize,
           subjectExchangeSettings.incentivizedTwapMaxTradeSize
         );
+      });
+
+      describe("when exchange name is invalid", async () => {
+        beforeEach(async () => {
+          subjectExchangeSettings = {
+            ...exchange,
+            exchangeName:"UniswapV3ExchangeAdapter"       // v1 exchange adapter
+          };
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Invalid exchange name");
+        });
       });
 
       describe("when buyExactSpotTradeData is invalid", async () => {
