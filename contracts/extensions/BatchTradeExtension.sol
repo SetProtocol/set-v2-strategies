@@ -149,14 +149,14 @@ contract BatchTradeExtension is BaseGlobalExtension {
     }
 
     /**
-     * ONLY OPERATOR: Executes a trade on a supported DEX.
+     * ONLY OPERATOR: Executes a batch of trades on a supported DEX. If any individual trades fail, events are emitted.
      * @dev Although the SetToken units are passed in for the send and receive quantities, the total quantity
      * sent and received is the quantity of SetToken units multiplied by the SetToken totalSupply.
      *
      * @param _setToken             Instance of the SetToken to trade
      * @param _trades               Struct of information for individual trades
      */
-    function trade(
+    function batchTrade(
         ISetToken _setToken,
         TradeInfo[] memory _trades
     )
