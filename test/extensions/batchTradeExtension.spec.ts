@@ -1,8 +1,8 @@
 import "module-alias/register";
 
-import { Contract } from "ethers";
-import { Address, Account } from "@utils/types";
-import { ADDRESS_ZERO } from "@utils/constants";
+import { BigNumber, Contract } from "ethers";
+import { Address, Account, TradeInfo } from "@utils/types";
+import { ADDRESS_ZERO, EMPTY_BYTES } from "@utils/constants";
 import {
   DelegatedManager,
   BatchTradeExtension,
@@ -90,7 +90,7 @@ describe.only("BatchTradeExtension", () => {
       methodologist.address,
       [batchTradeExtension.address],
       [operator.address],
-      [setV2Setup.dai.address, setV2Setup.weth.address],
+      [setV2Setup.dai.address, setV2Setup.weth.address, setV2Setup.wbtc.address],
       true
     );
 
@@ -440,6 +440,102 @@ describe.only("BatchTradeExtension", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Must be Manager");
+      });
+    });
+  });
+
+  describe("#batchTrade", async () => {
+    let mintedTokens: BigNumber;
+    let subjectSetToken: Address;
+    let subjectTradeOne: TradeInfo;
+    let subjectTradeTwo: TradeInfo;
+    let subjectTrades: TradeInfo[];
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      await batchTradeExtension.connect(owner.wallet).initializeModuleAndExtension(delegatedManager.address);
+
+      mintedTokens = ether(1);
+      await setV2Setup.dai.approve(setV2Setup.issuanceModule.address, ether(1));
+      await setV2Setup.issuanceModule.issue(setToken.address, mintedTokens, owner.address);
+
+      // Fund TradeAdapter with destinationTokens WBTC, WETH and DAI
+      await setV2Setup.wbtc.transfer(tradeMock.address, ether(1));
+      await setV2Setup.weth.transfer(tradeMock.address, ether(10));
+      await setV2Setup.dai.transfer(tradeMock.address, ether(10));
+
+      subjectCaller = operator;
+      subjectSetToken = setToken.address;
+      subjectTradeOne = {
+        exchangeName: tradeAdapterName,
+        sendToken: setV2Setup.dai.address,
+        sendQuantity: ether(0.6),
+        receiveToken: setV2Setup.weth.address,
+        minReceiveQuantity: ether(0),
+        data: EMPTY_BYTES
+      } as TradeInfo;
+      subjectTradeTwo = {
+        exchangeName: tradeAdapterName,
+        sendToken: setV2Setup.dai.address,
+        sendQuantity: ether(0.4),
+        receiveToken: setV2Setup.wbtc.address,
+        minReceiveQuantity: ether(0),
+        data: EMPTY_BYTES
+      } as TradeInfo;
+      subjectTrades = [subjectTradeOne, subjectTradeTwo];
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return batchTradeExtension.connect(subjectCaller.wallet).batchTrade(
+        subjectSetToken,
+        subjectTrades
+      );
+    }
+
+    it("should successfully execute the trades", async () => {
+      const oldSendTokenBalance = await setV2Setup.dai.balanceOf(setToken.address);
+      const oldReceiveTokenOneBalance = await setV2Setup.weth.balanceOf(setToken.address);
+      const oldReceiveTokenTwoBalance = await setV2Setup.wbtc.balanceOf(setToken.address);
+
+      await subject();
+
+      const expectedNewSendTokenBalance = oldSendTokenBalance.sub(ether(1.0));
+      const actualNewSendTokenBalance = await setV2Setup.dai.balanceOf(setToken.address);
+      const expectedNewReceiveTokenOneBalance = oldReceiveTokenOneBalance.add(ether(10));
+      const actualNewReceiveTokenOneBalance = await setV2Setup.weth.balanceOf(setToken.address);
+      const expectedNewReceiveTokenTwoBalance = oldReceiveTokenTwoBalance.add(ether(1));
+      const actualNewReceiveTokenTwoBalance = await setV2Setup.wbtc.balanceOf(setToken.address);
+
+      expect(expectedNewSendTokenBalance).to.eq(actualNewSendTokenBalance);
+      expect(expectedNewReceiveTokenOneBalance).to.eq(actualNewReceiveTokenOneBalance);
+      expect(expectedNewReceiveTokenTwoBalance).to.eq(actualNewReceiveTokenTwoBalance);
+    });
+
+    describe("when the sender is not an operator", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be approved operator");
+      });
+    });
+
+    describe("when a receiveToken is not an allowed asset", async () => {
+      beforeEach(async () => {
+        subjectTradeTwo = {
+          exchangeName: tradeAdapterName,
+          sendToken: setV2Setup.dai.address,
+          sendQuantity: ether(0.4),
+          receiveToken: setV2Setup.usdc.address,
+          minReceiveQuantity: ether(0),
+          data: EMPTY_BYTES
+        } as TradeInfo;
+        subjectTrades = [subjectTradeOne, subjectTradeTwo];
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be allowed asset");
       });
     });
   });

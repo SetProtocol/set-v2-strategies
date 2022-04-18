@@ -119,3 +119,12 @@ export interface StreamingFeeState {
   maxStreamingFeePercentage: BigNumber;
   lastStreamingFeeTimestamp: BigNumber;
 }
+
+export interface TradeInfo {
+  exchangeName: string;
+  sendToken: Address;
+  sendQuantity: BigNumber;
+  receiveToken: Address;
+  minReceiveQuantity: BigNumber;
+  data: Bytes;
+}
