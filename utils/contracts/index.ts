@@ -17,3 +17,4 @@ export { SupplyCapIssuanceHook } from "../../typechain/SupplyCapIssuanceHook";
 export { TradeExtension } from "../../typechain/TradeExtension";
 export { IssuanceExtension } from "../../typechain/IssuanceExtension";
 export { StreamingFeeSplitExtension } from "../../typechain/StreamingFeeSplitExtension";
+export { BatchTradeExtension } from "../../typechain/BatchTradeExtension";
