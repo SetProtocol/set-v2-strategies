@@ -444,7 +444,7 @@ describe("BatchTradeExtension", () => {
     });
   });
 
-  describe.only("#batchTrade", async () => {
+  describe("#batchTrade", async () => {
     let mintedTokens: BigNumber;
     let subjectSetToken: Address;
     let subjectTradeOne: TradeInfo;
@@ -597,7 +597,7 @@ describe("BatchTradeExtension", () => {
         await expect(s).to.emit(batchTradeExtension, "StringTradeFailed").withArgs(
           setToken.address,
           1,
-          "Insufficient funds in exchange"
+          "Address: low-level call with value failed"
         );
         await expect(s).to.emit(batchTradeExtension, "BytesTradeFailed").withArgs(
           setToken.address,
