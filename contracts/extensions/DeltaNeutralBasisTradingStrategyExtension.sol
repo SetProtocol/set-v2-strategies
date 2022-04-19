@@ -1388,9 +1388,9 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
             uint256 reinvestmentNotional = strategy.basisTradingModule.getUpdatedSettledFunding(strategy.setToken);
             uint256 setTotalSupply = strategy.setToken.totalSupply();
 
-            // Reinvestment often occurs with very small amounts which lead to edge case rounding errors
+            // Reinvestment often occurs with very small amounts which leads to edge case rounding errors.
             // Reinvest only if amount is greater than 10 wei position units worth of USDC to avoid weird rounding errors during reinvest
-            if (reinvestmentNotional.fromPreciseUnitToDecimals(collateralDecimals).preciesDiv(setTotalSupply) > 10) {
+            if (reinvestmentNotional.fromPreciseUnitToDecimals(collateralDecimals).preciseDiv(setTotalSupply) > 10) {
                 return ShouldRebalance.REINVEST;
             }
         }
