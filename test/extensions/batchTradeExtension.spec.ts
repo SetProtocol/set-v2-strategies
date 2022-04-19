@@ -444,7 +444,7 @@ describe("BatchTradeExtension", () => {
     });
   });
 
-  describe("#batchTrade", async () => {
+  describe.only("#batchTrade", async () => {
     let mintedTokens: BigNumber;
     let subjectSetToken: Address;
     let subjectTradeOne: TradeInfo;
@@ -593,7 +593,13 @@ describe("BatchTradeExtension", () => {
       });
 
       it("should emit the correct BytesTradeFailed event", async () => {
-        await expect(subject()).to.emit(batchTradeExtension, "BytesTradeFailed").withArgs(
+        const s = await subject();
+        await expect(s).to.emit(batchTradeExtension, "StringTradeFailed").withArgs(
+          setToken.address,
+          1,
+          "Insufficient funds in exchange"
+        );
+        await expect(s).to.emit(batchTradeExtension, "BytesTradeFailed").withArgs(
           setToken.address,
           1,
           ""
