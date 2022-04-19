@@ -552,8 +552,8 @@ describe("BatchTradeExtension", () => {
         expect(oldReceiveTokenTwoBalance).to.eq(actualNewReceiveTokenTwoBalance);
       });
 
-      it("should emit the correct StringTradeFailed event", async () => {
-        await expect(subject()).to.emit(batchTradeExtension, "StringTradeFailed").withArgs(
+      it("should emit the correct TradeFailed event", async () => {
+        await expect(subject()).to.emit(batchTradeExtension, "TradeFailed").withArgs(
           setToken.address,
           1,
           "Insufficient funds in exchange"

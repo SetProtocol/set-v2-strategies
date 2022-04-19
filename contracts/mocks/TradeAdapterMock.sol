@@ -30,10 +30,10 @@ contract TradeAdapterMock {
     {
         uint256 destinationBalance = ERC20(_destinationToken).balanceOf(address(this));
         require(ERC20(_sourceToken).transferFrom(_destinationAddress, address(this), _sourceQuantity), "ERC20 TransferFrom failed");
-        if (destinationBalance >= _minDestinationQuantity) { // normal case
+        if (destinationBalance >= _minDestinationQuantity) {
             require(ERC20(_destinationToken).transfer(_destinationAddress, destinationBalance), "ERC20 transfer failed");
         }
-        else { // string revert case, minimum destination quantity not in exchange
+        else {
             revert("Insufficient funds in exchange");
         }
     }
@@ -72,9 +72,4 @@ contract TradeAdapterMock {
 
         return (address(this), 0, methodData);
     }
-}
-
-contract ExternalContract {
-    constructor(bool _success) public {if (!_success) {revert();}}
-    function testCall() external {revert();}
 }

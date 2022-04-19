@@ -38,12 +38,12 @@ contract BatchTradeExtension is BaseGlobalExtension {
     /* ============ Structs ============ */
 
     struct TradeInfo {
-        string exchangeName;
-        address sendToken;
-        uint256 sendQuantity;
-        address receiveToken;
-        uint256 minReceiveQuantity;
-        bytes data;
+        string exchangeName;             // Human readable name of the exchange in the integrations registry
+        address sendToken;               // Address of the token to be sent to the exchange
+        uint256 sendQuantity;            // Units of token in SetToken sent to the exchange
+        address receiveToken;            // Address of the token that will be received from the exchange
+        uint256 minReceiveQuantity;      // Min units of token in SetToken to be received from the exchange
+        bytes data;                      // Arbitrary bytes to be used to construct trade call data
     }
 
     /* ============ Events ============ */
@@ -53,16 +53,10 @@ contract BatchTradeExtension is BaseGlobalExtension {
         address indexed _delegatedManager
     );
 
-    event StringTradeFailed(
-        address indexed _setToken,
-        uint256 _index,
-        string _reason
-    );
-
-    event BytesTradeFailed(
-        address indexed _setToken,
-        uint256 _index,
-        bytes _reason
+    event TradeFailed(
+        address indexed _setToken,       // SetToken which failed trade targeted
+        uint256 _index,                  // Index of trade that failed in _trades parameter of batchTrade call
+        string _reason                   // String reason for the failure
     );
 
     /* ============ State Variables ============ */
@@ -176,9 +170,12 @@ contract BatchTradeExtension is BaseGlobalExtension {
                 _trades[i].data
             );
 
+            // Try to execute trade through TradeModule, emit events when string Error is caught
+            // Note: Do not catch bytes Error because all calls are routed through Address.functionCallWithValue, which appends a
+            // "Address: low-level call with value failed" reason string to anonymous failures from deeper in the call stack
             try _manager(_setToken).interactManager(address(tradeModule), callData) {}
             catch Error(string memory _err) {
-                emit StringTradeFailed(address(_setToken), i, _err);
+                emit TradeFailed(address(_setToken), i, _err);
             }
         }
     }
