@@ -180,9 +180,6 @@ contract BatchTradeExtension is BaseGlobalExtension {
             catch Error(string memory _err) {
                 emit StringTradeFailed(address(_setToken), i, _err);
             }
-            catch (bytes memory _err) {
-                emit BytesTradeFailed(address(_setToken), i, _err);
-            }
         }
     }
 

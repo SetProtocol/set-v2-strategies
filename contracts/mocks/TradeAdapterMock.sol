@@ -30,19 +30,7 @@ contract TradeAdapterMock {
     {
         uint256 destinationBalance = ERC20(_destinationToken).balanceOf(address(this));
         require(ERC20(_sourceToken).transferFrom(_destinationAddress, address(this), _sourceQuantity), "ERC20 TransferFrom failed");
-
-        if (_minDestinationQuantity == 1) { // byte revert case, min nonzero uint256 minimum receive quantity
-            // revert with bytecode attempts, reverting with string("Address: low-level call with value failed")
-            // revert(); // revert
-            // _minDestinationQuantity = _minDestinationQuantity / (_minDestinationQuantity - 1); // divide by zero
-            // assert(false); // failed assertion
-
-            // ExternalContract externalContractOne = new ExternalContract(false); // failed contract creation
-
-            ExternalContract externalContractTwo = new ExternalContract(true); // failed external contract call
-            externalContractTwo.testCall();
-        }
-        else if (destinationBalance >= _minDestinationQuantity) { // normal case
+        if (destinationBalance >= _minDestinationQuantity) { // normal case
             require(ERC20(_destinationToken).transfer(_destinationAddress, destinationBalance), "ERC20 transfer failed");
         }
         else { // string revert case, minimum destination quantity not in exchange
