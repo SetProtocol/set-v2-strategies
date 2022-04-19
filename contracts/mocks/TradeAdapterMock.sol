@@ -3,7 +3,7 @@ pragma solidity 0.6.10;
 pragma experimental ABIEncoderV2;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "hardhat/console.sol";
+
 /**
  * Trade Adapter that doubles as a mock exchange
  */
