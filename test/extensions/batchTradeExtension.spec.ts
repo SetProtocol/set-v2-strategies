@@ -6,12 +6,12 @@ import { ADDRESS_ZERO, EMPTY_BYTES } from "@utils/constants";
 import {
   DelegatedManager,
   BatchTradeExtension,
-  ManagerCore
+  ManagerCore,
+  TradeAdapterMock
 } from "@utils/contracts/index";
 import {
   SetToken,
-  TradeModule,
-  TradeAdapterMock
+  TradeModule
 } from "@setprotocol/set-protocol-v2/utils/contracts";
 import DeployHelper from "@utils/deploys";
 import {
@@ -26,7 +26,7 @@ import { ContractTransaction } from "ethers";
 
 const expect = getWaffleExpect();
 
-describe.only("BatchTradeExtension", () => {
+describe("BatchTradeExtension", () => {
   let owner: Account;
   let methodologist: Account;
   let operator: Account;
@@ -61,7 +61,7 @@ describe.only("BatchTradeExtension", () => {
     tradeModule = await deployer.setDeployer.modules.deployTradeModule(setV2Setup.controller.address);
     await setV2Setup.controller.addModule(tradeModule.address);
 
-    tradeMock = await deployer.setDeployer.mocks.deployTradeAdapterMock();
+    tradeMock = await deployer.mocks.deployTradeAdapterMock();
 
     await setV2Setup.integrationRegistry.addIntegration(
       tradeModule.address,
@@ -518,6 +518,86 @@ describe.only("BatchTradeExtension", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Must be approved operator");
+      });
+    });
+
+    describe("when a trade fails with a string error", async () => {
+      beforeEach(async () => {
+        subjectTradeTwo = {
+          exchangeName: tradeAdapterName,
+          sendToken: setV2Setup.dai.address,
+          sendQuantity: ether(0.4),
+          receiveToken: setV2Setup.wbtc.address,
+          minReceiveQuantity: ether(2),
+          data: EMPTY_BYTES
+        } as TradeInfo;
+        subjectTrades = [subjectTradeOne, subjectTradeTwo];
+      });
+
+      it("should perform the other trades", async () => {
+        const oldSendTokenBalance = await setV2Setup.dai.balanceOf(setToken.address);
+        const oldReceiveTokenOneBalance = await setV2Setup.weth.balanceOf(setToken.address);
+        const oldReceiveTokenTwoBalance = await setV2Setup.wbtc.balanceOf(setToken.address);
+
+        await subject();
+
+        const expectedNewSendTokenBalance = oldSendTokenBalance.sub(ether(0.6));
+        const actualNewSendTokenBalance = await setV2Setup.dai.balanceOf(setToken.address);
+        const expectedNewReceiveTokenOneBalance = oldReceiveTokenOneBalance.add(ether(10));
+        const actualNewReceiveTokenOneBalance = await setV2Setup.weth.balanceOf(setToken.address);
+        const actualNewReceiveTokenTwoBalance = await setV2Setup.wbtc.balanceOf(setToken.address);
+
+        expect(expectedNewSendTokenBalance).to.eq(actualNewSendTokenBalance);
+        expect(expectedNewReceiveTokenOneBalance).to.eq(actualNewReceiveTokenOneBalance);
+        expect(oldReceiveTokenTwoBalance).to.eq(actualNewReceiveTokenTwoBalance);
+      });
+
+      it("should emit the correct StringTradeFailed event", async () => {
+        await expect(subject()).to.emit(batchTradeExtension, "StringTradeFailed").withArgs(
+          setToken.address,
+          1,
+          "Insufficient funds in exchange"
+        );
+      });
+    });
+
+    describe("when a trade fails with a byte error", async () => {
+      beforeEach(async () => {
+        subjectTradeTwo = {
+          exchangeName: tradeAdapterName,
+          sendToken: setV2Setup.dai.address,
+          sendQuantity: ether(0.4),
+          receiveToken: setV2Setup.wbtc.address,
+          minReceiveQuantity: BigNumber.from(1),
+          data: EMPTY_BYTES
+        } as TradeInfo;
+        subjectTrades = [subjectTradeOne, subjectTradeTwo];
+      });
+
+      it("should perform the other trades", async () => {
+        const oldSendTokenBalance = await setV2Setup.dai.balanceOf(setToken.address);
+        const oldReceiveTokenOneBalance = await setV2Setup.weth.balanceOf(setToken.address);
+        const oldReceiveTokenTwoBalance = await setV2Setup.wbtc.balanceOf(setToken.address);
+
+        await subject();
+
+        const expectedNewSendTokenBalance = oldSendTokenBalance.sub(ether(0.6));
+        const actualNewSendTokenBalance = await setV2Setup.dai.balanceOf(setToken.address);
+        const expectedNewReceiveTokenOneBalance = oldReceiveTokenOneBalance.add(ether(10));
+        const actualNewReceiveTokenOneBalance = await setV2Setup.weth.balanceOf(setToken.address);
+        const actualNewReceiveTokenTwoBalance = await setV2Setup.wbtc.balanceOf(setToken.address);
+
+        expect(expectedNewSendTokenBalance).to.eq(actualNewSendTokenBalance);
+        expect(expectedNewReceiveTokenOneBalance).to.eq(actualNewReceiveTokenOneBalance);
+        expect(oldReceiveTokenTwoBalance).to.eq(actualNewReceiveTokenTwoBalance);
+      });
+
+      it("should emit the correct BytesTradeFailed event", async () => {
+        await expect(subject()).to.emit(batchTradeExtension, "BytesTradeFailed").withArgs(
+          setToken.address,
+          1,
+          ""
+        );
       });
     });
 

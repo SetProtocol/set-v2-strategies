@@ -3,7 +3,7 @@ pragma solidity 0.6.10;
 pragma experimental ABIEncoderV2;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
+import "hardhat/console.sol";
 /**
  * Trade Adapter that doubles as a mock exchange
  */
@@ -25,13 +25,25 @@ contract TradeAdapterMock {
         address _destinationToken,
         address _destinationAddress,
         uint256 _sourceQuantity,
-        uint256 /* _minDestinationQuantity */
+        uint256 _minDestinationQuantity
     )
         external
     {
         uint256 destinationBalance = ERC20(_destinationToken).balanceOf(address(this));
         require(ERC20(_sourceToken).transferFrom(_destinationAddress, address(this), _sourceQuantity), "ERC20 TransferFrom failed");
-        require(ERC20(_destinationToken).transfer(_destinationAddress, destinationBalance), "ERC20 transfer failed");
+
+        if (_minDestinationQuantity == 1) { // byte revert case, min nonzero uint256 minimum receive quantity
+            // revert with bytecode by failing on an ExternalContract call
+            ExternalContract externalContract = new ExternalContract();
+            (bool success,) = address(externalContract).call(abi.encodeWithSignature("testCall(bool)", false));
+            require(success);
+        }
+        else if (destinationBalance >= _minDestinationQuantity) { // normal case
+            require(ERC20(_destinationToken).transfer(_destinationAddress, destinationBalance), "ERC20 transfer failed");
+        }
+        else { // string revert case, minimum destination quantity not in exchange
+            revert("Insufficient funds in exchange");
+        }
     }
 
     /* ============ Adapter Functions ============ */
@@ -67,5 +79,13 @@ contract TradeAdapterMock {
         );
 
         return (address(this), 0, methodData);
+    }
+}
+
+contract ExternalContract {
+    bool status;
+    function testCall(bool _success) external {
+        require(_success, "ExternalContract call failed");
+        status = _success;
     }
 }

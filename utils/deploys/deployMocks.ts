@@ -6,7 +6,8 @@ import {
   ManagerMock,
   ModuleMock,
   MutualUpgradeMock,
-  PerpV2PriceFeedMock
+  PerpV2PriceFeedMock,
+  TradeAdapterMock
 } from "../contracts/index";
 
 import {
@@ -24,6 +25,7 @@ import { ContractCallerMock__factory } from "@setprotocol/set-protocol-v2/dist/t
 import { MutualUpgradeMock__factory } from "../../typechain/factories/MutualUpgradeMock__factory";
 import { MutualUpgradeV2Mock__factory } from "../../typechain/factories/MutualUpgradeV2Mock__factory";
 import { PerpV2PriceFeedMock__factory } from "../../typechain/factories/PerpV2PriceFeedMock__factory";
+import { TradeAdapterMock__factory  } from "../../typechain/factories/TradeAdapterMock__factory";
 import { StandardTokenMock__factory  } from "@setprotocol/set-protocol-v2/dist/typechain";
 
 export default class DeployMocks {
@@ -77,5 +79,9 @@ export default class DeployMocks {
 
   public async deployPerpV2PriceFeedMock(decimals: number): Promise<PerpV2PriceFeedMock> {
     return await new PerpV2PriceFeedMock__factory(this._deployerSigner).deploy(decimals);
+  }
+
+  public async deployTradeAdapterMock(): Promise<TradeAdapterMock> {
+    return await new TradeAdapterMock__factory(this._deployerSigner).deploy();
   }
 }
