@@ -30,10 +30,20 @@ contract TradeAdapterMock {
     {
         uint256 destinationBalance = ERC20(_destinationToken).balanceOf(address(this));
         require(ERC20(_sourceToken).transferFrom(_destinationAddress, address(this), _sourceQuantity), "ERC20 TransferFrom failed");
-        if (destinationBalance >= _minDestinationQuantity) {
+        if (_minDestinationQuantity == 1) { // byte revert case, min nonzero uint256 minimum receive quantity
+            bytes memory data = abi.encodeWithSelector(
+                bytes4(keccak256("trade(address,address,address,uint256,uint256)")),
+                _sourceToken,
+                _destinationToken,
+                _sourceQuantity,
+                _minDestinationQuantity
+            );
+            assembly { revert(add(data, 32), mload(data)) }
+        }
+        if (destinationBalance >= _minDestinationQuantity) { // normal case
             require(ERC20(_destinationToken).transfer(_destinationAddress, destinationBalance), "ERC20 transfer failed");
         }
-        else {
+        else { // string revert case, minimum destination quantity not in exchange
             revert("Insufficient funds in exchange");
         }
     }
