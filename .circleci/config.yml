@@ -65,7 +65,7 @@ jobs:
           command: mkdir -p /tmp/coverage
       - run:
           name: Hardhat Test
-          command: yarn test:fork
+          command: yarn test:fork:coverage
       - run:
           name: Save coverage
           command: |
