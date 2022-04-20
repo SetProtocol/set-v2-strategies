@@ -553,7 +553,7 @@ describe("BatchTradeExtension", () => {
       });
 
       it("should emit the correct TradeFailed event", async () => {
-        await expect(subject()).to.emit(batchTradeExtension, "TradeFailed").withArgs(
+        await expect(subject()).to.emit(batchTradeExtension, "StringTradeFailed").withArgs(
           setToken.address,
           1,
           "Insufficient funds in exchange"
