@@ -35,15 +35,12 @@ export class BatchTradeUtils {
         });
 
         if (decodedLog.name === "StringTradeFailed") {
-          console.log("StringTradeFailed");
           const tradeIndex = (decodedLog.args as any)._index.toNumber();
           results[tradeIndex].success = false;
           results[tradeIndex].revertReason = (decodedLog.args as any)._reason;
         }
 
-        // May need to do something extra here to decode low level revert bytes
         if (decodedLog.name === "BytesTradeFailed") {
-          console.log("BytesTradeFailed");
           const tradeIndex = (decodedLog.args as any)._index.toNumber();
           results[tradeIndex].success = false;
           results[tradeIndex].revertReason = (decodedLog.args as any)._reason;
