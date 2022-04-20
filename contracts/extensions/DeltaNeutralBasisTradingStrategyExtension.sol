@@ -128,8 +128,9 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         uint256 rebalanceInterval;                      // Period of time required since last rebalance timestamp in seconds
         uint256 reinvestInterval;                       // Period of time required since last reinvestment timestamp in seconds
         uint256 minReinvestUnits;                       // Minimum reinvestment amount per Set at which `shouldRebalance` returns 4 (`ShouldRebalance.REINVEST`)
-                                                        // provided the reinvest interval has elaspsed. This threshold helps to avoid weird rounding errors that
-                                                        // can happen while reinvesting very small amounts. In collateral decimals (10e6 for USDC)
+                                                        // provided the reinvest interval has elapsed. This threshold helps to avoid weird rounding errors that
+                                                        // can happen while reinvesting very small amounts and helps the methodologist to not waste gas on reinvesting
+                                                        // very small amounts. In collateral decimals (10e6 for USDC).
 
     }
 
