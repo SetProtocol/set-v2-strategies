@@ -61,8 +61,20 @@ jobs:
           name: Set Up Environment Variables
           command: cp .env.default .env
       - run:
+          name: Create shared coverage outputs folder
+          command: mkdir -p /tmp/coverage
+      - run:
           name: Hardhat Test
           command: yarn test:fork
+      - run:
+          name: Save coverage
+          command: |
+            cp coverage.json /tmp/coverage/cov_forked_0.json
+            chmod -R 777 /tmp/coverage/cov_forked_0.json
+      - persist_to_workspace:
+          root: /tmp/coverage
+          paths:
+            - cov_forked_0.json
 
   coverage:
     docker:
@@ -120,7 +132,8 @@ jobs:
               cov_1.json \
               cov_2.json \
               cov_3.json \
-              cov_4.json
+              cov_4.json \
+              cov_forked_0.json
       - run:
           name: Upload coverage
           command: |
