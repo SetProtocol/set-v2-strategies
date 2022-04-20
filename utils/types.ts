@@ -128,3 +128,9 @@ export interface TradeInfo {
   minReceiveQuantity: BigNumber;
   data: Bytes;
 }
+
+export interface BatchTradeResult {
+  success: boolean;
+  tradeInfo: TradeInfo;
+  revertReason?: string | undefined;
+};

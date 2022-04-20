@@ -12,6 +12,7 @@ export {
 export { bitcoin, ether, gWei, usdc, wbtc } from "./unitsUtils";
 export { Blockchain } from "./blockchainUtils";
 export { ProtocolUtils } from "./protocolUtils";
+export { BatchTradeUtils } from "./batchTradeUtils";
 export {
   convertLibraryNameToLinkId
 } from "./libraryUtils";
