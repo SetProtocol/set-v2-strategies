@@ -121,6 +121,7 @@ jobs:
     steps:
       - attach_workspace:
           at: /tmp/coverage
+      - attach_workspace:
           at: /tmp/forked_coverage
       - restore_cache:
           key: compiled-env-{{ .Environment.CIRCLE_SHA1 }}
