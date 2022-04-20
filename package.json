@@ -33,6 +33,7 @@
     "prepare": "yarn build",
     "prepublishOnly": "yarn clean && yarn build:npm",
     "test": "npx hardhat test --network localhost",
+    "test:fork:coverage": "FORK=true COVERAGE=true npx hardhat coverage",
     "test:fork": "FORK=true npx hardhat test",
     "test:fork:fast": "NO_COMPILE=true TS_NODE_TRANSPILE_ONLY=1 FORK=true npx hardhat test --no-compile",
     "test:clean": "yarn clean && yarn build && yarn test",
