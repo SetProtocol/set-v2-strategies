@@ -1,6 +1,6 @@
 {
   "name": "@setprotocol/set-v2-strategies",
-  "version": "0.0.9-basis.0",
+  "version": "0.0.10",
   "description": "",
   "main": "dist",
   "types": "dist/types",
