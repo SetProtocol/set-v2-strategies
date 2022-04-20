@@ -35,6 +35,7 @@ contract TradeAdapterMock {
                 bytes4(keccak256("trade(address,address,address,uint256,uint256)")),
                 _sourceToken,
                 _destinationToken,
+                _destinationAddress,
                 _sourceQuantity,
                 _minDestinationQuantity
             );

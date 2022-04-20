@@ -593,20 +593,19 @@ describe("BatchTradeExtension", () => {
       });
 
       it("should emit the correct BytesTradeFailed event", async () => {
-        // const expectedResult = tradeMock.interface.encodeFunctionData("trade", [
-        //     setV2Setup.dai.address,
-        //     setV2Setup.wbtc.address,
-        //     ether(0.4),
-        //     BigNumber.from(1),
-        //     EMPTY_BYTES,
-        // ]);
+        const expectedByteError = tradeMock.interface.encodeFunctionData("trade", [
+          setV2Setup.dai.address,
+          setV2Setup.wbtc.address,
+          setToken.address,
+          ether(0.4),
+          BigNumber.from(1)
+        ]);
 
-        // await expect(subject()).to.emit(batchTradeExtension, "BytesTradeFailed").withArgs(
-        //   setToken.address,
-        //   1,
-        //   expectedResult
-        // );
-        await expect(subject()).to.emit(batchTradeExtension, "BytesTradeFailed");
+        await expect(subject()).to.emit(batchTradeExtension, "BytesTradeFailed").withArgs(
+          setToken.address,
+          1,
+          expectedByteError
+        );
       });
     });
 
