@@ -208,7 +208,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         int256 _maxLeverageRatio,
         uint256 _recenteringSpeed,
         uint256 _rebalanceInterval,
-        uint256 _reinvestInterval
+        uint256 _reinvestInterval,
+        uint256 _minReinvestUnits
     );
     event ExecutionSettingsUpdated(
         uint256 _twapCooldownPeriod,
@@ -533,7 +534,8 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
             methodology.maxLeverageRatio,
             methodology.recenteringSpeed,
             methodology.rebalanceInterval,
-            methodology.reinvestInterval
+            methodology.reinvestInterval,
+            methodology.minReinvestUnits
         );
     }
 
@@ -1393,7 +1395,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
             uint256 setTotalSupply = strategy.setToken.totalSupply();
             uint256 reinvestUnits = reinvestmentNotional.fromPreciseUnitToDecimals(collateralDecimals).preciseDiv(setTotalSupply);
 
-            if (reinvestUnits > methodology.minReinvestUnits) {
+            if (reinvestUnits >= methodology.minReinvestUnits) {
                 return ShouldRebalance.REINVEST;
             }
         }
@@ -1432,6 +1434,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
             _methodology.recenteringSpeed <= PreciseUnitMath.preciseUnit() && _methodology.recenteringSpeed > 0,
             "Must be valid recentering speed"
         );
+        require(_methodology.minReinvestUnits > 0, "Must be valid min reinvest units");
         require (
             _execution.slippageTolerance <= PreciseUnitMath.preciseUnit(),
             "Slippage tolerance must be <100%"

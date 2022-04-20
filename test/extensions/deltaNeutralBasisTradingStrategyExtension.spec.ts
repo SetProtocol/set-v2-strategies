@@ -2654,8 +2654,22 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             subjectMethodologySettings.maxLeverageRatio,
             subjectMethodologySettings.recenteringSpeed,
             subjectMethodologySettings.rebalanceInterval,
-            subjectMethodologySettings.reinvestInterval
+            subjectMethodologySettings.reinvestInterval,
+            subjectMethodologySettings.minReinvestUnits
           );
+        });
+
+        describe("when min reinvest units is zero", async () => {
+          beforeEach(async () => {
+            subjectMethodologySettings = {
+              ...subjectMethodologySettings,
+              minReinvestUnits: ZERO
+            };
+          });
+
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Must be valid min reinvest units");
+          });
         });
 
         describe("when the caller is not the operator", async () => {
