@@ -90,6 +90,7 @@ export interface PerpV2BasisMethodologySettings {
   recenteringSpeed: BigNumber;
   rebalanceInterval: BigNumber;
   reinvestInterval: BigNumber;
+  minReinvestUnits: BigNumber;
 }
 
 export interface PerpV2BasisExecutionSettings {

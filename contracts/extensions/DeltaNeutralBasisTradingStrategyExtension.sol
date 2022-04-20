@@ -127,6 +127,10 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         uint256 recenteringSpeed;                       // % at which to rebalance back to target leverage in precise units (10e18). Always a positive number
         uint256 rebalanceInterval;                      // Period of time required since last rebalance timestamp in seconds
         uint256 reinvestInterval;                       // Period of time required since last reinvestment timestamp in seconds
+        uint256 minReinvestUnits;                       // Minimum reinvestment amount per Set at which `shouldRebalance` returns 4 (`ShouldRebalance.REINVEST`)
+                                                        // provided the reinvest interval has elaspsed. This threshold helps to avoid weird rounding errors that
+                                                        // can happen while reinvesting very small amounts. In collateral decimals (10e6 for USDC)
+
     }
 
     struct ExecutionSettings {
@@ -1387,10 +1391,9 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         if (block.timestamp.sub(lastReinvestTimestamp) > methodology.reinvestInterval) {
             uint256 reinvestmentNotional = strategy.basisTradingModule.getUpdatedSettledFunding(strategy.setToken);
             uint256 setTotalSupply = strategy.setToken.totalSupply();
+            uint256 reinvestUnits = reinvestmentNotional.fromPreciseUnitToDecimals(collateralDecimals).preciseDiv(setTotalSupply);
 
-            // Reinvestment often occurs with very small amounts which leads to edge case rounding errors.
-            // Reinvest only if amount is greater than 10 wei position units worth of USDC to avoid weird rounding errors during reinvest
-            if (reinvestmentNotional.fromPreciseUnitToDecimals(collateralDecimals).preciseDiv(setTotalSupply) > 10) {
+            if (reinvestUnits > methodology.minReinvestUnits) {
                 return ShouldRebalance.REINVEST;
             }
         }
