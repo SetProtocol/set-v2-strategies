@@ -250,6 +250,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
     const recenteringSpeed = ether(0.05);
     const rebalanceInterval = ONE_DAY_IN_SECONDS;
     const reinvestInterval = ONE_DAY_IN_SECONDS.mul(7);
+    const minReinvestUnits = TWO;
 
     const exchangeName = "UniswapV3ExchangeAdapterV2";
     const buyExactSpotTradeData = await uniswapV3ExchangeAdapter.generateDataParam(
@@ -295,7 +296,8 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
       maxLeverageRatio: maxLeverageRatio,
       recenteringSpeed: recenteringSpeed,
       rebalanceInterval: rebalanceInterval,
-      reinvestInterval: reinvestInterval
+      reinvestInterval: reinvestInterval,
+      minReinvestUnits: minReinvestUnits
     };
     execution = {
       twapCooldownPeriod: twapCooldownPeriod,
@@ -365,7 +367,8 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         maxLeverageRatio: ether(-1.3),
         recenteringSpeed: ether(0.05),
         rebalanceInterval: BigNumber.from(86400),
-        reinvestInterval: ONE_DAY_IN_SECONDS.mul(7)
+        reinvestInterval: ONE_DAY_IN_SECONDS.mul(7),
+        minReinvestUnits: TWO
       };
       subjectExecutionSettings = {
         twapCooldownPeriod: BigNumber.from(120),
@@ -2617,7 +2620,8 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           maxLeverageRatio: ether(-1.1),
           recenteringSpeed: ether(0.1),
           rebalanceInterval: BigNumber.from(43200),
-          reinvestInterval: ONE_DAY_IN_SECONDS.mul(7)
+          reinvestInterval: ONE_DAY_IN_SECONDS.mul(7),
+          minReinvestUnits: TWO
         };
         subjectCaller = owner;
       };
@@ -2650,8 +2654,22 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             subjectMethodologySettings.maxLeverageRatio,
             subjectMethodologySettings.recenteringSpeed,
             subjectMethodologySettings.rebalanceInterval,
-            subjectMethodologySettings.reinvestInterval
+            subjectMethodologySettings.reinvestInterval,
+            subjectMethodologySettings.minReinvestUnits
           );
+        });
+
+        describe("when min reinvest units is zero", async () => {
+          beforeEach(async () => {
+            subjectMethodologySettings = {
+              ...subjectMethodologySettings,
+              minReinvestUnits: ZERO
+            };
+          });
+
+          it("should revert", async () => {
+            await expect(subject()).to.be.revertedWith("Must be valid min reinvest units");
+          });
         });
 
         describe("when the caller is not the operator", async () => {
@@ -3513,7 +3531,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             });
           });
 
-          describe("when reinvestment amount is zero", async () => {
+          describe("when reinvestment amount is below threshold", async () => {
             beforeEach(async () => {
               // Set oracle price above mark price to accrue negative funding
               await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1020));
@@ -3828,7 +3846,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             });
           });
 
-          describe("when reinvestment amount is zero", async () => {
+          describe("when reinvestment amount is below threshold", async () => {
             beforeEach(async () => {
               // Set oracle price above mark price to accrue negative funding
               await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(1020));
