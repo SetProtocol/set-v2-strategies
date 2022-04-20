@@ -256,7 +256,10 @@ describe("BatchTradeExtension - ZeroExAPITradeAdapter - TradeModule Integration 
       });
     });
 
-    context("when trading and triggering underbought error", () => {
+    // Skipping next two tests because they're unstable & we're using real-time quotes from 0x.
+    // Preserving these because setups are useful for debugging and generating fixture data.
+    // (A stable unit test case was developed to hit the relevant bytes error `catch` block in batchTrade)
+    context.skip("when trading and triggering underbought error", () => {
       beforeEach(async () => {
         // Issue 4 more sets
         await setV2Setup.issuanceModule.issue(setToken.address, ether(4), owner.address);
@@ -288,8 +291,7 @@ describe("BatchTradeExtension - ZeroExAPITradeAdapter - TradeModule Integration 
         subjectCaller = operator;
       });
 
-      // Test is highly unstable...sometimes we error with underbought, sometimes we don't
-      it.skip("trades as expected", async () => {
+      it("trades as expected", async () => {
         const initialDaiDefaultPosition = await setToken.getDefaultPositionRealUnit(tokens.dai.address);
         const initialWbtcDefaultPosition = await setToken.getDefaultPositionRealUnit(tokens.wbtc.address);
 
@@ -314,8 +316,7 @@ describe("BatchTradeExtension - ZeroExAPITradeAdapter - TradeModule Integration 
       });
     });
 
-    // This test likely to be unstable too...
-    context("when trading and triggering a bytes error", () => {
+    context.skip("when trading and triggering a bytes error", () => {
       beforeEach(async () => {
         // Issue 70 sets
         await setV2Setup.issuanceModule.issue(setToken.address, ether(70), owner.address);
