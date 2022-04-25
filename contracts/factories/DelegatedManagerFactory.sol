@@ -53,6 +53,21 @@ contract DelegatedManagerFactory {
         bool isPending;
     }
 
+    struct SetInitializers {
+        address[] _components;
+        address[] _modules;
+        int256[] _units;
+        string _name;
+        string _symbol;
+    }
+
+    struct ManagerInitializers {
+        address[] _operators;
+        address[] _assets;
+        address[] _extensions;
+        bytes[] _initializeBytecode;
+    }
+
     /* ============ Events ============ */
 
     /**
@@ -113,57 +128,54 @@ contract DelegatedManagerFactory {
 
     /* ============ External Functions ============ */
 
-    /**
-     * ANYONE CAN CALL: Deploys a new SetToken and DelegatedManager. Sets some temporary metadata about
-     * the deployment which will be read during a subsequent intialization step which wires everything
-     * together.
-     *
-     * @param _components       List of addresses of components for initial Positions
-     * @param _units            List of units. Each unit is the # of components per 10^18 of a SetToken
-     * @param _name             Name of the SetToken
-     * @param _symbol           Symbol of the SetToken
-     * @param _owner            Address to set as the DelegateManager's `owner` role
-     * @param _methodologist    Address to set as the DelegateManager's methodologist role
-     * @param _modules          List of modules to enable. All modules must be approved by the Controller
-     * @param _operators        List of operators authorized for the DelegateManager
-     * @param _assets           List of assets DelegateManager can trade. When empty, asset allow list is not enforced
-     * @param _extensions       List of extensions authorized for the DelegateManager
-     *
-     * @return (ISetToken, address) The created SetToken and DelegatedManager addresses, respectively
-     */
+
     function createSetAndManager(
-        address[] memory _components,
-        int256[] memory _units,
-        string memory _name,
-        string memory _symbol,
+        SetInitializers memory _setInitializers,
+        ManagerInitializers memory _managerInitializers,
         address _owner,
         address _methodologist,
-        address[] memory _modules,
-        address[] memory _operators,
-        address[] memory _assets,
-        address[] memory _extensions
+        uint256 _ownerFeeSplit,
+        address _ownerFeeRecipient
     )
         external
         returns (ISetToken, address)
     {
-        _validateManagerParameters(_components, _extensions, _assets);
+        _validateManagerParameters(
+            _setInitializers._components,
+            _managerInitializers._extensions,
+            _managerInitializers._assets
+        );
 
         ISetToken setToken = _deploySet(
-            _components,
-            _units,
-            _modules,
-            _name,
-            _symbol
+            _setInitializers._components,
+            _setInitializers._units,
+            _setInitializers._modules,
+            _setInitializers._name,
+            _setInitializers._symbol
         );
 
         DelegatedManager manager = _deployManager(
             setToken,
-            _extensions,
-            _operators,
-            _assets
+            _managerInitializers._extensions,
+            _managerInitializers._operators,
+            _managerInitializers._assets
         );
 
-        _setInitializationState(setToken, address(manager), _owner, _methodologist);
+        setToken.setManager(address(manager));
+
+        _initializeExtensions(
+            manager,
+            _managerInitializers._extensions,
+            _managerInitializers._initializeBytecode
+        );
+
+        _setManagerState(
+            manager,
+            _owner,
+            _methodologist,
+            _ownerFeeSplit,
+            _ownerFeeRecipient
+        );
 
         return (setToken, address(manager));
     }
@@ -212,55 +224,6 @@ contract DelegatedManagerFactory {
         _setInitializationState(_setToken, address(manager), _owner, _methodologist);
 
         return address(manager);
-    }
-
-    /**
-     * ONLY DEPLOYER: Wires SetToken, DelegatedManager, global manager extensions, and modules together
-     * into a functioning package.
-     *
-     * NOTE: When migrating to this manager system from an existing SetToken, the SetToken's current manager address
-     * must be reset to point at the newly deployed DelegatedManager contract in a separate, final transaction.
-     *
-     * @param  _setToken                Instance of the SetToken
-     * @param  _ownerFeeSplit           Percent of fees in precise units (10^16 = 1%) sent to owner, rest to methodologist
-     * @param  _ownerFeeRecipient       Address which receives owner's share of fees when they're distributed
-     * @param  _extensions              List of addresses of extensions which need to be initialized
-     * @param  _initializeBytecode      List of bytecode encoded calls to relevant target's initialize function
-     */
-    function initialize(
-        ISetToken _setToken,
-        uint256 _ownerFeeSplit,
-        address _ownerFeeRecipient,
-        address[] memory _extensions,
-        bytes[] memory _initializeBytecode
-    )
-        external
-    {
-        require(initializeState[_setToken].isPending, "Manager must be awaiting initialization");
-        require(msg.sender == initializeState[_setToken].deployer, "Only deployer can initialize manager");
-        _extensions.validatePairsWithArray(_initializeBytecode);
-
-        IDelegatedManager manager = initializeState[_setToken].manager;
-
-        // If the SetToken was factory-deployed & factory is its current `manager`, transfer
-        // managership to the new DelegatedManager
-        if (_setToken.manager() == address(this)) {
-            _setToken.setManager(address(manager));
-        }
-
-        _initializeExtensions(manager, _extensions, _initializeBytecode);
-
-        _setManagerState(
-            manager,
-            initializeState[_setToken].owner,
-            initializeState[_setToken].methodologist,
-            _ownerFeeSplit,
-            _ownerFeeRecipient
-        );
-
-        delete initializeState[_setToken];
-
-        emit DelegatedManagerInitialized(_setToken, manager);
     }
 
     /* ============ Internal Functions ============ */
@@ -354,7 +317,7 @@ contract DelegatedManagerFactory {
      * @param  _initializeBytecode       List of bytecode encoded calls to relevant extensions's initialize function
      */
     function _initializeExtensions(
-        IDelegatedManager _manager,
+        DelegatedManager _manager,
         address[] memory _extensions,
         bytes[] memory _initializeBytecode
     ) internal {
@@ -415,7 +378,7 @@ contract DelegatedManagerFactory {
      * @param  _ownerFeeRecipient       Address which receives owner's share of fees when they're distributed
      */
     function _setManagerState(
-        IDelegatedManager _manager,
+        DelegatedManager _manager,
         address _owner,
         address _methodologist,
         uint256 _ownerFeeSplit,
