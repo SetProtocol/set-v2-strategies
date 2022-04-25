@@ -126,7 +126,7 @@ export interface TradeInfo {
   sendToken: Address;
   sendQuantity: BigNumber;
   receiveToken: Address;
-  minReceiveQuantity: BigNumber;
+  receiveQuantity: BigNumber;
   data: Bytes;
 }
 

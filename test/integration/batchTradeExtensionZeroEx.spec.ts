@@ -208,7 +208,7 @@ describe("BatchTradeExtension - ZeroExAPITradeAdapter - TradeModule Integration 
           sendToken: tokens.dai.address,
           sendQuantity: daiPositionUnit,
           receiveToken: tokens.wbtc.address,
-          minReceiveQuantity: ether(0),
+          receiveQuantity: ether(0),
           data: daiQuote.data
         } as TradeInfo;
 
@@ -217,7 +217,7 @@ describe("BatchTradeExtension - ZeroExAPITradeAdapter - TradeModule Integration 
           sendToken: tokens.weth.address,
           sendQuantity: wethPositionUnit,
           receiveToken: tokens.wbtc.address,
-          minReceiveQuantity: ether(0),
+          receiveQuantity: ether(0),
           data: wethQuote.data
         } as TradeInfo;
 
@@ -282,7 +282,7 @@ describe("BatchTradeExtension - ZeroExAPITradeAdapter - TradeModule Integration 
           sendToken: tokens.dai.address,
           sendQuantity: daiPositionUnit,
           receiveToken: tokens.wbtc.address,
-          minReceiveQuantity: ether(0),
+          receiveQuantity: ether(0),
           data: daiQuote.data
         } as TradeInfo;
 
@@ -340,7 +340,7 @@ describe("BatchTradeExtension - ZeroExAPITradeAdapter - TradeModule Integration 
           sendToken: tokens.dai.address,
           sendQuantity: daiPositionUnit,
           receiveToken: tokens.wbtc.address,
-          minReceiveQuantity: ether(0),
+          receiveQuantity: ether(0),
           data: daiQuote.data
         } as TradeInfo;
 

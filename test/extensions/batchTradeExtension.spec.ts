@@ -190,7 +190,7 @@ describe("BatchTradeExtension", () => {
       });
 
       it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("Extension must be initialized");
+        await expect(subject()).to.be.revertedWith("Must be initialized extension");
       });
     });
 
@@ -201,7 +201,7 @@ describe("BatchTradeExtension", () => {
       });
 
       it("should revert", async () => {
-        await expect(subject()).to.be.revertedWith("Extension must be initialized");
+        await expect(subject()).to.be.revertedWith("Must be initialized extension");
       });
     });
 
@@ -471,7 +471,7 @@ describe("BatchTradeExtension", () => {
         sendToken: setV2Setup.dai.address,
         sendQuantity: ether(0.6),
         receiveToken: setV2Setup.weth.address,
-        minReceiveQuantity: ether(0),
+        receiveQuantity: ether(0),
         data: EMPTY_BYTES
       } as TradeInfo;
       subjectTradeTwo = {
@@ -479,7 +479,7 @@ describe("BatchTradeExtension", () => {
         sendToken: setV2Setup.dai.address,
         sendQuantity: ether(0.4),
         receiveToken: setV2Setup.wbtc.address,
-        minReceiveQuantity: ether(0),
+        receiveQuantity: ether(0),
         data: EMPTY_BYTES
       } as TradeInfo;
       subjectTrades = [subjectTradeOne, subjectTradeTwo];
@@ -528,7 +528,7 @@ describe("BatchTradeExtension", () => {
           sendToken: setV2Setup.dai.address,
           sendQuantity: ether(0.4),
           receiveToken: setV2Setup.wbtc.address,
-          minReceiveQuantity: ether(2),
+          receiveQuantity: ether(2),
           data: EMPTY_BYTES
         } as TradeInfo;
         subjectTrades = [subjectTradeOne, subjectTradeTwo];
@@ -568,7 +568,7 @@ describe("BatchTradeExtension", () => {
           sendToken: setV2Setup.dai.address,
           sendQuantity: ether(0.4),
           receiveToken: setV2Setup.wbtc.address,
-          minReceiveQuantity: BigNumber.from(1),
+          receiveQuantity: BigNumber.from(1),
           data: EMPTY_BYTES
         } as TradeInfo;
         subjectTrades = [subjectTradeOne, subjectTradeTwo];
@@ -616,7 +616,7 @@ describe("BatchTradeExtension", () => {
           sendToken: setV2Setup.dai.address,
           sendQuantity: ether(0.4),
           receiveToken: setV2Setup.usdc.address,
-          minReceiveQuantity: ether(0),
+          receiveQuantity: ether(0),
           data: EMPTY_BYTES
         } as TradeInfo;
         subjectTrades = [subjectTradeOne, subjectTradeTwo];
