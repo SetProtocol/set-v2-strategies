@@ -4,13 +4,15 @@ import {
   BatchTradeExtension,
   IssuanceExtension,
   StreamingFeeSplitExtension,
-  TradeExtension
+  TradeExtension,
+  WrapExtension
 } from "../contracts/index";
 
 import { BatchTradeExtension__factory } from "../../typechain/factories/BatchTradeExtension__factory";
 import { IssuanceExtension__factory } from "../../typechain/factories/IssuanceExtension__factory";
 import { StreamingFeeSplitExtension__factory } from "../../typechain/factories/StreamingFeeSplitExtension__factory";
 import { TradeExtension__factory } from "../../typechain/factories/TradeExtension__factory";
+import { WrapExtension__factory } from "../../typechain/factories/WrapExtension__factory";
 
 export default class DeployGlobalExtensions {
   private _deployerSigner: Signer;
@@ -56,6 +58,16 @@ export default class DeployGlobalExtensions {
     return await new TradeExtension__factory(this._deployerSigner).deploy(
       managerCore,
       tradeModule,
+    );
+  }
+
+  public async deployWrapExtension(
+    managerCore: Address,
+    wrapModule: Address
+  ): Promise<WrapExtension> {
+    return await new WrapExtension__factory(this._deployerSigner).deploy(
+      managerCore,
+      wrapModule,
     );
   }
 }
