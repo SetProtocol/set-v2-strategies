@@ -1,8 +1,8 @@
 import "module-alias/register";
 
-import { Contract } from "ethers";
+import { BigNumber, Contract } from "ethers";
 import { Address, Account } from "@utils/types";
-import { ADDRESS_ZERO } from "@utils/constants";
+import { ADDRESS_ZERO, ZERO_BYTES } from "@utils/constants";
 import {
   DelegatedManager,
   WrapExtension,
@@ -18,7 +18,9 @@ import {
   addSnapshotBeforeRestoreAfterEach,
   ether,
   getAccounts,
-  getWaffleExpect
+  getWaffleExpect,
+  preciseMul,
+  getProvider
 } from "@utils/index";
 import { SystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
 import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2/dist/utils/test";
@@ -76,7 +78,7 @@ describe("WrapExtension", () => {
     );
 
     setToken = await setV2Setup.createSetToken(
-      [setV2Setup.dai.address],
+      [setV2Setup.weth.address],
       [ether(1)],
       [setV2Setup.issuanceModule.address, wrapModule.address]
     );
@@ -439,6 +441,319 @@ describe("WrapExtension", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Must be Manager");
+      });
+    });
+  });
+
+  context("when the WrapExtension is initialized and SetToken has been issued", async () => {
+    let setTokensIssued: BigNumber;
+
+    before(async () => {
+      wrapExtension.connect(owner.wallet).initializeModuleAndExtension(delegatedManager.address);
+
+      // Issue some Sets
+      setTokensIssued = ether(10);
+      const underlyingRequired = setTokensIssued;
+      await setV2Setup.weth.approve(setV2Setup.issuanceModule.address, underlyingRequired);
+      await setV2Setup.issuanceModule.issue(setToken.address, setTokensIssued, owner.address);
+    });
+
+    describe("#wrap", async () => {
+      let subjectSetToken: Address;
+      let subjectUnderlyingToken: Address;
+      let subjectWrappedToken: Address;
+      let subjectUnderlyingUnits: BigNumber;
+      let subjectIntegrationName: string;
+      let subjectWrapData: string;
+      let subjectCaller: Account;
+
+      beforeEach(async () => {
+        subjectSetToken = setToken.address;
+        subjectUnderlyingToken = setV2Setup.weth.address;
+        subjectWrappedToken = wrapAdapterMock.address;
+        subjectUnderlyingUnits = ether(1);
+        subjectIntegrationName = wrapAdapterMockIntegrationName;
+        subjectWrapData = ZERO_BYTES;
+        subjectCaller = operator;
+      });
+
+      async function subject(): Promise<any> {
+        return wrapExtension.connect(subjectCaller.wallet).wrap(
+          subjectSetToken,
+          subjectUnderlyingToken,
+          subjectWrappedToken,
+          subjectUnderlyingUnits,
+          subjectIntegrationName,
+          subjectWrapData
+        );
+      }
+
+      it("should mint the correct wrapped asset to the SetToken", async () => {
+        await subject();
+        const wrappedBalance = await wrapAdapterMock.balanceOf(setToken.address);
+        const expectedTokenBalance = setTokensIssued;
+        expect(wrappedBalance).to.eq(expectedTokenBalance);
+      });
+
+      it("should reduce the correct quantity of the underlying quantity", async () => {
+        const previousUnderlyingBalance = await setV2Setup.weth.balanceOf(setToken.address);
+
+        await subject();
+        const underlyingTokenBalance = await setV2Setup.weth.balanceOf(setToken.address);
+        const expectedUnderlyingBalance = previousUnderlyingBalance.sub(setTokensIssued);
+        expect(underlyingTokenBalance).to.eq(expectedUnderlyingBalance);
+      });
+
+      it("remove the underlying position and replace with the wrapped token position", async () => {
+        await subject();
+
+        const positions = await setToken.getPositions();
+        const receivedWrappedTokenPosition = positions[0];
+
+        expect(positions.length).to.eq(1);
+        expect(receivedWrappedTokenPosition.component).to.eq(subjectWrappedToken);
+        expect(receivedWrappedTokenPosition.unit).to.eq(subjectUnderlyingUnits);
+      });
+
+      describe("when the caller is not the operator", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be approved operator");
+        });
+      });
+    });
+
+    describe("#wrapWithEther", async () => {
+      let subjectSetToken: Address;
+      let subjectWrappedToken: Address;
+      let subjectUnderlyingUnits: BigNumber;
+      let subjectIntegrationName: string;
+      let subjectWrapData: string;
+      let subjectCaller: Account;
+
+      beforeEach(async () => {
+        subjectSetToken = setToken.address;
+        subjectWrappedToken = wrapAdapterMock.address;
+        subjectUnderlyingUnits = ether(1);
+        subjectIntegrationName = wrapAdapterMockIntegrationName;
+        subjectWrapData = ZERO_BYTES;
+        subjectCaller = operator;
+      });
+
+      async function subject(): Promise<any> {
+        return wrapExtension.connect(subjectCaller.wallet).wrapWithEther(
+          subjectSetToken,
+          subjectWrappedToken,
+          subjectUnderlyingUnits,
+          subjectIntegrationName,
+          subjectWrapData
+        );
+      }
+
+      it("should mint the correct wrapped asset to the SetToken", async () => {
+        await subject();
+        const wrappedBalance = await wrapAdapterMock.balanceOf(setToken.address);
+        const expectedTokenBalance = setTokensIssued;
+        expect(wrappedBalance).to.eq(expectedTokenBalance);
+      });
+
+      it("should reduce the correct quantity of WETH", async () => {
+        const previousUnderlyingBalance = await setV2Setup.weth.balanceOf(setToken.address);
+
+        await subject();
+        const underlyingTokenBalance = await setV2Setup.weth.balanceOf(setToken.address);
+        const expectedUnderlyingBalance = previousUnderlyingBalance.sub(setTokensIssued);
+        expect(underlyingTokenBalance).to.eq(expectedUnderlyingBalance);
+      });
+
+      it("should send the correct quantity of ETH to the external protocol", async () => {
+        const provider = getProvider();
+        const preEthBalance = await provider.getBalance(wrapAdapterMock.address);
+
+        await subject();
+
+        const postEthBalance = await provider.getBalance(wrapAdapterMock.address);
+        expect(postEthBalance).to.eq(preEthBalance.add(preciseMul(subjectUnderlyingUnits, setTokensIssued)));
+      });
+
+      it("removes the underlying position and replace with the wrapped token position", async () => {
+        await subject();
+
+        const positions = await setToken.getPositions();
+        const receivedWrappedTokenPosition = positions[0];
+
+        expect(positions.length).to.eq(1);
+        expect(receivedWrappedTokenPosition.component).to.eq(subjectWrappedToken);
+        expect(receivedWrappedTokenPosition.unit).to.eq(subjectUnderlyingUnits);
+      });
+
+      describe("when the caller is not the operator", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be approved operator");
+        });
+      });
+    });
+
+    describe("#unwrap", async () => {
+      let subjectSetToken: Address;
+      let subjectUnderlyingToken: Address;
+      let subjectWrappedToken: Address;
+      let subjectWrappedTokenUnits: BigNumber;
+      let subjectIntegrationName: string;
+      let subjectUnwrapData: string;
+      let subjectCaller: Account;
+
+      let wrappedQuantity: BigNumber;
+
+      beforeEach(async () => {
+        subjectSetToken = setToken.address;
+        subjectUnderlyingToken = setV2Setup.weth.address;
+        subjectWrappedToken = wrapAdapterMock.address;
+        subjectWrappedTokenUnits = ether(0.5);
+        subjectIntegrationName = wrapAdapterMockIntegrationName;
+        subjectUnwrapData = ZERO_BYTES;
+        subjectCaller = operator;
+
+        wrappedQuantity = ether(1);
+
+        await wrapExtension.connect(operator.wallet).wrap(
+          subjectSetToken,
+          subjectUnderlyingToken,
+          subjectWrappedToken,
+          wrappedQuantity,
+          subjectIntegrationName,
+          ZERO_BYTES
+        );
+      });
+
+      async function subject(): Promise<any> {
+        return wrapExtension.connect(subjectCaller.wallet).unwrap(
+          subjectSetToken,
+          subjectUnderlyingToken,
+          subjectWrappedToken,
+          subjectWrappedTokenUnits,
+          subjectIntegrationName,
+          subjectUnwrapData
+        );
+      }
+
+      it("should burn the correct wrapped asset to the SetToken", async () => {
+        await subject();
+        const newWrappedBalance = await wrapAdapterMock.balanceOf(setToken.address);
+        const expectedTokenBalance = preciseMul(setTokensIssued, wrappedQuantity.sub(subjectWrappedTokenUnits));
+        expect(newWrappedBalance).to.eq(expectedTokenBalance);
+      });
+
+      it("should properly update the underlying and wrapped token units", async () => {
+        await subject();
+
+        const positions = await setToken.getPositions();
+        const [receivedWrappedPosition, receivedUnderlyingPosition] = positions;
+
+        expect(positions.length).to.eq(2);
+        expect(receivedWrappedPosition.component).to.eq(subjectWrappedToken);
+        expect(receivedWrappedPosition.unit).to.eq(ether(0.5));
+
+        expect(receivedUnderlyingPosition.component).to.eq(subjectUnderlyingToken);
+        expect(receivedUnderlyingPosition.unit).to.eq(ether(0.5));
+      });
+
+      describe("when the caller is not the operator", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be approved operator");
+        });
+      });
+    });
+
+    describe("#unwrapWithEther", async () => {
+      let subjectSetToken: Address;
+      let subjectWrappedToken: Address;
+      let subjectWrappedTokenUnits: BigNumber;
+      let subjectIntegrationName: string;
+      let subjectUnwrapData: string;
+      let subjectCaller: Account;
+
+      let wrappedQuantity: BigNumber;
+
+      beforeEach(async () => {
+        subjectSetToken = setToken.address;
+        subjectWrappedToken = wrapAdapterMock.address;
+        subjectWrappedTokenUnits = ether(0.5);
+        subjectIntegrationName = wrapAdapterMockIntegrationName;
+        subjectUnwrapData = ZERO_BYTES;
+        subjectCaller = operator;
+
+        wrappedQuantity = ether(1);
+
+        await wrapExtension.connect(operator.wallet).wrapWithEther(
+          subjectSetToken,
+          subjectWrappedToken,
+          wrappedQuantity,
+          subjectIntegrationName,
+          ZERO_BYTES
+        );
+      });
+
+      async function subject(): Promise<any> {
+        return wrapExtension.connect(subjectCaller.wallet).unwrapWithEther(
+          subjectSetToken,
+          subjectWrappedToken,
+          subjectWrappedTokenUnits,
+          subjectIntegrationName,
+          subjectUnwrapData
+        );
+      }
+
+      it("should burn the correct wrapped asset to the SetToken", async () => {
+        await subject();
+        const newWrappedBalance = await wrapAdapterMock.balanceOf(setToken.address);
+        const expectedTokenBalance = preciseMul(setTokensIssued, wrappedQuantity.sub(subjectWrappedTokenUnits));
+        expect(newWrappedBalance).to.eq(expectedTokenBalance);
+      });
+
+      it("should properly update the underlying and wrapped token units", async () => {
+        await subject();
+
+        const positions = await setToken.getPositions();
+        const [receivedWrappedPosition, receivedUnderlyingPosition] = positions;
+
+        expect(positions.length).to.eq(2);
+        expect(receivedWrappedPosition.component).to.eq(subjectWrappedToken);
+        expect(receivedWrappedPosition.unit).to.eq(ether(0.5));
+
+        expect(receivedUnderlyingPosition.component).to.eq(setV2Setup.weth.address);
+        expect(receivedUnderlyingPosition.unit).to.eq(ether(0.5));
+      });
+
+      it("should have sent the correct quantity of ETH to the SetToken", async () => {
+        const provider = getProvider();
+        const preEthBalance = await provider.getBalance(wrapAdapterMock.address);
+
+        await subject();
+
+        const postEthBalance = await provider.getBalance(wrapAdapterMock.address);
+        expect(postEthBalance).to.eq(preEthBalance.sub(preciseMul(subjectWrappedTokenUnits, setTokensIssued)));
+      });
+
+      describe("when the caller is not the operator", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be approved operator");
+        });
       });
     });
   });
