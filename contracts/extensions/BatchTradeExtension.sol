@@ -56,13 +56,25 @@ contract BatchTradeExtension is BaseGlobalExtension {
     event StringTradeFailed(
         address indexed _setToken,       // Address of the SetToken which the failed trade targeted
         uint256 indexed _index,          // Index of trade that failed in _trades parameter of batchTrade call
-        string _reason                   // String reason for the trade failure
+        string _reason,                  // String reason for the trade failure
+        string exchangeName,             // Human readable name of the exchange in the integrations registry
+        address sendToken,               // Address of the token to be sent to the exchange
+        uint256 sendQuantity,            // Max units of `sendToken` sent to the exchange
+        address receiveToken,            // Address of the token that will be received from the exchange
+        uint256 receiveQuantity,         // Min units of `receiveToken` to be received from the exchange
+        bytes data                       // Arbitrary bytes to be used to construct trade call data
     );
 
     event BytesTradeFailed(
         address indexed _setToken,       // Address of the SetToken which the failed trade targeted
         uint256 indexed _index,          // Index of trade that failed in _trades parameter of batchTrade call
-        bytes _lowLevelData              // Bytes low level data reason for the trade failure
+        bytes _lowLevelData,             // Bytes low level data reason for the trade failure
+        string exchangeName,             // Human readable name of the exchange in the integrations registry
+        address sendToken,               // Address of the token to be sent to the exchange
+        uint256 sendQuantity,            // Max units of `sendToken` sent to the exchange
+        address receiveToken,            // Address of the token that will be received from the exchange
+        uint256 receiveQuantity,         // Min units of `receiveToken` to be received from the exchange
+        bytes data                       // Arbitrary bytes to be used to construct trade call data
     );
 
     /* ============ State Variables ============ */
@@ -172,9 +184,29 @@ contract BatchTradeExtension is BaseGlobalExtension {
             // decode-able off-chain given enough context about protocol targeted by the adapter.
             try manager.interactManager(address(tradeModule), callData) {}
             catch Error(string memory reason) {
-                emit StringTradeFailed(address(_setToken), i, reason);
+                emit StringTradeFailed(
+                    address(_setToken),
+                    i,
+                    reason,
+                    _trades[i].exchangeName,
+                    _trades[i].sendToken,
+                    _trades[i].sendQuantity,
+                    _trades[i].receiveToken,
+                    _trades[i].receiveQuantity,
+                    _trades[i].data
+                );
             } catch (bytes memory lowLevelData) {
-                emit BytesTradeFailed(address(_setToken), i, lowLevelData);
+                emit BytesTradeFailed(
+                    address(_setToken),
+                    i,
+                    lowLevelData,
+                    _trades[i].exchangeName,
+                    _trades[i].sendToken,
+                    _trades[i].sendQuantity,
+                    _trades[i].receiveToken,
+                    _trades[i].receiveQuantity,
+                    _trades[i].data
+                );
             }
         }
     }

@@ -26,7 +26,7 @@ import { ContractTransaction } from "ethers";
 
 const expect = getWaffleExpect();
 
-describe("BatchTradeExtension", () => {
+describe.only("BatchTradeExtension", () => {
   let owner: Account;
   let methodologist: Account;
   let operator: Account;
@@ -552,11 +552,17 @@ describe("BatchTradeExtension", () => {
         expect(oldReceiveTokenTwoBalance).to.eq(actualNewReceiveTokenTwoBalance);
       });
 
-      it("should emit the correct TradeFailed event", async () => {
+      it("should emit the correct StringTradeFailed event", async () => {
         await expect(subject()).to.emit(batchTradeExtension, "StringTradeFailed").withArgs(
           setToken.address,
           1,
-          "Insufficient funds in exchange"
+          "Insufficient funds in exchange",
+          tradeAdapterName,
+          setV2Setup.dai.address,
+          ether(0.4),
+          setV2Setup.wbtc.address,
+          ether(2),
+          EMPTY_BYTES
         );
       });
     });
@@ -604,7 +610,13 @@ describe("BatchTradeExtension", () => {
         await expect(subject()).to.emit(batchTradeExtension, "BytesTradeFailed").withArgs(
           setToken.address,
           1,
-          expectedByteError
+          expectedByteError,
+          tradeAdapterName,
+          setV2Setup.dai.address,
+          ether(0.4),
+          setV2Setup.wbtc.address,
+          BigNumber.from(1),
+          EMPTY_BYTES
         );
       });
     });
