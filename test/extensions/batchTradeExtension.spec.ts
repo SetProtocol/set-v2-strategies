@@ -23,10 +23,11 @@ import {
 import { SystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
 import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2/dist/utils/test";
 import { ContractTransaction } from "ethers";
+import { getLastBlockTransaction } from "@utils/test/testingUtils";
 
 const expect = getWaffleExpect();
 
-describe.only("BatchTradeExtension", () => {
+describe("BatchTradeExtension", () => {
   let owner: Account;
   let methodologist: Account;
   let operator: Account;
@@ -73,7 +74,8 @@ describe.only("BatchTradeExtension", () => {
 
     batchTradeExtension = await deployer.globalExtensions.deployBatchTradeExtension(
       managerCore.address,
-      tradeModule.address
+      tradeModule.address,
+      [tradeAdapterName]
     );
 
     setToken = await setV2Setup.createSetToken(
@@ -105,16 +107,19 @@ describe.only("BatchTradeExtension", () => {
   describe("#constructor", async () => {
     let subjectManagerCore: Address;
     let subjectTradeModule: Address;
+    let subjectIntegrations: string[];
 
     beforeEach(async () => {
       subjectManagerCore = managerCore.address;
       subjectTradeModule = tradeModule.address;
+      subjectIntegrations = [tradeAdapterName];
     });
 
     async function subject(): Promise<BatchTradeExtension> {
       return await deployer.globalExtensions.deployBatchTradeExtension(
         subjectManagerCore,
-        subjectTradeModule
+        subjectTradeModule,
+        subjectIntegrations
       );
     }
 
@@ -123,6 +128,144 @@ describe.only("BatchTradeExtension", () => {
 
       const storedModule = await batchTradeExtension.tradeModule();
       expect(storedModule).to.eq(subjectTradeModule);
+    });
+
+    it("should have set the correct integrations length of 1", async () => {
+      const batchTradeExtension = await subject();
+
+      const integrations = await batchTradeExtension.getIntegrations();
+      expect(integrations.length).to.eq(1);
+    });
+
+    it("should have a valid integration", async () => {
+      const batchTradeExtension = await subject();
+
+      const validIntegration = await batchTradeExtension.isIntegration(tradeAdapterName);
+      expect(validIntegration).to.eq(true);
+    });
+
+    it("should emit the IntegrationAdded event", async () => {
+      const batchTradeExtension = await subject();
+
+      await expect(getLastBlockTransaction()).to.emit(batchTradeExtension, "IntegrationAdded").withArgs(tradeAdapterName);
+    });
+  });
+
+  describe("#addIntegrations", async () => {
+    let subjectIntegrations: string[];
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      subjectIntegrations = ["Test1", "Test2"];
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return batchTradeExtension.connect(subjectCaller.wallet).addIntegrations(subjectIntegrations);
+    }
+
+    it("should be stored in the integrations array", async () => {
+      await subject();
+
+      const integrations = await batchTradeExtension.getIntegrations();
+      expect(integrations.length).to.eq(3);
+    });
+
+    it("should be returned as valid integrations", async () => {
+      await subject();
+
+      const validIntegrationOne = await batchTradeExtension.isIntegration("Test1");
+      const validIntegrationTwo = await batchTradeExtension.isIntegration("Test2");
+      expect(validIntegrationOne).to.eq(true);
+      expect(validIntegrationTwo).to.eq(true);
+    });
+
+    it("should emit the first IntegrationAdded event", async () => {
+      await expect(subject()).to.emit(batchTradeExtension, "IntegrationAdded").withArgs("Test1");
+    });
+
+    it("should emit the second IntegrationAdded event", async () => {
+      await expect(subject()).to.emit(batchTradeExtension, "IntegrationAdded").withArgs("Test2");
+    });
+
+    describe("when the sender is not the ManagerCore owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Caller must be ManagerCore owner");
+      });
+    });
+
+    describe("when the integration already exists", async () => {
+      beforeEach(async () => {
+        await subject();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Integration already exists");
+      });
+    });
+  });
+
+  describe("#removeIntegrations", async () => {
+    let subjectIntegrations: string[];
+    let subjectCaller: Account;
+
+    beforeEach(async () => {
+      await batchTradeExtension.connect(owner.wallet).addIntegrations(["Test1", "Test2"]);
+
+      subjectIntegrations = ["Test1", "Test2"];
+      subjectCaller = owner;
+    });
+
+    async function subject(): Promise<ContractTransaction> {
+      return batchTradeExtension.connect(subjectCaller.wallet).removeIntegrations(subjectIntegrations);
+    }
+
+    it("should be remove integrations from the integrations array", async () => {
+      await subject();
+
+      const integrations = await batchTradeExtension.getIntegrations();
+      expect(integrations.length).to.eq(1);
+    });
+
+    it("should return false as valid integrations", async () => {
+      await subject();
+
+      const validIntegrationOne = await batchTradeExtension.isIntegration("Test1");
+      const validIntegrationTwo = await batchTradeExtension.isIntegration("Test2");
+      expect(validIntegrationOne).to.eq(false);
+      expect(validIntegrationTwo).to.eq(false);
+    });
+
+    it("should emit the first IntegrationRemoved event", async () => {
+      await expect(subject()).to.emit(batchTradeExtension, "IntegrationRemoved").withArgs("Test1");
+    });
+
+    it("should emit the second IntegrationRemoved event", async () => {
+      await expect(subject()).to.emit(batchTradeExtension, "IntegrationRemoved").withArgs("Test2");
+    });
+
+    describe("when the sender is not the ManagerCore owner", async () => {
+      beforeEach(async () => {
+        subjectCaller = await getRandomAccount();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Caller must be ManagerCore owner");
+      });
+    });
+
+    describe("when the integration does not exist", async () => {
+      beforeEach(async () => {
+        await subject();
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Integration does not exist");
+      });
     });
   });
 
@@ -618,6 +761,24 @@ describe.only("BatchTradeExtension", () => {
           BigNumber.from(1),
           EMPTY_BYTES
         );
+      });
+    });
+
+    describe("when a exchangeName is not an allowed integration", async () => {
+      beforeEach(async () => {
+        subjectTradeTwo = {
+          exchangeName: "ZeroExApiAdapter",
+          sendToken: setV2Setup.dai.address,
+          sendQuantity: ether(0.4),
+          receiveToken: setV2Setup.wbtc.address,
+          receiveQuantity: ether(0),
+          data: EMPTY_BYTES
+        } as TradeInfo;
+        subjectTrades = [subjectTradeOne, subjectTradeTwo];
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be allowed integration");
       });
     });
 

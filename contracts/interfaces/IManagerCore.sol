@@ -22,4 +22,5 @@ interface IManagerCore {
     function isExtension(address _extension) external view returns(bool);
     function isFactory(address _factory) external view returns(bool);
     function isManager(address _manager) external view returns(bool);
+    function owner() external view returns(address);
 }

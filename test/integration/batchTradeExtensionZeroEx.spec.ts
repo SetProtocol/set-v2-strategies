@@ -142,7 +142,8 @@ describe("BatchTradeExtension - ZeroExAPITradeAdapter - TradeModule Integration 
 
     batchTradeExtension = await deployer.globalExtensions.deployBatchTradeExtension(
       managerCore.address,
-      tradeModule.address
+      tradeModule.address,
+      [zeroExApiAdapterName]
     );
 
     delegatedManager = await deployer.manager.deployDelegatedManager(

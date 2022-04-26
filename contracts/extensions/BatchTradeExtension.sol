@@ -21,6 +21,7 @@ pragma experimental "ABIEncoderV2";
 
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 import { ITradeModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/ITradeModule.sol";
+import { StringArrayUtils } from "@setprotocol/set-protocol-v2/contracts/lib/StringArrayUtils.sol";
 
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
@@ -34,6 +35,7 @@ import { IManagerCore } from "../interfaces/IManagerCore.sol";
  * on a DEX and the owner the ability to restrict operator(s) permissions with an asset whitelist.
  */
 contract BatchTradeExtension is BaseGlobalExtension {
+    using StringArrayUtils for string[];
 
     /* ============ Structs ============ */
 
@@ -47,6 +49,9 @@ contract BatchTradeExtension is BaseGlobalExtension {
     }
 
     /* ============ Events ============ */
+
+    event IntegrationAdded(string _integrationName);      // String name of TradeModule exchange integration to allow
+    event IntegrationRemoved(string _integrationName);    // String name of TradeModule exchange integration to disallow
 
     event BatchTradeExtensionInitialized(
         address indexed _setToken,                 // Address of the SetToken which had BatchTradeExtension initialized on their manager
@@ -82,25 +87,77 @@ contract BatchTradeExtension is BaseGlobalExtension {
     // Instance of TradeModule
     ITradeModule public immutable tradeModule;
 
+    // List of allowed TradeModule exchange integrations
+    string[] public integrations;
+
+    // Mapping to check whether string is allowed TradeModule exchange integration
+    mapping(string => bool) public isIntegration;
+
     /* ============ Constructor ============ */
 
     /**
-     * Instantiate with ManagerCore and TradeModule addresses.
+     * Instantiate with ManagerCore address, TradeModule address, and allowed TradeModule integration strings.
      *
      * @param _managerCore              Address of ManagerCore contract
      * @param _tradeModule              Address of TradeModule contract
+     * @param _integrations             List of TradeModule exchange integrations to allow
      */
     constructor(
         IManagerCore _managerCore,
-        ITradeModule _tradeModule
+        ITradeModule _tradeModule,
+        string[] memory _integrations
     )
         public
         BaseGlobalExtension(_managerCore)
     {
         tradeModule = _tradeModule;
+
+        integrations = _integrations;
+        uint256 integrationsLength = _integrations.length;
+        for (uint256 i = 0; i < integrationsLength; i++) {
+            _addIntegration(_integrations[i]);
+        }
     }
 
     /* ============ External Functions ============ */
+
+    /**
+     * PRIVILEGED GOVERNANCE FUNCTION. Allows governance to add allowed TradeModule exchange integrations
+     *
+     * @param _integrations     List of TradeModule exchange integrations to allow
+     */
+    function addIntegrations(string[] memory _integrations) external {
+        require(msg.sender == managerCore.owner(), "Caller must be ManagerCore owner");
+
+        uint256 integrationsLength = _integrations.length;
+        for (uint256 i = 0; i < integrationsLength; i++) {
+            require(!isIntegration[_integrations[i]], "Integration already exists");
+
+            integrations.push(_integrations[i]);
+
+            _addIntegration(_integrations[i]);
+        }
+    }
+
+    /**
+     * PRIVILEGED GOVERNANCE FUNCTION. Allows governance to remove allowed TradeModule exchange integrations
+     *
+     * @param _integrations     List of TradeModule exchange integrations to disallow
+     */
+    function removeIntegrations(string[] memory _integrations) external {
+        require(msg.sender == managerCore.owner(), "Caller must be ManagerCore owner");
+
+        uint256 integrationsLength = _integrations.length;
+        for (uint256 i = 0; i < integrationsLength; i++) {
+            require(isIntegration[_integrations[i]], "Integration does not exist");
+
+            integrations.removeStorage(_integrations[i]);
+
+            isIntegration[_integrations[i]] = false;
+
+            IntegrationRemoved(_integrations[i]);
+        }
+    }
 
     /**
      * ONLY OWNER: Initializes TradeModule on the SetToken associated with the DelegatedManager.
@@ -166,6 +223,7 @@ contract BatchTradeExtension is BaseGlobalExtension {
         uint256 tradesLength = _trades.length;
         IDelegatedManager manager = _manager(_setToken);
         for(uint256 i = 0; i < tradesLength; i++) {
+            require(isIntegration[_trades[i].exchangeName], "Must be allowed integration");
             require(manager.isAllowedAsset(_trades[i].receiveToken), "Must be allowed asset");
 
             bytes memory callData = abi.encodeWithSelector(
@@ -211,7 +269,24 @@ contract BatchTradeExtension is BaseGlobalExtension {
         }
     }
 
+    /* ============ External Getter Functions ============ */
+
+    function getIntegrations() external view returns (string[] memory) {
+        return integrations;
+    }
+
     /* ============ Internal Functions ============ */
+
+    /**
+     * Add an allowed TradeModule exchange integration to the BatchTradeExtension
+     *
+     * @param _integrationName               Name of TradeModule exchange integration to allow
+     */
+    function _addIntegration(string memory _integrationName) internal {
+        isIntegration[_integrationName] = true;
+
+        emit IntegrationAdded(_integrationName);
+    }
 
     /**
      * Internal function to initialize TradeModule on the SetToken associated with the DelegatedManager.
