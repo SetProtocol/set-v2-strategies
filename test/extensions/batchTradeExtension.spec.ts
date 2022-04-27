@@ -700,12 +700,14 @@ describe("BatchTradeExtension", () => {
           setToken.address,
           1,
           "Insufficient funds in exchange",
-          tradeAdapterName,
-          setV2Setup.dai.address,
-          ether(0.4),
-          setV2Setup.wbtc.address,
-          ether(2),
-          EMPTY_BYTES
+          [
+            tradeAdapterName,
+            setV2Setup.dai.address,
+            ether(0.4),
+            setV2Setup.wbtc.address,
+            ether(2),
+            EMPTY_BYTES
+          ]
         );
       });
     });
@@ -754,12 +756,14 @@ describe("BatchTradeExtension", () => {
           setToken.address,
           1,
           expectedByteError,
-          tradeAdapterName,
-          setV2Setup.dai.address,
-          ether(0.4),
-          setV2Setup.wbtc.address,
-          BigNumber.from(1),
-          EMPTY_BYTES
+          [
+            tradeAdapterName,
+            setV2Setup.dai.address,
+            ether(0.4),
+            setV2Setup.wbtc.address,
+            BigNumber.from(1),
+            EMPTY_BYTES
+          ]
         );
       });
     });
