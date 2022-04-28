@@ -20,3 +20,4 @@ export { StreamingFeeSplitExtension } from "../../typechain/StreamingFeeSplitExt
 export { BatchTradeExtension } from "../../typechain/BatchTradeExtension";
 export { TradeAdapterMock } from "../../typechain/TradeAdapterMock";
 export { WrapExtension } from "../../typechain/WrapExtension";
+export { ClaimExtension } from "../../typechain/ClaimExtension";

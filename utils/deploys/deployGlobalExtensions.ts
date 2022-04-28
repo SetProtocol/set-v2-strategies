@@ -2,6 +2,7 @@ import { Signer } from "ethers";
 import { Address } from "../types";
 import {
   BatchTradeExtension,
+  ClaimExtension,
   IssuanceExtension,
   StreamingFeeSplitExtension,
   TradeExtension,
@@ -9,6 +10,7 @@ import {
 } from "../contracts/index";
 
 import { BatchTradeExtension__factory } from "../../typechain/factories/BatchTradeExtension__factory";
+import { ClaimExtension__factory } from "../../typechain/factories/ClaimExtension__factory";
 import { IssuanceExtension__factory } from "../../typechain/factories/IssuanceExtension__factory";
 import { StreamingFeeSplitExtension__factory } from "../../typechain/factories/StreamingFeeSplitExtension__factory";
 import { TradeExtension__factory } from "../../typechain/factories/TradeExtension__factory";
@@ -28,6 +30,18 @@ export default class DeployGlobalExtensions {
     return await new BatchTradeExtension__factory(this._deployerSigner).deploy(
       managerCore,
       tradeModule,
+    );
+  }
+
+  public async deployClaimExtension(
+    managerCore: Address,
+    airdropModule: Address,
+    claimModule: Address
+  ): Promise<ClaimExtension> {
+    return await new ClaimExtension__factory(this._deployerSigner).deploy(
+      managerCore,
+      airdropModule,
+      claimModule
     );
   }
 
