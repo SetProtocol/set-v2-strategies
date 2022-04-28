@@ -667,6 +667,45 @@ describe("ClaimExtension", () => {
       });
     });
 
+    describe("when the ClaimModule is not pending or initialized", async () => {
+      beforeEach(async () => {
+        await claimExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+        await claimExtension.connect(owner.wallet).initializeClaimModule(
+          delegatedManager.address,
+          true,
+          [await getRandomAddress(), await getRandomAddress()],
+          [claimAdapterMockIntegrationNameOne, claimAdapterMockIntegrationNameTwo]
+        );
+        await delegatedManager.connect(owner.wallet).removeExtensions([claimExtension.address]);
+        await delegatedManager.connect(owner.wallet).setManager(owner.address);
+        await setToken.connect(owner.wallet).removeModule(claimModule.address);
+        await setToken.connect(owner.wallet).setManager(delegatedManager.address);
+        await delegatedManager.connect(owner.wallet).addExtensions([claimExtension.address]);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be pending initialization");
+      });
+    });
+
+    describe("when the ClaimModule is already initialized", async () => {
+      beforeEach(async () => {
+        await claimExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
+        await claimExtension.connect(owner.wallet).initializeClaimModule(
+          delegatedManager.address,
+          true,
+          [await getRandomAddress(), await getRandomAddress()],
+          [claimAdapterMockIntegrationNameOne, claimAdapterMockIntegrationNameTwo]
+        );
+        await delegatedManager.connect(owner.wallet).removeExtensions([claimExtension.address]);
+        await delegatedManager.connect(owner.wallet).addExtensions([claimExtension.address]);
+      });
+
+      it("should revert", async () => {
+        await expect(subject()).to.be.revertedWith("Must be pending initialization");
+      });
+    });
+
     describe("when the extension is not pending or initialized", async () => {
       beforeEach(async () => {
         await claimExtension.connect(owner.wallet).initializeExtension(delegatedManager.address);
