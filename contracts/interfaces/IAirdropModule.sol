@@ -32,7 +32,7 @@ interface IAirdropModule {
 
     function initialize(ISetToken _setToken, AirdropSettings memory _airdropSettings) external;
 
-    function airdropSettings(ISetToken _setToken) external returns(AirdropSettings memory);
+    function airdropSettings(ISetToken _setToken) external view returns(AirdropSettings memory);
     function batchAbsorb(ISetToken _setToken, address[] memory _tokens) external;
     function absorb(ISetToken _setToken, IERC20 _token) external;
     function addAirdrop(ISetToken _setToken, IERC20 _airdrop) external;

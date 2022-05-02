@@ -29,7 +29,7 @@ interface IClaimModule {
         string[] calldata _integrationNames
     ) external;
 
-    function anyoneClaim(ISetToken _setToken) external returns(bool);
+    function anyoneClaim(ISetToken _setToken) external view returns(bool);
     function claim(ISetToken _setToken, address _rewardPool, string calldata _integrationName) external;
     function batchClaim(ISetToken _setToken, address[] calldata _rewardPools, string[] calldata _integrationNames) external;
     function updateAnyoneClaim(ISetToken _setToken, bool _anyoneClaim) external;

@@ -2,7 +2,7 @@ import "module-alias/register";
 
 import { BigNumber, Contract } from "ethers";
 import { Address, Account } from "@utils/types";
-import { ADDRESS_ZERO } from "@utils/constants";
+import { ADDRESS_ZERO, ZERO, PRECISE_UNIT } from "@utils/constants";
 import {
   DelegatedManager,
   ClaimExtension,
@@ -20,7 +20,9 @@ import {
   ether,
   getAccounts,
   getWaffleExpect,
-  getRandomAddress
+  getRandomAddress,
+  preciseMul,
+  preciseDiv
 } from "@utils/index";
 import { SystemFixture } from "@setprotocol/set-protocol-v2/dist/utils/fixtures";
 import { getSystemFixture, getRandomAccount } from "@setprotocol/set-protocol-v2/dist/utils/test";
@@ -86,7 +88,8 @@ describe("ClaimExtension", () => {
     claimExtension = await deployer.globalExtensions.deployClaimExtension(
       managerCore.address,
       airdropModule.address,
-      claimModule.address
+      claimModule.address,
+      setV2Setup.integrationRegistry.address
     );
 
     setToken = await setV2Setup.createSetToken(
@@ -103,7 +106,7 @@ describe("ClaimExtension", () => {
       methodologist.address,
       [claimExtension.address],
       [operator.address],
-      [setV2Setup.dai.address, setV2Setup.weth.address, setV2Setup.wbtc.address],
+      [setV2Setup.usdc.address, setV2Setup.weth.address],
       true
     );
 
@@ -119,18 +122,21 @@ describe("ClaimExtension", () => {
     let subjectManagerCore: Address;
     let subjectAirdropModule: Address;
     let subjectClaimModule: Address;
+    let subjectIntegrationRegistry: Address;
 
     beforeEach(async () => {
       subjectManagerCore = managerCore.address;
       subjectAirdropModule = airdropModule.address;
       subjectClaimModule = claimModule.address;
+      subjectIntegrationRegistry = setV2Setup.integrationRegistry.address;
     });
 
     async function subject(): Promise<ClaimExtension> {
       return await deployer.globalExtensions.deployClaimExtension(
         subjectManagerCore,
         subjectAirdropModule,
-        subjectClaimModule
+        subjectClaimModule,
+        subjectIntegrationRegistry
       );
     }
 
@@ -146,6 +152,13 @@ describe("ClaimExtension", () => {
 
       const storedModule = await claimExtension.claimModule();
       expect(storedModule).to.eq(subjectClaimModule);
+    });
+
+    it("should set the correct IntegrationRegistry address", async () => {
+      const claimExtension = await subject();
+
+      const storedIntegrationRegistry = await claimExtension.integrationRegistry();
+      expect(storedIntegrationRegistry).to.eq(subjectIntegrationRegistry);
     });
   });
 
@@ -776,6 +789,864 @@ describe("ClaimExtension", () => {
 
       it("should revert", async () => {
         await expect(subject()).to.be.revertedWith("Must be Manager");
+      });
+    });
+  });
+
+  context("when the ClaimExtension, AirdropModule, and ClaimModule are initialized", async () => {
+    let airdrops: Address[];
+    let airdropFee: BigNumber;
+    let anyoneAbsorb: boolean;
+    let airdropFeeRecipient: Address;
+
+    let rewardPools: Address[];
+    let integrations: string[];
+    let anyoneClaim: boolean;
+
+    let protocolFee: BigNumber;
+
+    before(async () => {
+      airdrops = [setV2Setup.usdc.address, setV2Setup.weth.address];
+      airdropFee = ether(.2);
+      anyoneAbsorb = false;
+      airdropFeeRecipient = delegatedManager.address;
+
+      rewardPools = [await getRandomAddress(), await getRandomAddress()];
+      integrations = [claimAdapterMockIntegrationNameOne, claimAdapterMockIntegrationNameTwo];
+      anyoneClaim = false;
+
+      claimExtension.connect(owner.wallet).initializeModulesAndExtension(
+        delegatedManager.address,
+        {
+          airdrops,
+          feeRecipient: airdropFeeRecipient,
+          airdropFee,
+          anyoneAbsorb
+        },
+        anyoneClaim,
+        rewardPools,
+        integrations
+      );
+
+      protocolFee = ether(.15);
+      await setV2Setup.controller.addFee(airdropModule.address, ZERO, protocolFee);
+
+      await setV2Setup.issuanceModule.issue(setToken.address, ether(1.124), owner.address);
+    });
+
+    describe("#batchAbsorb", async () => {
+      let subjectSetToken: Address;
+      let subjectTokens: Address[];
+      let subjectCaller: Account;
+
+      beforeEach(async () => {
+        await setV2Setup.usdc.transfer(setToken.address, ether(1));
+        await setV2Setup.weth.transfer(setToken.address, ether(1));
+
+        subjectSetToken = setToken.address;
+        subjectTokens = [setV2Setup.usdc.address, setV2Setup.weth.address];
+        subjectCaller = operator;
+      });
+
+      async function subject(): Promise<ContractTransaction> {
+        return claimExtension.connect(subjectCaller.wallet).batchAbsorb(
+          subjectSetToken,
+          subjectTokens
+        );
+      }
+
+      it("should create the correct new usdc position", async () => {
+        const totalSupply = await setToken.totalSupply();
+        const preDropBalance = ZERO;
+        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+
+        await subject();
+
+        const airdroppedTokens = balance.sub(preDropBalance);
+        const netBalance = balance.sub(preciseMul(airdroppedTokens, airdropFee));
+
+        const positions = await setToken.getPositions();
+        expect(positions[1].unit).to.eq(preciseDiv(netBalance, totalSupply));
+      });
+
+      it("should transfer the correct usdc amount to the setToken feeRecipient", async () => {
+        const preDropBalance = ZERO;
+        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+
+        await subject();
+
+        const airdroppedTokens = balance.sub(preDropBalance);
+        const expectedManagerTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), PRECISE_UNIT.sub(protocolFee));
+
+        const actualManagerTake = await setV2Setup.usdc.balanceOf(delegatedManager.address);
+        expect(actualManagerTake).to.eq(expectedManagerTake);
+      });
+
+      it("should transfer the correct usdc amount to the protocol feeRecipient", async () => {
+        const preDropBalance = ZERO;
+        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+
+        await subject();
+
+        const airdroppedTokens = balance.sub(preDropBalance);
+        const expectedProtocolTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), protocolFee);
+        const actualProtocolTake = await setV2Setup.usdc.balanceOf(setV2Setup.feeRecipient);
+        expect(actualProtocolTake).to.eq(expectedProtocolTake);
+      });
+
+      it("should emit the correct ComponentAbsorbed event for USDC", async () => {
+        const preDropBalance = ZERO;
+        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+
+        const airdroppedTokens = balance.sub(preDropBalance);
+        const expectedManagerTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), PRECISE_UNIT.sub(protocolFee));
+        const expectedProtocolTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), protocolFee);
+        await expect(subject()).to.emit(airdropModule, "ComponentAbsorbed").withArgs(
+          setToken.address,
+          setV2Setup.usdc.address,
+          airdroppedTokens,
+          expectedManagerTake,
+          expectedProtocolTake
+        );
+      });
+
+      it("should create the correct new eth position", async () => {
+        const totalSupply = await setToken.totalSupply();
+        const prePositions = await setToken.getPositions();
+        const preDropBalance = preciseMul(prePositions[0].unit, totalSupply);
+        const balance = await setV2Setup.weth.balanceOf(setToken.address);
+
+        await subject();
+
+        const airdroppedTokens = balance.sub(preDropBalance);
+        const netBalance = balance.sub(preciseMul(airdroppedTokens, airdropFee));
+
+        const positions = await setToken.getPositions();
+        expect(positions[0].unit).to.eq(preciseDiv(netBalance, totalSupply));
+      });
+
+      it("should transfer the correct weth amount to the setToken feeRecipient", async () => {
+        const totalSupply = await setToken.totalSupply();
+        const prePositions = await setToken.getPositions();
+        const preDropBalance = preciseMul(prePositions[0].unit, totalSupply);
+        const balance = await setV2Setup.weth.balanceOf(setToken.address);
+
+        await subject();
+
+        const airdroppedTokens = balance.sub(preDropBalance);
+        const expectedManagerTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), PRECISE_UNIT.sub(protocolFee));
+
+        const actualManagerTake = await setV2Setup.weth.balanceOf(delegatedManager.address);
+        expect(actualManagerTake).to.eq(expectedManagerTake);
+      });
+
+      it("should transfer the correct weth amount to the protocol feeRecipient", async () => {
+        const totalSupply = await setToken.totalSupply();
+        const prePositions = await setToken.getPositions();
+        const preDropBalance = preciseMul(prePositions[0].unit, totalSupply);
+        const balance = await setV2Setup.weth.balanceOf(setToken.address);
+
+        await subject();
+
+        const airdroppedTokens = balance.sub(preDropBalance);
+        const expectedProtocolTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), protocolFee);
+
+        const actualProtocolTake = await setV2Setup.weth.balanceOf(setV2Setup.feeRecipient);
+        expect(actualProtocolTake).to.eq(expectedProtocolTake);
+      });
+
+      it("should emit the correct ComponentAbsorbed event for WETH", async () => {
+        const totalSupply = await setToken.totalSupply();
+        const prePositions = await setToken.getPositions();
+        const preDropBalance = preciseMul(prePositions[0].unit, totalSupply);
+        const balance = await setV2Setup.weth.balanceOf(setToken.address);
+
+        const airdroppedTokens = balance.sub(preDropBalance);
+        const expectedManagerTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), PRECISE_UNIT.sub(protocolFee));
+        const expectedProtocolTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), protocolFee);
+        await expect(subject()).to.emit(airdropModule, "ComponentAbsorbed").withArgs(
+          setToken.address,
+          setV2Setup.weth.address,
+          airdroppedTokens,
+          expectedManagerTake,
+          expectedProtocolTake
+        );
+      });
+
+      describe("when anyoneAbsorb is false and the caller is not the DelegatedManager operator", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be approved operator");
+        });
+      });
+
+      // describe("when anyoneAbsorb is true and the caller is not the DelegatedManager operator", async () => {
+      //   beforeEach(async () => {
+      //     subjectCaller = await getRandomAccount();
+      //   });
+
+      //   it("should create the correct new usdc position", async () => {
+      //     const totalSupply = await setToken.totalSupply();
+      //     const preDropBalance = ZERO;
+      //     const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+
+      //     await subject();
+
+      //     const airdroppedTokens = balance.sub(preDropBalance);
+      //     const netBalance = balance.sub(preciseMul(airdroppedTokens, airdropFee));
+
+      //     const positions = await setToken.getPositions();
+      //     expect(positions[1].unit).to.eq(preciseDiv(netBalance, totalSupply));
+      //   });
+      // });
+
+      describe("when a passed token is not an allowed asset", async () => {
+        beforeEach(async () => {
+          subjectTokens = [setV2Setup.usdc.address, setV2Setup.wbtc.address];
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be allowed asset");
+        });
+      });
+    });
+
+    describe("#absorb", async () => {
+      let subjectSetToken: Address;
+      let subjectToken: Address;
+      let subjectCaller: Account;
+
+      beforeEach(async () => {
+        await setV2Setup.usdc.transfer(setToken.address, ether(1));
+
+        subjectSetToken = setToken.address;
+        subjectToken = setV2Setup.usdc.address;
+        subjectCaller = operator;
+      });
+
+      async function subject(): Promise<ContractTransaction> {
+        return claimExtension.connect(subjectCaller.wallet).absorb(
+          subjectSetToken,
+          subjectToken
+        );
+      }
+
+      it("should create the correct new usdc position", async () => {
+        const totalSupply = await setToken.totalSupply();
+        const preDropBalance = ZERO;
+        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+
+        await subject();
+
+        const airdroppedTokens = balance.sub(preDropBalance);
+        const netBalance = balance.sub(preciseMul(airdroppedTokens, airdropFee));
+
+        const positions = await setToken.getPositions();
+        expect(positions[1].unit).to.eq(preciseDiv(netBalance, totalSupply));
+      });
+
+      it("should transfer the correct usdc amount to the setToken feeRecipient", async () => {
+        const preDropBalance = ZERO;
+        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+
+        await subject();
+
+        const airdroppedTokens = balance.sub(preDropBalance);
+        const expectedManagerTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), PRECISE_UNIT.sub(protocolFee));
+
+        const actualManagerTake = await setV2Setup.usdc.balanceOf(delegatedManager.address);
+        expect(actualManagerTake).to.eq(expectedManagerTake);
+      });
+
+      it("should transfer the correct usdc amount to the protocol feeRecipient", async () => {
+        const preDropBalance = ZERO;
+        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+
+        await subject();
+
+        const airdroppedTokens = balance.sub(preDropBalance);
+        const expectedProtocolTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), protocolFee);
+        const actualProtocolTake = await setV2Setup.usdc.balanceOf(setV2Setup.feeRecipient);
+        expect(actualProtocolTake).to.eq(expectedProtocolTake);
+      });
+
+      it("should emit the correct ComponentAbsorbed event for USDC", async () => {
+        const preDropBalance = ZERO;
+        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+
+        const airdroppedTokens = balance.sub(preDropBalance);
+        const expectedManagerTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), PRECISE_UNIT.sub(protocolFee));
+        const expectedProtocolTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), protocolFee);
+        await expect(subject()).to.emit(airdropModule, "ComponentAbsorbed").withArgs(
+          setToken.address,
+          setV2Setup.usdc.address,
+          airdroppedTokens,
+          expectedManagerTake,
+          expectedProtocolTake
+        );
+      });
+
+      describe("when anyoneAbsorb is false and the caller is not the DelegatedManager operator", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be approved operator");
+        });
+      });
+
+      // describe("when anyoneAbsorb is true and the caller is not the DelegatedManager operator", async () => {
+      //   beforeEach(async () => {
+      //     subjectCaller = await getRandomAccount();
+      //   });
+
+      //   it("should create the correct new usdc position", async () => {
+      //     const totalSupply = await setToken.totalSupply();
+      //     const preDropBalance = ZERO;
+      //     const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+
+      //     await subject();
+
+      //     const airdroppedTokens = balance.sub(preDropBalance);
+      //     const netBalance = balance.sub(preciseMul(airdroppedTokens, airdropFee));
+
+      //     const positions = await setToken.getPositions();
+      //     expect(positions[1].unit).to.eq(preciseDiv(netBalance, totalSupply));
+      //   });
+      // });
+
+      describe("when passed token is not an allowed asset", async () => {
+        beforeEach(async () => {
+          subjectToken = setV2Setup.wbtc.address;
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be allowed asset");
+        });
+      });
+    });
+
+    describe("#addAirdrop", async () => {
+      let subjectSetToken: Address;
+      let subjectAirdrop: Address;
+      let subjectCaller: Account;
+
+      beforeEach(async () => {
+        subjectSetToken = setToken.address;
+        subjectAirdrop = setV2Setup.wbtc.address;
+        subjectCaller = owner;
+      });
+
+      async function subject(): Promise<ContractTransaction> {
+        return claimExtension.connect(subjectCaller.wallet).addAirdrop(
+          subjectSetToken,
+          subjectAirdrop
+        );
+      }
+
+      it("should add the new token", async () => {
+        await subject();
+
+        const airdrops = await airdropModule.getAirdrops(setToken.address);
+        const isAirdrop = await airdropModule.isAirdrop(setToken.address, setV2Setup.wbtc.address);
+        expect(airdrops[2]).to.eq(setV2Setup.wbtc.address);
+        expect(isAirdrop).to.be.true;
+      });
+
+      describe("when the sender is not the owner", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be owner");
+        });
+      });
+    });
+
+    describe("#removeAirdrop", async () => {
+      let subjectSetToken: Address;
+      let subjectAirdrop: Address;
+      let subjectCaller: Account;
+
+      beforeEach(async () => {
+        subjectSetToken = setToken.address;
+        subjectAirdrop = setV2Setup.usdc.address;
+        subjectCaller = owner;
+      });
+
+      async function subject(): Promise<ContractTransaction> {
+        return claimExtension.connect(subjectCaller.wallet).removeAirdrop(
+          subjectSetToken,
+          subjectAirdrop
+        );
+      }
+
+      it("should remove the token", async () => {
+        await subject();
+
+        const airdrops = await airdropModule.getAirdrops(setToken.address);
+        const isAirdrop = await airdropModule.isAirdrop(subjectSetToken, subjectAirdrop);
+        expect(airdrops).to.not.contain(subjectAirdrop);
+        expect(isAirdrop).to.be.false;
+      });
+
+      describe("when the sender is not the owner", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be owner");
+        });
+      });
+    });
+
+    describe("#updateAnyoneAbsorb", async () => {
+      let subjectSetToken: Address;
+      let subjectAnyoneAbsorb: boolean;
+      let subjectCaller: Account;
+
+      beforeEach(async () => {
+        subjectSetToken = setToken.address;
+        subjectAnyoneAbsorb = true;
+        subjectCaller = owner;
+      });
+
+      async function subject(): Promise<ContractTransaction> {
+        return claimExtension.connect(subjectCaller.wallet).updateAnyoneAbsorb(
+          subjectSetToken,
+          subjectAnyoneAbsorb
+        );
+      }
+
+      it("should flip the anyoneAbsorb indicator", async () => {
+        await subject();
+
+        const airdropSettings = await airdropModule.airdropSettings(setToken.address);
+        expect(airdropSettings.anyoneAbsorb).to.be.true;
+      });
+
+      describe("when the sender is not the owner", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be owner");
+        });
+      });
+    });
+
+    describe("#updateAirdropFeeRecipient", async () => {
+      let subjectSetToken: Address;
+      let subjectNewFeeRecipient: Address;
+      let subjectCaller: Account;
+
+      beforeEach(async () => {
+        subjectSetToken = setToken.address;
+        subjectNewFeeRecipient = await getRandomAddress();
+        subjectCaller = owner;
+      });
+
+      async function subject(): Promise<ContractTransaction> {
+        return claimExtension.connect(subjectCaller.wallet).updateAirdropFeeRecipient(
+          subjectSetToken,
+          subjectNewFeeRecipient
+        );
+      }
+
+      it("should change the fee recipient to the new address", async () => {
+        await subject();
+
+        const airdropSettings = await airdropModule.airdropSettings(setToken.address);
+        expect(airdropSettings.feeRecipient).to.eq(subjectNewFeeRecipient);
+      });
+
+      describe("when the sender is not the owner", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be owner");
+        });
+      });
+    });
+
+    describe("#updateAirdropFee", async () => {
+      let subjectSetToken: Address;
+      let subjectNewFee: BigNumber;
+      let subjectCaller: Account;
+
+      beforeEach(async () => {
+        await setV2Setup.usdc.transfer(setToken.address, ether(1));
+
+        subjectSetToken = setToken.address;
+        subjectNewFee = ether(.5);
+        subjectCaller = owner;
+      });
+
+      async function subject(): Promise<ContractTransaction> {
+        return claimExtension.connect(subjectCaller.wallet).updateAirdropFee(
+          subjectSetToken,
+          subjectNewFee
+        );
+      }
+
+      it("should create the correct new usdc position", async () => {
+        const totalSupply = await setToken.totalSupply();
+        const preDropBalance = ZERO;
+        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+
+        await subject();
+
+        const airdroppedTokens = balance.sub(preDropBalance);
+        const netBalance = balance.sub(preciseMul(airdroppedTokens, airdropFee));
+
+        const positions = await setToken.getPositions();
+        expect(positions[1].unit).to.eq(preciseDiv(netBalance, totalSupply));
+      });
+
+      it("should set the new fee", async () => {
+        await subject();
+
+        const airdropSettings = await airdropModule.airdropSettings(setToken.address);
+        expect(airdropSettings.airdropFee).to.eq(subjectNewFee);
+      });
+
+      describe("when the sender is not the owner", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be owner");
+        });
+      });
+    });
+
+    describe("#updateAnyoneClaim", async () => {
+      let subjectSetToken: Address;
+      let subjectAnyoneClaim: boolean;
+      let subjectCaller: Account;
+
+      beforeEach(async () => {
+        subjectSetToken = setToken.address;
+        subjectAnyoneClaim = true;
+        subjectCaller = owner;
+      });
+
+      async function subject(): Promise<ContractTransaction> {
+        return claimExtension.connect(subjectCaller.wallet).updateAnyoneClaim(
+          subjectSetToken,
+          subjectAnyoneClaim
+        );
+      }
+
+      it("should change the anyoneClaim indicator", async () => {
+        const anyoneClaimBefore = await claimModule.anyoneClaim(subjectSetToken);
+        expect(anyoneClaimBefore).to.eq(false);
+
+        await subject();
+
+        const anyoneClaim = await claimModule.anyoneClaim(subjectSetToken);
+        expect(anyoneClaim).to.eq(true);
+
+        subjectAnyoneClaim = false;
+        await subject();
+
+        const anyoneClaimAfter = await claimModule.anyoneClaim(subjectSetToken);
+        expect(anyoneClaimAfter).to.eq(false);
+      });
+
+      describe("when the sender is not the owner", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be owner");
+        });
+      });
+    });
+
+    describe("#addClaim", async () => {
+      let subjectSetToken: Address;
+      let subjectRewardPool: Address;
+      let subjectIntegration: string;
+      let subjectCaller: Account;
+
+      beforeEach(async () => {
+        subjectSetToken = setToken.address;
+        subjectRewardPool = await getRandomAddress();
+        subjectIntegration = claimAdapterMockIntegrationNameTwo;
+        subjectCaller = owner;
+      });
+
+      async function subject(): Promise<ContractTransaction> {
+        return claimExtension.connect(subjectCaller.wallet).addClaim(
+          subjectSetToken,
+          subjectRewardPool,
+          subjectIntegration
+        );
+      }
+
+      it("should add the rewardPool to the rewardPoolList and rewardPoolStatus", async () => {
+        expect(await claimModule.isRewardPool(subjectSetToken, subjectRewardPool)).to.be.false;
+
+        await subject();
+
+        expect(await claimModule.isRewardPool(subjectSetToken, subjectRewardPool)).to.be.true;
+        expect(await claimModule.rewardPoolList(subjectSetToken, 2)).to.eq(subjectRewardPool);
+      });
+
+      it("should add new integration for the rewardPool", async () => {
+        const rewardPoolClaimsBefore = await claimModule.getRewardPoolClaims(setToken.address, subjectRewardPool);
+        const isIntegrationAddedBefore = await claimModule.claimSettingsStatus(setToken.address, subjectRewardPool, claimAdapterMockTwo.address);
+        expect(rewardPoolClaimsBefore.length).to.eq(0);
+        expect(isIntegrationAddedBefore).to.be.false;
+
+        await subject();
+
+        const rewardPoolClaims = await claimModule.getRewardPoolClaims(setToken.address, subjectRewardPool);
+        const isIntegrationAdded = await claimModule.claimSettingsStatus(setToken.address, subjectRewardPool, claimAdapterMockTwo.address);
+        expect(rewardPoolClaims.length).to.eq(1);
+        expect(rewardPoolClaims[0]).to.eq(claimAdapterMockTwo.address);
+        expect(isIntegrationAdded).to.be.true;
+      });
+
+      describe("when the sender is not the owner", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be owner");
+        });
+      });
+    });
+
+    describe("#batchAddClaim", async () => {
+      let subjectSetToken: Address;
+      let subjectRewardPools: Address[];
+      let subjectIntegrations: string[];
+      let subjectCaller: Account;
+
+      beforeEach(async () => {
+        subjectSetToken = setToken.address;
+        const [rewardPoolOne, rewardPoolTwo] = [await getRandomAddress(), await getRandomAddress()];
+        subjectRewardPools = [rewardPoolOne, rewardPoolOne, rewardPoolTwo];
+        subjectIntegrations = [claimAdapterMockIntegrationNameOne, claimAdapterMockIntegrationNameTwo, claimAdapterMockIntegrationNameOne];
+        subjectCaller = owner;
+      });
+
+      async function subject(): Promise<ContractTransaction> {
+        return claimExtension.connect(subjectCaller.wallet).batchAddClaim(
+          subjectSetToken,
+          subjectRewardPools,
+          subjectIntegrations
+        );
+      }
+
+      it("should add the rewardPools to the rewardPoolList", async () => {
+        const isFirstAddedBefore = await claimModule.rewardPoolStatus(subjectSetToken, subjectRewardPools[0]);
+        const isSecondAddedBefore = await claimModule.rewardPoolStatus(subjectSetToken, subjectRewardPools[2]);
+        expect((await claimModule.getRewardPools(subjectSetToken)).length).to.eq(2);
+        expect(isFirstAddedBefore).to.be.false;
+        expect(isSecondAddedBefore).to.be.false;
+
+        await subject();
+
+        const rewardPools = await claimModule.getRewardPools(subjectSetToken);
+        const isFirstAdded = await claimModule.rewardPoolStatus(subjectSetToken, subjectRewardPools[0]);
+        const isSecondAdded = await claimModule.rewardPoolStatus(subjectSetToken, subjectRewardPools[2]);
+        expect(rewardPools.length).to.eq(4);
+        expect(rewardPools[2]).to.eq(subjectRewardPools[0]);
+        expect(rewardPools[3]).to.eq(subjectRewardPools[2]);
+        expect(isFirstAdded).to.be.true;
+        expect(isSecondAdded).to.be.true;
+      });
+
+      it("should add all new integrations for the rewardPools", async () => {
+        await subject();
+
+        const rewardPoolOneClaims = await claimModule.getRewardPoolClaims(setToken.address, subjectRewardPools[0]);
+        const rewardPoolTwoClaims = await claimModule.getRewardPoolClaims(setToken.address, subjectRewardPools[2]);
+        const isFirstIntegrationAddedPool1 = await claimModule.claimSettingsStatus(
+          setToken.address,
+          subjectRewardPools[0],
+          claimAdapterMockOne.address
+        );
+        const isSecondIntegrationAddedPool1 = await claimModule.claimSettingsStatus(
+          setToken.address,
+          subjectRewardPools[1],
+          claimAdapterMockTwo.address
+        );
+        const isIntegrationAddedPool2 = await claimModule.claimSettingsStatus(
+          setToken.address,
+          subjectRewardPools[0],
+          claimAdapterMockOne.address
+        );
+        expect(rewardPoolOneClaims[0]).to.eq(claimAdapterMockOne.address);
+        expect(rewardPoolOneClaims[1]).to.eq(claimAdapterMockTwo.address);
+        expect(rewardPoolTwoClaims[0]).to.eq(claimAdapterMockOne.address);
+        expect(isFirstIntegrationAddedPool1).to.be.true;
+        expect(isSecondIntegrationAddedPool1).to.be.true;
+        expect(isIntegrationAddedPool2).to.be.true;
+      });
+
+      describe("when the sender is not the owner", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be owner");
+        });
+      });
+    });
+
+    describe("#removeClaim", async () => {
+      let subjectSetToken: Address;
+      let subjectRewardPool: Address;
+      let subjectIntegration: string;
+      let subjectCaller: Account;
+
+      beforeEach(async () => {
+        subjectSetToken = setToken.address;
+        subjectRewardPool = await getRandomAddress();
+        subjectIntegration = claimAdapterMockIntegrationNameOne;
+        subjectCaller = owner;
+
+        await claimExtension.connect(subjectCaller.wallet).addClaim(
+          subjectSetToken,
+          subjectRewardPool,
+          subjectIntegration
+        );
+      });
+
+      async function subject(): Promise<ContractTransaction> {
+        return claimExtension.connect(subjectCaller.wallet).removeClaim(
+          subjectSetToken,
+          subjectRewardPool,
+          subjectIntegration
+        );
+      }
+
+      it("should remove the adapter associated to the reward pool", async () => {
+        const rewardPoolClaimsBefore = await claimModule.getRewardPoolClaims(setToken.address, subjectRewardPool);
+        const isAdapterAddedBefore = await claimModule.claimSettingsStatus(setToken.address, subjectRewardPool, claimAdapterMockOne.address);
+        expect(rewardPoolClaimsBefore.length).to.eq(1);
+        expect(isAdapterAddedBefore).to.be.true;
+
+        await subject();
+
+        const rewardPoolClaims = await claimModule.getRewardPoolClaims(setToken.address, subjectRewardPool);
+        const isAdapterAdded = await claimModule.claimSettingsStatus(setToken.address, subjectRewardPool, claimAdapterMockOne.address);
+        expect(rewardPoolClaims.length).to.eq(0);
+        expect(isAdapterAdded).to.be.false;
+      });
+
+      it("should remove the rewardPool from the rewardPoolStatus", async () => {
+        expect(await claimModule.isRewardPool(setToken.address, subjectRewardPool)).to.be.true;
+
+        await subject();
+
+        expect(await claimModule.isRewardPool(setToken.address, subjectRewardPool)).to.be.false;
+      });
+
+      describe("when the sender is not the owner", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be owner");
+        });
+      });
+    });
+
+    describe("#batchRemoveClaim", async () => {
+      let subjectSetToken: Address;
+      let subjectRewardPools: Address[];
+      let subjectIntegrations: string[];
+      let subjectCaller: Account;
+
+      beforeEach(async () => {
+        subjectSetToken = setToken.address;
+        subjectRewardPools = [await getRandomAddress(), await getRandomAddress()];
+        subjectIntegrations = [claimAdapterMockIntegrationNameOne, claimAdapterMockIntegrationNameTwo];
+        subjectCaller = owner;
+
+        await claimExtension.connect(subjectCaller.wallet).batchAddClaim(
+          subjectSetToken,
+          subjectRewardPools,
+          subjectIntegrations
+        );
+      });
+
+      async function subject(): Promise<ContractTransaction> {
+        return claimExtension.connect(subjectCaller.wallet).batchRemoveClaim(
+          subjectSetToken,
+          subjectRewardPools,
+          subjectIntegrations
+        );
+      }
+
+      it("should remove the adapter associated to the reward pool", async () => {
+        const rewardPoolOneClaimsBefore = await claimModule.getRewardPoolClaims(setToken.address, subjectRewardPools[0]);
+        const rewardPoolTwoClaimsBefore = await claimModule.getRewardPoolClaims(setToken.address, subjectRewardPools[1]);
+        const isRewardPoolOneAdapterOneBefore = await claimModule.claimSettingsStatus(
+          setToken.address,
+          subjectRewardPools[0],
+          claimAdapterMockOne.address
+        );
+        const isRewardPoolTwoAdapterTwoBefore = await claimModule.claimSettingsStatus(
+          setToken.address,
+          subjectRewardPools[1],
+          claimAdapterMockTwo.address
+        );
+        expect(rewardPoolOneClaimsBefore.length).to.eq(1);
+        expect(rewardPoolTwoClaimsBefore.length).to.eq(1);
+        expect(isRewardPoolOneAdapterOneBefore).to.be.true;
+        expect(isRewardPoolTwoAdapterTwoBefore).to.be.true;
+
+        await subject();
+
+        const rewardPoolOneClaims = await claimModule.getRewardPoolClaims(setToken.address, subjectRewardPools[0]);
+        const rewardPoolTwoClaims = await claimModule.getRewardPoolClaims(setToken.address, subjectRewardPools[1]);
+        const isRewardPoolOneAdapterOne = await claimModule.claimSettingsStatus(setToken.address, subjectRewardPools[0], claimAdapterMockOne.address);
+        const isRewardPoolTwoAdapterTwo = await claimModule.claimSettingsStatus(setToken.address, subjectRewardPools[1], claimAdapterMockTwo.address);
+        expect(rewardPoolOneClaims.length).to.eq(0);
+        expect(rewardPoolTwoClaims.length).to.eq(0);
+        expect(isRewardPoolOneAdapterOne).to.be.false;
+        expect(isRewardPoolTwoAdapterTwo).to.be.false;
+
+      });
+
+      it("should remove the rewardPool from the rewardPoolStatus", async () => {
+        expect(await claimModule.isRewardPool(subjectSetToken, subjectRewardPools[0])).to.be.true;
+        expect(await claimModule.isRewardPool(subjectSetToken, subjectRewardPools[1])).to.be.true;
+
+        await subject();
+
+        expect(await claimModule.isRewardPool(subjectSetToken, subjectRewardPools[0])).to.be.false;
+        expect(await claimModule.isRewardPool(subjectSetToken, subjectRewardPools[1])).to.be.false;
+      });
+
+      describe("when the sender is not the owner", async () => {
+        beforeEach(async () => {
+          subjectCaller = await getRandomAccount();
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be owner");
+        });
       });
     });
   });

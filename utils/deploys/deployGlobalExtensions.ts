@@ -36,12 +36,14 @@ export default class DeployGlobalExtensions {
   public async deployClaimExtension(
     managerCore: Address,
     airdropModule: Address,
-    claimModule: Address
+    claimModule: Address,
+    integrationRegistry: Address
   ): Promise<ClaimExtension> {
     return await new ClaimExtension__factory(this._deployerSigner).deploy(
       managerCore,
       airdropModule,
-      claimModule
+      claimModule,
+      integrationRegistry
     );
   }
 
