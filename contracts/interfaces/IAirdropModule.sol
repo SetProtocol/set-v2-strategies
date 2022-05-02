@@ -20,9 +20,13 @@ pragma solidity 0.6.10;
 pragma experimental "ABIEncoderV2";
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import { AddressArrayUtils } from "@setprotocol/set-protocol-v2/contracts/lib/AddressArrayUtils.sol";
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 interface IAirdropModule {
+    using AddressArrayUtils for address[];
+
     struct AirdropSettings {
         address[] airdrops;                     // Array of tokens manager is allowing to be absorbed
         address feeRecipient;                   // Address airdrop fees are sent to
@@ -30,9 +34,15 @@ interface IAirdropModule {
         bool anyoneAbsorb;                      // Boolean indicating if any address can call absorb or just the manager
     }
 
+    struct AirdropReturnSettings {
+        address feeRecipient;
+        uint256 airdropFee;
+        bool anyoneAbsorb;
+    }
+
     function initialize(ISetToken _setToken, AirdropSettings memory _airdropSettings) external;
 
-    function airdropSettings(ISetToken _setToken) external view returns(AirdropSettings memory);
+    function airdropSettings(ISetToken _setToken) external view returns(AirdropReturnSettings memory);
     function batchAbsorb(ISetToken _setToken, address[] memory _tokens) external;
     function absorb(ISetToken _setToken, IERC20 _token) external;
     function addAirdrop(ISetToken _setToken, IERC20 _airdrop) external;

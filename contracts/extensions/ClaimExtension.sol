@@ -30,8 +30,6 @@ import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
 import { IManagerCore } from "../interfaces/IManagerCore.sol";
 
-import "hardhat/console.sol";
-
 /**
  * @title ClaimExtension
  * @author Set Protocol
@@ -66,15 +64,15 @@ contract ClaimExtension is BaseGlobalExtension {
     }
 
     /**
-     * Throws if
+     * Throws if anyoneAbsorb is false and caller is not the operator
      */
     modifier onlyValidAbsorbCaller(ISetToken _setToken) {
-        require(_isValidAbsorbCaller(_setToken), "Must be valid AirdropModule caller");
+        require(_isValidAbsorbCaller(_setToken), "Must be valid AirdropModule absorb caller");
         _;
     }
 
     modifier onlyValidClaimAndAbsorbCaller(ISetToken _setToken) {
-        require(_isValidClaimAndAbsorbCaller(_setToken), "Must be valid ClaimModule caller");
+        require(_isValidClaimAndAbsorbCaller(_setToken), "Must be valid AirdropModule absorb and ClaimModule claim caller");
         _;
     }
 
@@ -216,7 +214,7 @@ contract ClaimExtension is BaseGlobalExtension {
         address[] memory _tokens
     )
         external
-        onlyOperator(_setToken) // onlyValidAbsorbCaller(_setToken)
+        onlyValidAbsorbCaller(_setToken)
         onlyAllowedAssets(_setToken, _tokens)
     {
         bytes memory callData = abi.encodeWithSelector(
@@ -239,7 +237,7 @@ contract ClaimExtension is BaseGlobalExtension {
         IERC20 _token
     )
         external
-        onlyOperator(_setToken) // onlyValidAbsorbCaller(_setToken)
+        onlyValidAbsorbCaller(_setToken)
         onlyAllowedAsset(_setToken, address(_token))
     {
         bytes memory callData = abi.encodeWithSelector(
@@ -360,10 +358,12 @@ contract ClaimExtension is BaseGlobalExtension {
         string calldata _integrationName
     )
         external
-        onlyOperator(_setToken) // onlyValidClaimAndAbsorbCaller(_setToken)
+        onlyValidClaimAndAbsorbCaller(_setToken)
     {
         IClaimAdapter adapter = IClaimAdapter(integrationRegistry.getIntegrationAdapter(address(claimModule), _integrationName));
         IERC20 rewardsToken = adapter.getTokenAddress(_rewardPool);
+
+        require(_manager(_setToken).isAllowedAsset(address(rewardsToken)), "Must be allowed asset");
 
         bytes memory claimCallData = abi.encodeWithSelector(
             IClaimModule.claim.selector,
@@ -387,7 +387,7 @@ contract ClaimExtension is BaseGlobalExtension {
         string[] calldata _integrationNames
     )
         external
-        onlyOperator(_setToken) // onlyValidClaimAndAbsorbCaller(_setToken)
+        onlyValidClaimAndAbsorbCaller(_setToken)
     {
         bytes memory claimCallData = abi.encodeWithSelector(
             IClaimModule.batchClaim.selector,
