@@ -397,17 +397,19 @@ contract ClaimExtension is BaseGlobalExtension {
         );
         _invokeManager(_manager(_setToken), address(claimModule), claimCallData);
 
-        address[] storage rewardTokens;
+        address[] storage uniqueRewardsTokens;
         uint256 numPools = _rewardPools.length;
         for (uint256 i = 0; i < numPools; i++) {
             IClaimAdapter adapter = IClaimAdapter(integrationRegistry.getIntegrationAdapter(address(claimModule), _integrationNames[i]));
-            rewardTokens.push(address(adapter.getTokenAddress(_rewardPools[i])));
+            address rewardsToken = address(adapter.getTokenAddress(_rewardPools[i]));
+            require(_manager(_setToken).isAllowedAsset(rewardsToken), "Must be allowed asset");
+            uniqueRewardsTokens.push(rewardsToken);
         }
 
         bytes memory absorbCallData = abi.encodeWithSelector(
             IAirdropModule.batchAbsorb.selector,
             _setToken,
-            rewardTokens
+            uniqueRewardsTokens
         );
         _invokeManager(_manager(_setToken), address(airdropModule), absorbCallData);
     }
