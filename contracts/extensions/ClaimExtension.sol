@@ -20,11 +20,14 @@ pragma solidity 0.6.10;
 pragma experimental "ABIEncoderV2";
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
+
+// import { IAirdropModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IAirdropModule.sol"; // need to add this to set-protocol-v2
 import { IAirdropModule } from "../interfaces/IAirdropModule.sol";
-import { IClaimModule } from "../interfaces/IClaimModule.sol";
 import { IClaimAdapter } from "@setprotocol/set-protocol-v2/contracts/interfaces/IClaimAdapter.sol";
+// import { IClaimModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IClaimModule.sol"; // need to add this to set-protocol-v2
+import { IClaimModule } from "../interfaces/IClaimModule.sol";
 import { IIntegrationRegistry } from "@setprotocol/set-protocol-v2/contracts/interfaces/IIntegrationRegistry.sol";
+import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
@@ -34,9 +37,11 @@ import { IManagerCore } from "../interfaces/IManagerCore.sol";
  * @title ClaimExtension
  * @author Set Protocol
  *
- * Smart contract global extension which provides DelegatedManager operator(s) the ability to
- * - claim tokens from external protocols given to a Set as part of participating in incentivized activities of other protocols
+ * Smart contract global extension which provides DelegatedManager owner the ability to perform administrative tasks on the AirdropModule
+ * and the ClaimModule and the DelegatedManager operator(s) the ability to
  * - absorb tokens sent to the SetToken into the token's positions
+ * - claim tokens from external protocols given to a Set as part of participating in incentivized activities of other protocols
+ *     and absorb them into the SetToken's positions in a single transaction
  */
 contract ClaimExtension is BaseGlobalExtension {
 
@@ -49,18 +54,12 @@ contract ClaimExtension is BaseGlobalExtension {
 
     /* ============ Modifiers ============ */
 
+    /**
+     * Throws if useAssetAllowList is true and one of the assets is not on the asset allow list
+     */
     modifier onlyAllowedAssets(ISetToken _setToken, address[] memory _assets) {
-        IDelegatedManager manager = _manager(_setToken);
-        if (!manager.useAssetAllowlist()) {
-            _;
-        }
-        else {
-            uint256 assetsLength = _assets.length;
-            for (uint i = 0; i < assetsLength; i++) {
-                require(manager.assetAllowlist(_assets[i]), "Must be allowed asset");
-            }
-            _;
-        }
+        _validateAllowedAssets(_setToken, _assets);
+        _;
     }
 
     /**
@@ -220,12 +219,7 @@ contract ClaimExtension is BaseGlobalExtension {
         onlyValidAbsorbCaller(_setToken)
         onlyAllowedAssets(_setToken, _tokens)
     {
-        bytes memory callData = abi.encodeWithSelector(
-            IAirdropModule.batchAbsorb.selector,
-            _setToken,
-            _tokens
-        );
-        _invokeManager(_manager(_setToken), address(airdropModule), callData);
+        _batchAbsorb(_setToken, _tokens);
     }
 
     /**
@@ -243,12 +237,7 @@ contract ClaimExtension is BaseGlobalExtension {
         onlyValidAbsorbCaller(_setToken)
         onlyAllowedAsset(_setToken, address(_token))
     {
-        bytes memory callData = abi.encodeWithSelector(
-            IAirdropModule.absorb.selector,
-            _setToken,
-            _token
-        );
-        _invokeManager(_manager(_setToken), address(airdropModule), callData);
+        _absorb(_setToken, _token);
     }
 
     /**
@@ -372,25 +361,11 @@ contract ClaimExtension is BaseGlobalExtension {
         external
         onlyValidClaimAndAbsorbCaller(_setToken)
     {
-        IClaimAdapter adapter = IClaimAdapter(integrationRegistry.getIntegrationAdapter(address(claimModule), _integrationName));
-        IERC20 rewardsToken = adapter.getTokenAddress(_rewardPool);
+        IERC20 rewardsToken = _getAndValidateRewardsToken(_setToken, _rewardPool, _integrationName);
 
-        require(_manager(_setToken).isAllowedAsset(address(rewardsToken)), "Must be allowed asset");
+        _claim(_setToken, _rewardPool, _integrationName);
 
-        bytes memory claimCallData = abi.encodeWithSelector(
-            IClaimModule.claim.selector,
-            _setToken,
-            _rewardPool,
-            _integrationName
-        );
-        _invokeManager(_manager(_setToken), address(claimModule), claimCallData);
-
-        bytes memory absorbCallData = abi.encodeWithSelector(
-            IAirdropModule.absorb.selector,
-            _setToken,
-            rewardsToken
-        );
-        _invokeManager(_manager(_setToken), address(airdropModule), absorbCallData);
+        _absorb(_setToken, rewardsToken);
     }
 
     /**
@@ -398,7 +373,7 @@ contract ClaimExtension is BaseGlobalExtension {
      * into positions. If airdropFee defined, send portion of each reward token to feeRecipient and a portion to protocol feeRecipient address.
      * Callable only by operator unless anyoneAbsorb on the AirdropModule and anyoneClaim on the ClaimModule are true.
      *
-     * @param _setToken                 Address of SetToken
+     * @param _setToken             Address of SetToken
      * @param _rewardPools          Addresses of rewardPools that identifies the contract governing claims. Maps to same index integrationNames
      * @param _integrationNames     Human-readable names matching adapter used to collect claim on pool. Maps to same index in rewardPools
      */
@@ -410,29 +385,16 @@ contract ClaimExtension is BaseGlobalExtension {
         external
         onlyValidClaimAndAbsorbCaller(_setToken)
     {
-        bytes memory claimCallData = abi.encodeWithSelector(
-            IClaimModule.batchClaim.selector,
-            _setToken,
-            _rewardPools,
-            _integrationNames
-        );
-        _invokeManager(_manager(_setToken), address(claimModule), claimCallData);
-
-        address[] storage uniqueRewardsTokens;
+        address[] storage rewardsTokens;
         uint256 numPools = _rewardPools.length;
         for (uint256 i = 0; i < numPools; i++) {
-            IClaimAdapter adapter = IClaimAdapter(integrationRegistry.getIntegrationAdapter(address(claimModule), _integrationNames[i]));
-            address rewardsToken = address(adapter.getTokenAddress(_rewardPools[i]));
-            require(_manager(_setToken).isAllowedAsset(rewardsToken), "Must be allowed asset");
-            uniqueRewardsTokens.push(rewardsToken);
+            IERC20 token = _getAndValidateRewardsToken(_setToken, _rewardPools[i], _integrationNames[i]);
+            rewardsTokens.push(address(token));
         }
 
-        bytes memory absorbCallData = abi.encodeWithSelector(
-            IAirdropModule.batchAbsorb.selector,
-            _setToken,
-            uniqueRewardsTokens
-        );
-        _invokeManager(_manager(_setToken), address(airdropModule), absorbCallData);
+        _batchClaim(_setToken, _rewardPools, _integrationNames);
+
+        _batchAbsorb(_setToken, rewardsTokens);
     }
 
     /**
@@ -614,14 +576,115 @@ contract ClaimExtension is BaseGlobalExtension {
         _invokeManager(_delegatedManager, address(claimModule), callData);
     }
 
+    /**
+     * Must have all assets on asset allow list or useAssetAllowlist to be false
+     */
+    function _validateAllowedAssets(ISetToken _setToken, address[] memory _assets) internal view {
+        IDelegatedManager manager = _manager(_setToken);
+        if (manager.useAssetAllowlist()) {
+            uint256 assetsLength = _assets.length;
+            for (uint i = 0; i < assetsLength; i++) {
+                require(manager.assetAllowlist(_assets[i]), "Must be allowed asset");
+            }
+        }
+    }
+
+    /**
+     * AirdropModule anyoneAbsorb setting must be true or must be operator
+     *
+     * @param _setToken             Instance of the SetToken corresponding to the DelegatedManager
+     */
     function _isValidAbsorbCaller(ISetToken _setToken) internal view returns(bool) {
         return airdropModule.airdropSettings(_setToken).anyoneAbsorb || _manager(_setToken).operatorAllowlist(msg.sender);
     }
 
+    /**
+     * Must be operator or must have both AirdropModule anyoneAbsorb and ClaimModule anyoneClaim
+     *
+     * @param _setToken             Instance of the SetToken corresponding to the DelegatedManager
+     */
     function _isValidClaimAndAbsorbCaller(ISetToken _setToken) internal view returns(bool) {
         return (
             (claimModule.anyoneClaim(_setToken) && airdropModule.airdropSettings(_setToken).anyoneAbsorb)
             || _manager(_setToken).operatorAllowlist(msg.sender)
         );
+    }
+
+    /**
+     * Absorb specified token into position. If airdropFee defined, send portion to feeRecipient and portion to protocol feeRecipient address.
+     *
+     * @param _setToken                 Address of SetToken
+     * @param _token                    Address of token to absorb
+     */
+    function _absorb(ISetToken _setToken, IERC20 _token) internal {
+        bytes memory callData = abi.encodeWithSelector(
+            IAirdropModule.absorb.selector,
+            _setToken,
+            _token
+        );
+        _invokeManager(_manager(_setToken), address(airdropModule), callData);
+    }
+
+    /**
+     * Absorb passed tokens into respective positions. If airdropFee defined, send portion to feeRecipient and portion to protocol feeRecipient address.
+     *
+     * @param _setToken                 Address of SetToken
+     * @param _tokens                   Array of tokens to absorb
+     */
+     function _batchAbsorb(ISetToken _setToken, address[] memory _tokens) internal {
+        bytes memory callData = abi.encodeWithSelector(
+            IAirdropModule.batchAbsorb.selector,
+            _setToken,
+            _tokens
+        );
+        _invokeManager(_manager(_setToken), address(airdropModule), callData);
+     }
+
+    /**
+     * Claim the rewards available on the rewardPool for the specified claim integration and absorb the reward token into position.
+     *
+     * @param _setToken                 Address of SetToken
+     * @param _rewardPool               Address of the rewardPool that identifies the contract governing claims
+     * @param _integrationName          ID of claim module integration (mapping on integration registry)
+     */
+    function _claim(ISetToken _setToken, address _rewardPool, string calldata _integrationName) internal {
+        bytes memory callData = abi.encodeWithSelector(
+            IClaimModule.claim.selector,
+            _setToken,
+            _rewardPool,
+            _integrationName
+        );
+        _invokeManager(_manager(_setToken), address(claimModule), callData);
+    }
+
+    /**
+     * Claims rewards on all the passed rewardPool/claim integration pairs and absorb the reward tokens into positions.
+     *
+     * @param _setToken             Address of SetToken
+     * @param _rewardPools          Addresses of rewardPools that identifies the contract governing claims. Maps to same index integrationNames
+     * @param _integrationNames     Human-readable names matching adapter used to collect claim on pool. Maps to same index in rewardPools
+     */
+    function _batchClaim(ISetToken _setToken, address[] calldata _rewardPools, string[] calldata _integrationNames) internal {
+        bytes memory callData = abi.encodeWithSelector(
+            IClaimModule.batchClaim.selector,
+            _setToken,
+            _rewardPools,
+            _integrationNames
+        );
+        _invokeManager(_manager(_setToken), address(claimModule), callData);
+    }
+
+    /**
+     * Get the rewards token from the rewardPool and integrationName and check if it is an allowed asset on the DelegatedManager
+     *
+     * @param _setToken                 Address of SetToken
+     * @param _rewardPool               Address of the rewardPool that identifies the contract governing claims
+     * @param _integrationName          ID of claim module integration (mapping on integration registry)
+     */
+    function _getAndValidateRewardsToken(ISetToken _setToken, address _rewardPool, string calldata _integrationName) internal view returns(IERC20) {
+        IClaimAdapter adapter = IClaimAdapter(integrationRegistry.getIntegrationAdapter(address(claimModule), _integrationName));
+        IERC20 rewardsToken = adapter.getTokenAddress(_rewardPool);
+        require(_manager(_setToken).isAllowedAsset(address(rewardsToken)), "Must be allowed asset");
+        return rewardsToken;
     }
 }

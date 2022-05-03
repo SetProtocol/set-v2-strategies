@@ -835,13 +835,19 @@ describe("ClaimExtension", () => {
     });
 
     describe("#batchAbsorb", async () => {
+      let airdropOne: BigNumber;
+      let airdropTwo: BigNumber;
+
       let subjectSetToken: Address;
       let subjectTokens: Address[];
       let subjectCaller: Account;
 
       beforeEach(async () => {
-        await setV2Setup.usdc.transfer(setToken.address, ether(1));
-        await setV2Setup.weth.transfer(setToken.address, ether(1));
+        airdropOne = ether(100);
+        airdropTwo = ether(1);
+
+        await setV2Setup.usdc.transfer(setToken.address, airdropOne);
+        await setV2Setup.weth.transfer(setToken.address, airdropTwo);
 
         subjectSetToken = setToken.address;
         subjectTokens = [setV2Setup.usdc.address, setV2Setup.weth.address];
@@ -856,73 +862,74 @@ describe("ClaimExtension", () => {
       }
 
       it("should create the correct new usdc position", async () => {
-        const totalSupply = await setToken.totalSupply();
-        const preDropBalance = ZERO;
-        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+        const balanceBefore = await setV2Setup.usdc.balanceOf(setToken.address);
+        expect(balanceBefore).to.eq(airdropOne);
 
         await subject();
 
-        const airdroppedTokens = balance.sub(preDropBalance);
-        const netBalance = balance.sub(preciseMul(airdroppedTokens, airdropFee));
+        const totalSupply = await setToken.totalSupply();
+        const actualBalanceAfter = await setV2Setup.usdc.balanceOf(setToken.address);
+
+        const expectedBalanceAfter = airdropOne.sub(preciseMul(airdropOne, airdropFee));
+        expect(actualBalanceAfter).to.eq(expectedBalanceAfter);
 
         const positions = await setToken.getPositions();
-        expect(positions[1].unit).to.eq(preciseDiv(netBalance, totalSupply));
+        const expectedUnitAfter = preciseDiv(expectedBalanceAfter, totalSupply);
+        expect(positions[1].component).to.eq(setV2Setup.usdc.address);
+        expect(positions[1].unit).to.eq(expectedUnitAfter);
       });
 
       it("should transfer the correct usdc amount to the setToken feeRecipient", async () => {
-        const preDropBalance = ZERO;
-        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+        const balanceBefore = await setV2Setup.usdc.balanceOf(setToken.address);
+        expect(balanceBefore).to.eq(airdropOne);
 
         await subject();
 
-        const airdroppedTokens = balance.sub(preDropBalance);
-        const expectedManagerTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), PRECISE_UNIT.sub(protocolFee));
-
         const actualManagerTake = await setV2Setup.usdc.balanceOf(delegatedManager.address);
+        const expectedManagerTake = preciseMul(preciseMul(airdropOne, airdropFee), PRECISE_UNIT.sub(protocolFee));
         expect(actualManagerTake).to.eq(expectedManagerTake);
       });
 
       it("should transfer the correct usdc amount to the protocol feeRecipient", async () => {
-        const preDropBalance = ZERO;
-        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+        const balanceBefore = await setV2Setup.usdc.balanceOf(setToken.address);
+        expect(balanceBefore).to.eq(airdropOne);
 
         await subject();
 
-        const airdroppedTokens = balance.sub(preDropBalance);
-        const expectedProtocolTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), protocolFee);
         const actualProtocolTake = await setV2Setup.usdc.balanceOf(setV2Setup.feeRecipient);
+        const expectedProtocolTake = preciseMul(preciseMul(airdropOne, airdropFee), protocolFee);
         expect(actualProtocolTake).to.eq(expectedProtocolTake);
       });
 
       it("should emit the correct ComponentAbsorbed event for USDC", async () => {
-        const preDropBalance = ZERO;
-        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
-
-        const airdroppedTokens = balance.sub(preDropBalance);
-        const expectedManagerTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), PRECISE_UNIT.sub(protocolFee));
-        const expectedProtocolTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), protocolFee);
+        const expectedManagerTake = preciseMul(preciseMul(airdropOne, airdropFee), PRECISE_UNIT.sub(protocolFee));
+        const expectedProtocolTake = preciseMul(preciseMul(airdropOne, airdropFee), protocolFee);
         await expect(subject()).to.emit(airdropModule, "ComponentAbsorbed").withArgs(
           setToken.address,
           setV2Setup.usdc.address,
-          airdroppedTokens,
+          airdropOne,
           expectedManagerTake,
           expectedProtocolTake
         );
       });
 
-      it("should create the correct new eth position", async () => {
+      it("should add the correct amount to the existing weth position", async () => {
         const totalSupply = await setToken.totalSupply();
         const prePositions = await setToken.getPositions();
-        const preDropBalance = preciseMul(prePositions[0].unit, totalSupply);
-        const balance = await setV2Setup.weth.balanceOf(setToken.address);
+        const knownBalance = preciseMul(prePositions[0].unit, totalSupply);
+        const balanceBefore = await setV2Setup.weth.balanceOf(setToken.address);
+        expect(airdropTwo).to.eq(balanceBefore.sub(knownBalance));
 
         await subject();
 
-        const airdroppedTokens = balance.sub(preDropBalance);
-        const netBalance = balance.sub(preciseMul(airdroppedTokens, airdropFee));
+        const expectedAirdropAmount = airdropTwo.sub(preciseMul(airdropTwo, airdropFee));
+        const expectedBalanceAfter = knownBalance.add(expectedAirdropAmount);
 
-        const positions = await setToken.getPositions();
-        expect(positions[0].unit).to.eq(preciseDiv(netBalance, totalSupply));
+        const actualBalanceAfter = await setV2Setup.weth.balanceOf(setToken.address);
+        expect(actualBalanceAfter).to.eq(expectedBalanceAfter);
+
+        const postPositions = await setToken.getPositions();
+        expect(postPositions[0].unit).to.eq(preciseDiv(expectedBalanceAfter, totalSupply));
       });
 
       it("should transfer the correct weth amount to the setToken feeRecipient", async () => {
@@ -991,17 +998,40 @@ describe("ClaimExtension", () => {
         });
 
         it("should create the correct new usdc position", async () => {
-          const totalSupply = await setToken.totalSupply();
-          const preDropBalance = ZERO;
-          const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+          const balanceBefore = await setV2Setup.usdc.balanceOf(setToken.address);
+          expect(balanceBefore).to.eq(airdropOne);
 
           await subject();
 
-          const airdroppedTokens = balance.sub(preDropBalance);
-          const netBalance = balance.sub(preciseMul(airdroppedTokens, airdropFee));
+          const totalSupply = await setToken.totalSupply();
+          const actualBalanceAfter = await setV2Setup.usdc.balanceOf(setToken.address);
+
+          const expectedBalanceAfter = airdropOne.sub(preciseMul(airdropOne, airdropFee));
+          expect(actualBalanceAfter).to.eq(expectedBalanceAfter);
 
           const positions = await setToken.getPositions();
-          expect(positions[1].unit).to.eq(preciseDiv(netBalance, totalSupply));
+          const expectedUnitAfter = preciseDiv(expectedBalanceAfter, totalSupply);
+          expect(positions[1].component).to.eq(setV2Setup.usdc.address);
+          expect(positions[1].unit).to.eq(expectedUnitAfter);
+        });
+
+        it("should add the correct amount to the existing weth position", async () => {
+          const totalSupply = await setToken.totalSupply();
+          const prePositions = await setToken.getPositions();
+          const knownBalance = preciseMul(prePositions[0].unit, totalSupply);
+          const balanceBefore = await setV2Setup.weth.balanceOf(setToken.address);
+          expect(airdropTwo).to.eq(balanceBefore.sub(knownBalance));
+
+          await subject();
+
+          const expectedAirdropAmount = airdropTwo.sub(preciseMul(airdropTwo, airdropFee));
+          const expectedBalanceAfter = knownBalance.add(expectedAirdropAmount);
+
+          const actualBalanceAfter = await setV2Setup.weth.balanceOf(setToken.address);
+          expect(actualBalanceAfter).to.eq(expectedBalanceAfter);
+
+          const postPositions = await setToken.getPositions();
+          expect(postPositions[0].unit).to.eq(preciseDiv(expectedBalanceAfter, totalSupply));
         });
       });
 
@@ -1044,12 +1074,15 @@ describe("ClaimExtension", () => {
     });
 
     describe("#absorb", async () => {
+      let airdropOne: BigNumber;
+
       let subjectSetToken: Address;
       let subjectToken: Address;
       let subjectCaller: Account;
 
       beforeEach(async () => {
-        await setV2Setup.usdc.transfer(setToken.address, ether(100));
+        airdropOne = ether(100);
+        await setV2Setup.usdc.transfer(setToken.address, airdropOne);
 
         subjectSetToken = setToken.address;
         subjectToken = setV2Setup.usdc.address;
@@ -1064,56 +1097,52 @@ describe("ClaimExtension", () => {
       }
 
       it("should create the correct new usdc position", async () => {
-        const totalSupply = await setToken.totalSupply();
-        const preDropBalance = ZERO;
-        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+        const balanceBefore = await setV2Setup.usdc.balanceOf(setToken.address);
+        expect(balanceBefore).to.eq(airdropOne);
 
         await subject();
 
-        const airdroppedTokens = balance.sub(preDropBalance);
-        const netBalance = balance.sub(preciseMul(airdroppedTokens, airdropFee));
+        const totalSupply = await setToken.totalSupply();
+        const actualBalanceAfter = await setV2Setup.usdc.balanceOf(setToken.address);
+
+        const expectedBalanceAfter = airdropOne.sub(preciseMul(airdropOne, airdropFee));
+        expect(actualBalanceAfter).to.eq(expectedBalanceAfter);
 
         const positions = await setToken.getPositions();
+        const expectedUnitAfter = preciseDiv(expectedBalanceAfter, totalSupply);
         expect(positions[1].component).to.eq(setV2Setup.usdc.address);
-        expect(positions[1].unit).to.eq(preciseDiv(netBalance, totalSupply));
+        expect(positions[1].unit).to.eq(expectedUnitAfter);
       });
 
       it("should transfer the correct usdc amount to the setToken feeRecipient", async () => {
-        const preDropBalance = ZERO;
-        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+        const balanceBefore = await setV2Setup.usdc.balanceOf(setToken.address);
+        expect(balanceBefore).to.eq(airdropOne);
 
         await subject();
 
-        const airdroppedTokens = balance.sub(preDropBalance);
-        const expectedManagerTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), PRECISE_UNIT.sub(protocolFee));
-
         const actualManagerTake = await setV2Setup.usdc.balanceOf(delegatedManager.address);
+        const expectedManagerTake = preciseMul(preciseMul(airdropOne, airdropFee), PRECISE_UNIT.sub(protocolFee));
         expect(actualManagerTake).to.eq(expectedManagerTake);
       });
 
       it("should transfer the correct usdc amount to the protocol feeRecipient", async () => {
-        const preDropBalance = ZERO;
-        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+        const balanceBefore = await setV2Setup.usdc.balanceOf(setToken.address);
+        expect(balanceBefore).to.eq(airdropOne);
 
         await subject();
 
-        const airdroppedTokens = balance.sub(preDropBalance);
-        const expectedProtocolTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), protocolFee);
         const actualProtocolTake = await setV2Setup.usdc.balanceOf(setV2Setup.feeRecipient);
+        const expectedProtocolTake = preciseMul(preciseMul(airdropOne, airdropFee), protocolFee);
         expect(actualProtocolTake).to.eq(expectedProtocolTake);
       });
 
       it("should emit the correct ComponentAbsorbed event for USDC", async () => {
-        const preDropBalance = ZERO;
-        const balance = await setV2Setup.usdc.balanceOf(setToken.address);
-
-        const airdroppedTokens = balance.sub(preDropBalance);
-        const expectedManagerTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), PRECISE_UNIT.sub(protocolFee));
-        const expectedProtocolTake = preciseMul(preciseMul(airdroppedTokens, airdropFee), protocolFee);
+        const expectedManagerTake = preciseMul(preciseMul(airdropOne, airdropFee), PRECISE_UNIT.sub(protocolFee));
+        const expectedProtocolTake = preciseMul(preciseMul(airdropOne, airdropFee), protocolFee);
         await expect(subject()).to.emit(airdropModule, "ComponentAbsorbed").withArgs(
           setToken.address,
           setV2Setup.usdc.address,
-          airdroppedTokens,
+          airdropOne,
           expectedManagerTake,
           expectedProtocolTake
         );
@@ -1137,18 +1166,21 @@ describe("ClaimExtension", () => {
         });
 
         it("should create the correct new usdc position", async () => {
-          const totalSupply = await setToken.totalSupply();
-          const preDropBalance = ZERO;
-          const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+          const balanceBefore = await setV2Setup.usdc.balanceOf(setToken.address);
+          expect(balanceBefore).to.eq(airdropOne);
 
           await subject();
 
-          const airdroppedTokens = balance.sub(preDropBalance);
-          const netBalance = balance.sub(preciseMul(airdroppedTokens, airdropFee));
+          const totalSupply = await setToken.totalSupply();
+          const actualBalanceAfter = await setV2Setup.usdc.balanceOf(setToken.address);
+
+          const expectedBalanceAfter = airdropOne.sub(preciseMul(airdropOne, airdropFee));
+          expect(actualBalanceAfter).to.eq(expectedBalanceAfter);
 
           const positions = await setToken.getPositions();
+          const expectedUnitAfter = preciseDiv(expectedBalanceAfter, totalSupply);
           expect(positions[1].component).to.eq(setV2Setup.usdc.address);
-          expect(positions[1].unit).to.eq(preciseDiv(netBalance, totalSupply));
+          expect(positions[1].unit).to.eq(expectedUnitAfter);
         });
       });
 
