@@ -64,13 +64,16 @@ contract ClaimExtension is BaseGlobalExtension {
     }
 
     /**
-     * Throws if anyoneAbsorb is false and caller is not the operator
+     * Throws if anyoneAbsorb on the AirdropModule is false and caller is not the operator
      */
     modifier onlyValidAbsorbCaller(ISetToken _setToken) {
         require(_isValidAbsorbCaller(_setToken), "Must be valid AirdropModule absorb caller");
         _;
     }
 
+    /**
+     * Throws if caller is not the operator and either anyoneAbsorb on the AirdropModule or anyoneClaim on the ClaimModule is false
+     */
     modifier onlyValidClaimAndAbsorbCaller(ISetToken _setToken) {
         require(_isValidClaimAndAbsorbCaller(_setToken), "Must be valid AirdropModule absorb and ClaimModule claim caller");
         _;
@@ -352,6 +355,15 @@ contract ClaimExtension is BaseGlobalExtension {
         _invokeManager(_manager(_setToken), address(airdropModule), callData);
     }
 
+    /**
+     * ONLY VALID CLAIM AND ABSORB CALLER: Claim the rewards available on the rewardPool for the specified claim integration and absorb
+     * the reward token into position. If airdropFee defined, send portion to feeRecipient and portion to protocol feeRecipient address.
+     * Callable only by operator unless anyoneAbsorb on the AirdropModule and anyoneClaim on the ClaimModule are true.
+     *
+     * @param _setToken                 Address of SetToken
+     * @param _rewardPool               Address of the rewardPool that identifies the contract governing claims
+     * @param _integrationName          ID of claim module integration (mapping on integration registry)
+     */
     function claimAndAbsorb(
         ISetToken _setToken,
         address _rewardPool,
@@ -381,6 +393,15 @@ contract ClaimExtension is BaseGlobalExtension {
         _invokeManager(_manager(_setToken), address(airdropModule), absorbCallData);
     }
 
+    /**
+     * ONLY VALID CLAIM AND ABSORB CALLER: Claims rewards on all the passed rewardPool/claim integration pairs and absorb the reward tokens
+     * into positions. If airdropFee defined, send portion of each reward token to feeRecipient and a portion to protocol feeRecipient address.
+     * Callable only by operator unless anyoneAbsorb on the AirdropModule and anyoneClaim on the ClaimModule are true.
+     *
+     * @param _setToken                 Address of SetToken
+     * @param _rewardPools          Addresses of rewardPools that identifies the contract governing claims. Maps to same index integrationNames
+     * @param _integrationNames     Human-readable names matching adapter used to collect claim on pool. Maps to same index in rewardPools
+     */
     function batchClaimAndAbsorb(
         ISetToken _setToken,
         address[] calldata _rewardPools,

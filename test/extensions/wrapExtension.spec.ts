@@ -468,6 +468,8 @@ describe("WrapExtension", () => {
       let subjectCaller: Account;
 
       beforeEach(async () => {
+        await delegatedManager.connect(owner.wallet).addAllowedAssets([wrapAdapterMock.address]);
+
         subjectSetToken = setToken.address;
         subjectUnderlyingToken = setV2Setup.weth.address;
         subjectWrappedToken = wrapAdapterMock.address;
@@ -524,6 +526,16 @@ describe("WrapExtension", () => {
           await expect(subject()).to.be.revertedWith("Must be approved operator");
         });
       });
+
+      describe("when the wrapped token is not an allowed asset", async () => {
+        beforeEach(async () => {
+          await delegatedManager.connect(owner.wallet).removeAllowedAssets([wrapAdapterMock.address]);
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be allowed asset");
+        });
+      });
     });
 
     describe("#wrapWithEther", async () => {
@@ -535,6 +547,8 @@ describe("WrapExtension", () => {
       let subjectCaller: Account;
 
       beforeEach(async () => {
+        await delegatedManager.connect(owner.wallet).addAllowedAssets([wrapAdapterMock.address]);
+
         subjectSetToken = setToken.address;
         subjectWrappedToken = wrapAdapterMock.address;
         subjectUnderlyingUnits = ether(1);
@@ -599,6 +613,16 @@ describe("WrapExtension", () => {
           await expect(subject()).to.be.revertedWith("Must be approved operator");
         });
       });
+
+      describe("when the wrapped token is not an allowed asset", async () => {
+        beforeEach(async () => {
+          await delegatedManager.connect(owner.wallet).removeAllowedAssets([wrapAdapterMock.address]);
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be allowed asset");
+        });
+      });
     });
 
     describe("#unwrap", async () => {
@@ -622,6 +646,8 @@ describe("WrapExtension", () => {
         subjectCaller = operator;
 
         wrappedQuantity = ether(1);
+
+        await delegatedManager.connect(owner.wallet).addAllowedAssets([wrapAdapterMock.address]);
 
         await wrapExtension.connect(operator.wallet).wrap(
           subjectSetToken,
@@ -674,6 +700,16 @@ describe("WrapExtension", () => {
           await expect(subject()).to.be.revertedWith("Must be approved operator");
         });
       });
+
+      describe("when the underlying token is not an allowed asset", async () => {
+        beforeEach(async () => {
+          await delegatedManager.connect(owner.wallet).removeAllowedAssets([setV2Setup.weth.address]);
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be allowed asset");
+        });
+      });
     });
 
     describe("#unwrapWithEther", async () => {
@@ -695,6 +731,8 @@ describe("WrapExtension", () => {
         subjectCaller = operator;
 
         wrappedQuantity = ether(1);
+
+        await delegatedManager.connect(owner.wallet).addAllowedAssets([wrapAdapterMock.address]);
 
         await wrapExtension.connect(operator.wallet).wrapWithEther(
           subjectSetToken,
@@ -753,6 +791,16 @@ describe("WrapExtension", () => {
 
         it("should revert", async () => {
           await expect(subject()).to.be.revertedWith("Must be approved operator");
+        });
+      });
+
+      describe("when the underlying token is not an allowed asset", async () => {
+        beforeEach(async () => {
+          await delegatedManager.connect(owner.wallet).removeAllowedAssets([setV2Setup.weth.address]);
+        });
+
+        it("should revert", async () => {
+          await expect(subject()).to.be.revertedWith("Must be allowed asset");
         });
       });
     });

@@ -1014,6 +1014,33 @@ describe("ClaimExtension", () => {
           await expect(subject()).to.be.revertedWith("Must be allowed asset");
         });
       });
+
+      describe("when useAssetAllowlist is false and a passed token is not on allowed asset list", async () => {
+        beforeEach(async () => {
+          await delegatedManager.connect(owner.wallet).removeAllowedAssets([setV2Setup.usdc.address]);
+          await delegatedManager.connect(owner.wallet).updateUseAssetAllowlist(false);
+
+          await setV2Setup.wbtc.transfer(setToken.address, ether(1));
+
+          await claimExtension.connect(owner.wallet).addAirdrop(setToken.address, setV2Setup.wbtc.address);
+
+          subjectTokens = [setV2Setup.usdc.address, setV2Setup.wbtc.address];
+        });
+
+        it("should create the correct new usdc position", async () => {
+          const totalSupply = await setToken.totalSupply();
+          const preDropBalance = ZERO;
+          const balance = await setV2Setup.usdc.balanceOf(setToken.address);
+
+          await subject();
+
+          const airdroppedTokens = balance.sub(preDropBalance);
+          const netBalance = balance.sub(preciseMul(airdroppedTokens, airdropFee));
+
+          const positions = await setToken.getPositions();
+          expect(positions[1].unit).to.eq(preciseDiv(netBalance, totalSupply));
+        });
+      });
     });
 
     describe("#absorb", async () => {
