@@ -863,7 +863,14 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         if (baseRebalanceUnits < 0) {
             _withdraw(oppositeBoundUnits);
 
-            _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, true);
+            // `_withdraw` sets position units to oppositeBoundUnits. The SetToken converts the real units, in this case oppositeBoundUnits,
+            // to virtual units and stores the virtual units. Converting the stored virtual units back to real units will return oppositeBoundUnits
+            // when position multiplier == 1e18 and oppositeBoundUnits - 1 when position mulitplier < 1e18. Hence, trying to trade
+            // oppositeBoundUnits worth of collateral when position unit < 1e18 would revert with "Unit cant be greater than existing".
+            // To avoid the revert, we fetch the latest position unit and pass it to the trade function.
+            uint256 collateralSendUnits = strategy.setToken.getDefaultPositionRealUnit(address(collateralToken)).toUint256();
+
+            _executeDexTrade(baseRebalanceUnits.abs(), collateralSendUnits, true);
         } else {
             _executeDexTrade(baseRebalanceUnits.abs(), oppositeBoundUnits, false);
         }

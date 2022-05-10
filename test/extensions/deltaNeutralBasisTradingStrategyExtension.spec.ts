@@ -1148,6 +1148,31 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
           });
         });
 
+        describe("when rebalance interval has not elapsed but is below min LR & position multiplier < 1e18", async () => {
+          beforeEach(async () => {
+            await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(900));
+            await perpV2PriceFeedMock.setPrice(BigNumber.from(900).mul(10 ** 8));
+
+            // pass time to accrue streaming fee
+            await increaseTimeAsync(ONE_DAY_IN_SECONDS.mul(7));
+
+            // collect fees to push position multiplier lower than 1e18
+            systemSetup.streamingFeeModule.connect(owner.wallet).accrueFee(setToken.address);
+          });
+
+          it("should verify initial testing conditions", async () => {
+            const currentLeverageRatio = await leverageStrategyExtension.getCurrentLeverageRatio();
+            const positionMultiplier = await setToken.positionMultiplier();
+
+            expect(positionMultiplier).to.be.lt(ether(1));
+            expect(currentLeverageRatio.abs()).to.be.lt(methodology.minLeverageRatio.abs());
+          });
+
+          it("should be able to rebalance", async () => {
+            await expect(subject()).to.not.be.reverted;
+          });
+        });
+
         describe("when rebalance interval has not elapsed below min leverage ratio and greater than max trade size", async () => {
           let newExchangeSettings: PerpV2BasisExchangeSettings;
 
