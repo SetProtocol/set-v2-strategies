@@ -21,8 +21,7 @@ pragma experimental "ABIEncoderV2";
 
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 import { IWETH } from "@setprotocol/set-protocol-v2/contracts/interfaces/external/IWETH.sol";
-// import { IWrapModuleV2 } from "@setprotocol/set-protocol-v2/contracts/interfaces/IWrapModuleV2.sol"; // need to add this to set-protocol-v2
-import { IWrapModuleV2 } from "../interfaces/IWrapModuleV2.sol";
+import { IWrapModuleV2 } from "@setprotocol/set-protocol-v2/contracts/interfaces/IWrapModuleV2.sol";
 
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";

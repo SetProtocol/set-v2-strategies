@@ -21,11 +21,9 @@ pragma experimental "ABIEncoderV2";
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-// import { IAirdropModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IAirdropModule.sol"; // need to add this to set-protocol-v2
-import { IAirdropModule } from "../interfaces/IAirdropModule.sol";
+import { IAirdropModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IAirdropModule.sol";
 import { IClaimAdapter } from "@setprotocol/set-protocol-v2/contracts/interfaces/IClaimAdapter.sol";
-// import { IClaimModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IClaimModule.sol"; // need to add this to set-protocol-v2
-import { IClaimModule } from "../interfaces/IClaimModule.sol";
+import { IClaimModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IClaimModule.sol";
 import { IIntegrationRegistry } from "@setprotocol/set-protocol-v2/contracts/interfaces/IIntegrationRegistry.sol";
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
 
