@@ -931,7 +931,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
       describe("when collateral balance is non-zero", async () => {
         beforeEach(async () => {
-          await leverageStrategyExtension.deposit(BigNumber.from(1));
+          await leverageStrategyExtension.deposit(usdc(1));
         });
 
         it("should revert", async () => {
