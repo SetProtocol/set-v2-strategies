@@ -25,11 +25,13 @@ export default class DeployGlobalExtensions {
 
   public async deployBatchTradeExtension(
     managerCore: Address,
-    tradeModule: Address
+    tradeModule: Address,
+    integrations: string[]
   ): Promise<BatchTradeExtension> {
     return await new BatchTradeExtension__factory(this._deployerSigner).deploy(
       managerCore,
       tradeModule,
+      integrations
     );
   }
 
