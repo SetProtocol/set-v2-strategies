@@ -919,9 +919,19 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         });
       });
 
+      describe("when collateral balance is non-zero but less than a position unit (must account for PERP decimal adjustment)", async () => {
+        beforeEach(async () => {
+          // Set up for test case where less than 100 USDC units are left
+        });
+
+        it("should not revert", async () => {
+          await expect(subject()).to.not.be.reverted;
+        });
+      });
+
       describe("when collateral balance is non-zero", async () => {
         beforeEach(async () => {
-          await leverageStrategyExtension.deposit(usdc(1));
+          await leverageStrategyExtension.deposit(BigNumber.from(1));
         });
 
         it("should revert", async () => {
