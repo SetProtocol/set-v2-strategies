@@ -417,7 +417,7 @@ contract ClaimExtension is BaseGlobalExtension {
 
     /**
      * ONLY OWNER: Adds a new claim integration for an existent rewardPool. If rewardPool doesn't have existing
-     * claims then rewardPool is added to rewardPoolLiost. The claim integration is associated to an adapter that
+     * claims then rewardPool is added to rewardPoolList. The claim integration is associated to an adapter that
      * provides the functionality to claim the rewards for a specific token.
      *
      * @param _setToken             Address of SetToken

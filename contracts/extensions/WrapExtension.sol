@@ -52,6 +52,12 @@ contract WrapExtension is BaseGlobalExtension {
 
     /* ============ Constructor ============ */
 
+    /**
+     * Instantiate with ManagerCore address and WrapModuleV2 address.
+     *
+     * @param _managerCore              Address of ManagerCore contract
+     * @param _wrapModule               Address of WrapModuleV2 contract
+     */
     constructor(
         IManagerCore _managerCore,
         IWrapModuleV2 _wrapModule
