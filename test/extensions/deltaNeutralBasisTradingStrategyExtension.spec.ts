@@ -919,9 +919,22 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         });
       });
 
-      describe("when collateral balance is non-zero but less than a position unit (must account for PERP decimal adjustment)", async () => {
+      describe.only("when collateral balance is non-zero but less than a position unit (must account for PERP decimal adjustment)", async () => {
         beforeEach(async () => {
-          // Set up for test case where less than 100 USDC units are left
+          await subject();
+
+          await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(950));
+          await perpV2PriceFeedMock.setPrice(BigNumber.from(950).mul(10 ** 8));
+
+          await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+
+          await leverageStrategyExtension.disengage();
+
+          await leverageStrategyExtension.withdraw(BigNumber.from(99698790));
+
+          const collateralUnits = (await perpBasisTradingModule.getAccountInfo(setToken.address)).collateralBalance;
+          console.log(collateralUnits.toString());
+
         });
 
         it("should not revert", async () => {
