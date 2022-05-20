@@ -919,22 +919,28 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         });
       });
 
-      describe.only("when collateral balance is non-zero but less than a position unit (must account for PERP decimal adjustment)", async () => {
+      describe("when collateral balance is non-zero but less than a position unit (must account for PERP decimal adjustment)", async () => {
         beforeEach(async () => {
+
           await subject();
 
-          await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(950));
-          await perpV2PriceFeedMock.setPrice(BigNumber.from(950).mul(10 ** 8));
-
+          // set funding rate to non-zero and accrue funding; allows us to shift the net collateral balance such that
+          // it no longer is an exact multiple of the total supply
+          await perpV2Setup.clearingHouseConfig.setMaxFundingRate(BigNumber.from(0.1e6));
+          await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(990));
+          await perpV2PriceFeedMock.setPrice(BigNumber.from(990).mul(10 ** 8));
           await increaseTimeAsync(ONE_DAY_IN_SECONDS);
 
           await leverageStrategyExtension.disengage();
 
-          await leverageStrategyExtension.withdraw(BigNumber.from(99698790));
+          const totalSupply = await setToken.totalSupply();
+          const accountInfo = await perpBasisTradingModule.getAccountInfo(setToken.address);
+          const netCollateral = accountInfo.collateralBalance.add(accountInfo.owedRealizedPnl);
+          const collateralUnits = toUSDCDecimals(preciseDiv(netCollateral, totalSupply));
 
-          const collateralUnits = (await perpBasisTradingModule.getAccountInfo(setToken.address)).collateralBalance;
-          console.log(collateralUnits.toString());
-
+          await leverageStrategyExtension.withdraw(collateralUnits);
+          // Left out collateral balance (in USDC decimals) = 60; Total supply = 100
+          // 60e18/100e18 < 1; Hence the re-engage should not revert
         });
 
         it("should not revert", async () => {
