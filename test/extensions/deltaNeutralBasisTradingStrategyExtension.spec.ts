@@ -919,6 +919,35 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         });
       });
 
+      describe("when collateral balance is non-zero but less than a position unit (must account for PERP decimal adjustment)", async () => {
+        beforeEach(async () => {
+
+          await subject();
+
+          // set funding rate to non-zero and accrue funding; allows us to shift the net collateral balance such that
+          // it no longer is an exact multiple of the total supply
+          await perpV2Setup.clearingHouseConfig.setMaxFundingRate(BigNumber.from(0.1e6));
+          await perpV2Setup.setBaseTokenOraclePrice(perpV2Setup.vETH, usdc(990));
+          await perpV2PriceFeedMock.setPrice(BigNumber.from(990).mul(10 ** 8));
+          await increaseTimeAsync(ONE_DAY_IN_SECONDS);
+
+          await leverageStrategyExtension.disengage();
+
+          const totalSupply = await setToken.totalSupply();
+          const accountInfo = await perpBasisTradingModule.getAccountInfo(setToken.address);
+          const netCollateral = accountInfo.collateralBalance.add(accountInfo.owedRealizedPnl);
+          const collateralUnits = toUSDCDecimals(preciseDiv(netCollateral, totalSupply));
+
+          await leverageStrategyExtension.withdraw(collateralUnits);
+          // Left out collateral balance (in USDC decimals) = 60; Total supply = 100
+          // 60e12/1e12 = 60, 60*1e18/100e18 < 1 (rounds to 0); Hence the re-engage should not revert!
+        });
+
+        it("should not revert", async () => {
+          await expect(subject()).to.not.be.reverted;
+        });
+      });
+
       describe("when collateral balance is non-zero", async () => {
         beforeEach(async () => {
           await leverageStrategyExtension.deposit(usdc(1));
