@@ -35,6 +35,7 @@ describe("ClaimExtension", () => {
   let owner: Account;
   let methodologist: Account;
   let operator: Account;
+  let ownerFeeRecipient: Account;
   let factory: Account;
 
   let deployer: DeployHelper;
@@ -44,6 +45,7 @@ describe("ClaimExtension", () => {
   let managerCore: ManagerCore;
   let delegatedManager: DelegatedManager;
   let claimExtension: ClaimExtension;
+  let ownerFeeSplit: BigNumber;
 
   let airdropModule: AirdropModule;
   let claimModule: ClaimModule;
@@ -57,6 +59,7 @@ describe("ClaimExtension", () => {
       owner,
       methodologist,
       operator,
+      ownerFeeRecipient,
       factory
     ] = await getAccounts();
 
@@ -109,6 +112,11 @@ describe("ClaimExtension", () => {
       [setV2Setup.usdc.address, setV2Setup.weth.address],
       true
     );
+
+    ownerFeeSplit = ether(0.6);
+    await delegatedManager.connect(owner.wallet).updateOwnerFeeSplit(ownerFeeSplit);
+    await delegatedManager.connect(methodologist.wallet).updateOwnerFeeSplit(ownerFeeSplit);
+    await delegatedManager.connect(owner.wallet).updateOwnerFeeRecipient(ownerFeeRecipient.address);
 
     await setToken.setManager(delegatedManager.address);
 
@@ -832,6 +840,89 @@ describe("ClaimExtension", () => {
       await setV2Setup.controller.addFee(airdropModule.address, ZERO, protocolFee);
 
       await setV2Setup.issuanceModule.issue(setToken.address, ether(1), owner.address);
+    });
+
+    describe("#distributeFees", async () => {
+      let numTokens: BigNumber;
+      let subjectToken: Address;
+      let subjectSetToken: Address;
+
+      beforeEach(async () => {
+        numTokens = ether(1);
+        await setV2Setup.dai.transfer(delegatedManager.address, numTokens);
+
+        subjectToken = setV2Setup.dai.address;
+        subjectSetToken = setToken.address;
+      });
+
+      async function subject(): Promise<ContractTransaction> {
+        return await claimExtension.distributeFees(subjectSetToken, subjectToken);
+      }
+
+      it("should send correct amount of fees to owner fee recipient and methodologist", async () => {
+        const ownerFeeRecipientBalanceBefore = await setV2Setup.dai.balanceOf(ownerFeeRecipient.address);
+        const methodologistBalanceBefore = await setV2Setup.dai.balanceOf(methodologist.address);
+
+        await subject();
+
+        const expectedOwnerTake = preciseMul(numTokens, ownerFeeSplit);
+        const expectedMethodologistTake = numTokens.sub(expectedOwnerTake);
+
+        const ownerFeeRecipientBalanceAfter = await setV2Setup.dai.balanceOf(ownerFeeRecipient.address);
+        const methodologistBalanceAfter = await setV2Setup.dai.balanceOf(methodologist.address);
+
+        const ownerFeeRecipientBalanceIncrease = ownerFeeRecipientBalanceAfter.sub(ownerFeeRecipientBalanceBefore);
+        const methodologistBalanceIncrease = methodologistBalanceAfter.sub(methodologistBalanceBefore);
+
+        expect(ownerFeeRecipientBalanceIncrease).to.eq(expectedOwnerTake);
+        expect(methodologistBalanceIncrease).to.eq(expectedMethodologistTake);
+      });
+
+      it("should emit the correct FeesDistributed event", async () => {
+        const expectedOwnerTake = preciseMul(numTokens, ownerFeeSplit);
+        const expectedMethodologistTake = numTokens.sub(expectedOwnerTake);
+
+        await expect(subject()).to.emit(claimExtension, "FeesDistributed").withArgs(
+          setToken.address,
+          setV2Setup.dai.address,
+          ownerFeeRecipient.address,
+          methodologist.address,
+          expectedOwnerTake,
+          expectedMethodologistTake
+        );;
+      });
+
+      describe("when methodologist fees are 0", async () => {
+        beforeEach(async () => {
+          await delegatedManager.connect(owner.wallet).updateOwnerFeeSplit(ether(1));
+          await delegatedManager.connect(methodologist.wallet).updateOwnerFeeSplit(ether(1));
+        });
+
+        it("should not send fees to methodologist", async () => {
+          const preMethodologistBalance = await setV2Setup.dai.balanceOf(methodologist.address);
+
+          await subject();
+
+          const postMethodologistBalance = await setV2Setup.dai.balanceOf(methodologist.address);
+          expect(postMethodologistBalance.sub(preMethodologistBalance)).to.eq(ZERO);
+        });
+      });
+
+      describe("when owner fees are 0", async () => {
+        beforeEach(async () => {
+          await delegatedManager.connect(owner.wallet).updateOwnerFeeSplit(ZERO);
+          await delegatedManager.connect(methodologist.wallet).updateOwnerFeeSplit(ZERO);
+        });
+
+        it("should not send fees to owner fee recipient", async () => {
+          const preOwnerFeeRecipientBalance = await setV2Setup.dai.balanceOf(owner.address);
+
+          await subject();
+
+          const postOwnerFeeRecipientBalance = await setV2Setup.dai.balanceOf(owner.address);
+          expect(postOwnerFeeRecipientBalance.sub(preOwnerFeeRecipientBalance)).to.eq(ZERO);
+        });
+      });
     });
 
     describe("#batchAbsorb", async () => {

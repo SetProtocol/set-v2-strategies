@@ -20,12 +20,14 @@ pragma solidity 0.6.10;
 pragma experimental "ABIEncoderV2";
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
 
 import { IAirdropModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IAirdropModule.sol";
 import { IClaimAdapter } from "@setprotocol/set-protocol-v2/contracts/interfaces/IClaimAdapter.sol";
 import { IClaimModule } from "@setprotocol/set-protocol-v2/contracts/interfaces/IClaimModule.sol";
 import { IIntegrationRegistry } from "@setprotocol/set-protocol-v2/contracts/interfaces/IIntegrationRegistry.sol";
 import { ISetToken } from "@setprotocol/set-protocol-v2/contracts/interfaces/ISetToken.sol";
+import { PreciseUnitMath } from "@setprotocol/set-protocol-v2/contracts/lib/PreciseUnitMath.sol";
 
 import { BaseGlobalExtension } from "../lib/BaseGlobalExtension.sol";
 import { IDelegatedManager } from "../interfaces/IDelegatedManager.sol";
@@ -42,12 +44,23 @@ import { IManagerCore } from "../interfaces/IManagerCore.sol";
  *     and absorb them into the SetToken's positions in a single transaction
  */
 contract ClaimExtension is BaseGlobalExtension {
+    using PreciseUnitMath for uint256;
+    using SafeMath for uint256;
 
     /* ============ Events ============ */
 
     event ClaimExtensionInitialized(
         address indexed _setToken,
         address indexed _delegatedManager
+    );
+
+    event FeesDistributed(
+        address _setToken,                         // Address of SetToken which generated the airdrop fees
+        address _token,                            // Address of the token to distribute
+        address indexed _ownerFeeRecipient,        // Address which receives the owner's take of the fees
+        address indexed _methodologist,            // Address of methodologist
+        uint256 _ownerTake,                        // Amount of _token distributed to owner
+        uint256 _methodologistTake                 // Amount of _token distributed to methodologist
     );
 
     /* ============ Modifiers ============ */
@@ -112,6 +125,47 @@ contract ClaimExtension is BaseGlobalExtension {
     }
 
     /* ============ External Functions ============ */
+
+    /**
+     * ANYONE CALLABLE: Distributes airdrop fees accrued to the DelegatedManager. Calculates fees for
+     * owner and methodologist, and sends to owner fee recipient and methodologist respectively.
+     *
+     * @param _setToken                 Address of SetToken
+     * @param _token                    Address of token to distribute
+     */
+    function distributeFees(
+        ISetToken _setToken,
+        IERC20 _token
+    )
+        public
+    {
+        IDelegatedManager delegatedManager = _manager(_setToken);
+
+        uint256 totalFees = _token.balanceOf(address(delegatedManager));
+
+        address methodologist = delegatedManager.methodologist();
+        address ownerFeeRecipient = delegatedManager.ownerFeeRecipient();
+
+        uint256 ownerTake = totalFees.preciseMul(delegatedManager.ownerFeeSplit());
+        uint256 methodologistTake = totalFees.sub(ownerTake);
+
+        if (ownerTake > 0) {
+            delegatedManager.transferTokens(address(_token), ownerFeeRecipient, ownerTake);
+        }
+
+        if (methodologistTake > 0) {
+            delegatedManager.transferTokens(address(_token), methodologist, methodologistTake);
+        }
+
+        emit FeesDistributed(
+            address(_setToken),
+            address(_token),
+            ownerFeeRecipient,
+            methodologist,
+            ownerTake,
+            methodologistTake
+        );
+    }
 
     /**
      * ONLY OWNER: Initializes AirdropModule on the SetToken associated with the DelegatedManager.
