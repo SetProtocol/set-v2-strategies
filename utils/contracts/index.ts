@@ -19,3 +19,5 @@ export { IssuanceExtension } from "../../typechain/IssuanceExtension";
 export { StreamingFeeSplitExtension } from "../../typechain/StreamingFeeSplitExtension";
 export { BatchTradeExtension } from "../../typechain/BatchTradeExtension";
 export { TradeAdapterMock } from "../../typechain/TradeAdapterMock";
+export { WrapExtension } from "../../typechain/WrapExtension";
+export { ClaimExtension } from "../../typechain/ClaimExtension";

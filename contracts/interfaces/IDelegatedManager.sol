@@ -33,7 +33,7 @@ interface IDelegatedManager {
     function updateOwnerFeeRecipient(address _newFeeRecipient) external;
 
     function setMethodologist(address _newMethodologist) external;
-    
+
     function transferOwnership(address _owner) external;
 
     function setToken() external view returns(ISetToken);
@@ -41,6 +41,7 @@ interface IDelegatedManager {
     function methodologist() external view returns(address);
     function operatorAllowlist(address _operator) external view returns(bool);
     function assetAllowlist(address _asset) external view returns(bool);
+    function useAssetAllowlist() external view returns(bool);
     function isAllowedAsset(address _asset) external view returns(bool);
     function isPendingExtension(address _extension) external view returns(bool);
     function isInitializedExtension(address _extension) external view returns(bool);
