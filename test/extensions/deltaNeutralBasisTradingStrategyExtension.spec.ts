@@ -940,7 +940,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
 
           await leverageStrategyExtension.withdraw(collateralUnits);
           // Left out collateral balance (in USDC decimals) = 60; Total supply = 100
-          // 60e18/100e18 < 1; Hence the re-engage should not revert
+          // 60e12/1e12 = 60, 60*1e18/100e18 < 1 (rounds to 0); Hence the re-engage should not revert!
         });
 
         it("should not revert", async () => {

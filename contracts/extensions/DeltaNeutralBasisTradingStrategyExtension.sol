@@ -1169,7 +1169,7 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         // Check that there is zero position unit of USDC of collateral value. Allows to neglect dust amounts.
         require(
             engageInfo.accountInfo.collateralBalance
-                .fromPreciseUnitToDecimals(collateralDecimals)
+                .fromPreciseUnitToDecimals(collateralDecimals)              // PERP returns 18 decimal number, must convert for logic to work
                 .preciseDiv(engageInfo.setTotalSupply.toInt256()) == 0,
             "PerpV2 collateral balance must be 0"
         );
