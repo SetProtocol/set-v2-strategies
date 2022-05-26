@@ -1113,13 +1113,22 @@ contract DeltaNeutralBasisTradingStrategyExtension is BaseExtension {
         int256 _newLeverageRatio
     )
         internal
-        pure
+        view
         returns (int256, int256)
     {
         // Calculate difference between new and current leverage ratio
         int256 leverageRatioDifference = _newLeverageRatio.sub(_leverageInfo.currentLeverageRatio);
         int256 denominator = _leverageInfo.currentLeverageRatio.preciseMul(PreciseUnitMath.preciseUnitInt().sub(_newLeverageRatio));
         int256 totalRebalanceNotional = leverageRatioDifference.preciseMul(_leverageInfo.action.baseBalance).preciseDiv(denominator);
+
+        if (totalRebalanceNotional > 0) {
+            // When decreasing our short position on PerpV2, we would also be selling spot position to decrease spot exposure and
+            // maintain delta-neutrality. `spotNotional` is the max amount of spot we can sell and totalRebalanceNotional should
+            // be <= spotNotional.
+            uint256 spotUnits = strategy.setToken.getDefaultPositionRealUnit(strategy.spotAssetAddress).toUint256();
+            uint256 spotNotional = spotUnits.preciseMul(_leverageInfo.action.setTotalSupply);
+            totalRebalanceNotional = Math.min(totalRebalanceNotional.abs(), spotNotional).toInt256();
+        }
 
         uint256 chunkRebalanceNotionalAbs = Math.min(totalRebalanceNotional.abs(), _leverageInfo.twapMaxTradeSize);
         return (
