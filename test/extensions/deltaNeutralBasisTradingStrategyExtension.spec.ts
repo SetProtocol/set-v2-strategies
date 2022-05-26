@@ -2412,6 +2412,42 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
             expect(usdcPositionUnit).to.eq(ZERO);
           });
 
+          describe("when base token position unit is greater than spot unit", async () => {
+            let extraUnits: BigNumber;
+
+            beforeEach(async () => {
+              extraUnits = TWO;
+
+              await baseManager.setManager(owner.wallet.address);
+
+              // Increase vETH short position by 2 units
+              await perpBasisTradingModule.connect(owner.wallet).trade(
+                setToken.address,
+                strategy.virtualBaseAddress,
+                extraUnits.mul(-1),
+                ZERO
+              );
+
+              await setToken.setManager(baseManager.address);
+            });
+
+            it("verify testing condition", async () => {
+              const baseUnit = (await perpBasisTradingModule.getPositionUnitInfo(setToken.address))[0].baseUnit;
+              const spotUnit = await setToken.getDefaultPositionRealUnit(spotAsset.address);
+              expect(baseUnit.abs()).to.be.gt(spotUnit);
+            });
+
+            it("should disengage max spot notional amount", async () => {
+              await subject();
+
+              const baseUnitAfter = (await perpBasisTradingModule.getPositionUnitInfo(setToken.address))[0].baseUnit;
+              const spotUnitAfter = await setToken.getDefaultPositionRealUnit(spotAsset.address);
+
+              expect(spotUnitAfter).eq(ZERO);
+              expect(baseUnitAfter.abs()).eq(extraUnits);
+            });
+          });
+
           describe("when SetToken has 0 supply", async () => {
             beforeEach(async () => {
               const totalSupply = await setToken.totalSupply();
@@ -2956,7 +2992,7 @@ describe("DeltaNeutralBasisTradingStrategyExtension", () => {
         beforeEach(async () => {
           subjectExchangeSettings = {
             ...exchange,
-            exchangeName:"UniswapV3ExchangeAdapter"       // v1 exchange adapter
+            exchangeName: "UniswapV3ExchangeAdapter"       // v1 exchange adapter
           };
         });
 
